@@ -27,7 +27,7 @@ Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/pla
 | M1.3 | Compose and Caddy | Done | [M1.3](M1.3-compose-caddy.md) |
 | M1.4 | CI pipeline | Done | [M1.4](M1.4-ci.md) |
 | M2.1 | Database package, roles, RLS | Done | [M2.1](M2.1-database-rls.md) |
-| M2.2 | Tenant context and `withTenant` | Not started | — |
+| M2.2 | Tenant context and `withTenant` | Done | [M2.2](M2.2-tenant-security.md) |
 | M2.3 | Authentication | Not started | — |
 | M2.4 | Organizations, products, environments, RBAC guard | Not started | — |
 | M2.5 | Audit log | Not started | — |
