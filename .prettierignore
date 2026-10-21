@@ -3,3 +3,4 @@ pnpm-lock.yaml
 **/.next
 **/src/generated
 *.md
+**/generated

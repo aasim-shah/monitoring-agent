@@ -1,0 +1,220 @@
+// Product Control Plane — identity and tenancy schema (master plan M2.1).
+// Tables are snake_case plural; models are PascalCase singular (`@@map`).
+// Row-level security, roles, and SECURITY DEFINER functions are defined in the
+// SQL migrations, not here (Prisma does not model them).
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  owner
+  admin
+  operator
+  analyst
+  viewer
+
+  @@map("member_role")
+}
+
+enum EmailTokenKind {
+  verify
+  reset
+
+  @@map("email_token_kind")
+}
+
+// ---------- Global identity (no tenant column, no RLS) ----------
+
+model User {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Stored lowercase.
+  email            String    @unique
+  passwordHash     String?   @map("password_hash")
+  emailVerifiedAt  DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  googleSub        String?   @unique @map("google_sub")
+  /// Serialized EncryptedSecret (@pcp/secrets); AAD "user:<id>:mfa".
+  mfaSecret        String?   @map("mfa_secret")
+  mfaPendingSecret String?   @map("mfa_pending_secret")
+  mfaEnabledAt     DateTime? @map("mfa_enabled_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sessions      Session[]
+  emailTokens   EmailToken[]
+  recoveryCodes MfaRecoveryCode[]
+  memberships   OrganizationMember[]
+
+  @@map("users")
+}
+
+model Session {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  tokenHash   String    @unique @map("token_hash")
+  mfaVerified Boolean   @default(false) @map("mfa_verified")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model EmailToken {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  kind      EmailTokenKind
+  tokenHash String         @unique @map("token_hash")
+  expiresAt DateTime       @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime?      @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
+  @@map("email_tokens")
+}
+
+model MfaRecoveryCode {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
+  @@map("mfa_recovery_codes")
+}
+
+// ---------- Tenant tables (RLS forced) ----------
+
+model Organization {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  timezone  String   @default("UTC")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  members     OrganizationMember[]
+  invitations Invitation[]
+  products    Product[]
+  teams       Team[]
+  auditLogs   AuditLog[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String     @map("organization_id") @db.Uuid
+  userId         String     @map("user_id") @db.Uuid
+  role           MemberRole
+  /// true = all products; false = only productIds.
+  allProducts    Boolean    @default(true) @map("all_products")
+  productIds     String[]   @default([]) @map("product_ids") @db.Uuid
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@unique([organizationId, id])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+model Invitation {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String     @map("organization_id") @db.Uuid
+  /// Stored lowercase.
+  email           String
+  role            MemberRole
+  allProducts     Boolean    @default(true) @map("all_products")
+  productIds      String[]   @default([]) @map("product_ids") @db.Uuid
+  tokenHash       String     @unique @map("token_hash")
+  invitedByUserId String     @map("invited_by_user_id") @db.Uuid
+  expiresAt       DateTime   @map("expires_at") @db.Timestamptz(6)
+  acceptedAt      DateTime?  @map("accepted_at") @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("invitations")
+}
+
+model Product {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  description    String?
+  /// Discovery hints, not proof of ownership.
+  domains        String[] @default([])
+  repositories   String[] @default([])
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  environments Environment[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, name])
+  @@map("products")
+}
+
+model Environment {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  name           String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, id])
+  @@unique([productId, name])
+  @@map("environments")
+}
+
+model Team {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, name])
+  @@map("teams")
+}
+
+/// Append-only: pcp_app has no UPDATE or DELETE privilege.
+model AuditLog {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  actorType      String   @map("actor_type")
+  actorId        String?  @map("actor_id")
+  action         String
+  targetType     String   @map("target_type")
+  targetId       String?  @map("target_id")
+  metadata       Json     @default("{}")
+  requestId      String?  @map("request_id")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
