@@ -1,0 +1,105 @@
+# Handoff Board
+
+Status of every master-plan task. Each started task has a handoff document in this folder (`<task-id>-<slug>.md`) describing what was delivered, how to verify it, test results, decisions, limitations, and next steps.
+
+Status values: **Done** (complete, tests green), **In progress** (work started, handoff describes current state), **Awaiting approval** (delivered, needs a human decision), **Not started**.
+
+Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/plans/2026-10-22-m0-m1-foundation.md`
+
+| Task | Title | Status | Handoff |
+|---|---|---|---|
+| M0.1 | Repository bootstrap and ADRs | Not started | — |
+| M0.2 | Shared contracts packages | Not started | — |
+| M0.3 | Threat model and data classification | Not started | — |
+| M0.4 | OpenAPI v1 draft | Not started | — |
+| M1.1 | Monorepo tooling | Done | [M1.1](M1.1-monorepo-tooling.md) |
+| M1.2 | Application skeletons | Not started | — |
+| M1.3 | Compose and Caddy | Not started | — |
+| M1.4 | CI pipeline | Not started | — |
+| M2.1 | Database package, roles, RLS | Not started | — |
+| M2.2 | Tenant context and `withTenant` | Not started | — |
+| M2.3 | Authentication | Not started | — |
+| M2.4 | Organizations, products, environments, RBAC guard | Not started | — |
+| M2.5 | Audit log | Not started | — |
+| M2.6 | Members and invitations | Not started | — |
+| M3.1 | Web foundation | Not started | — |
+| M3.2 | Organization, product, environment, member, audit screens | Not started | — |
+| M3.3 | Typed API client | Not started | — |
+| M4.1 | Envelope encryption | Not started | — |
+| M4.2 | Connector SDK runtime | Not started | — |
+| M4.3 | Connection lifecycle and registry | Not started | — |
+| M4.4 | Job framework | Not started | — |
+| M5.1 | Agent CA and certificate issuance | Not started | — |
+| M5.2 | Enrollment | Not started | — |
+| M5.3 | mTLS edge and agent authentication | Not started | — |
+| M5.4 | Heartbeats and fleet status | Not started | — |
+| M5.5 | Tasks and streams | Not started | — |
+| M5.6 | Rotation and revocation | Not started | — |
+| M5.7 | Fleet UI | Not started | — |
+| M6.1 | Agent distribution build | Not started | — |
+| M6.2 | `pcp-agentctl` | Not started | — |
+| M6.3 | `pcpcontrol` extension (heartbeat, tasks, discovery) | Not started | — |
+| M6.4 | OpAMP server and supervisor | Not started | — |
+| M6.5 | Ingest gateway | Not started | — |
+| M6.6 | Telemetry query module | Not started | — |
+| M6.7 | Installer and systemd units | Not started | — |
+| M6.8 | Host overview UI | Not started | — |
+| M7.1 | Webhook ingestion framework | Not started | — |
+| M7.2 | Cloudflare connector | Not started | — |
+| M7.3 | GitHub connector | Not started | — |
+| M7.4 | Prometheus (Mode A) and Grafana connectors | Not started | — |
+| M7.5 | Integrations UI | Not started | — |
+| M8.1 | Private connector worker | Not started | — |
+| M8.2 | Database connectors | Not started | — |
+| M8.3 | Custom REST connector and SSRF guard | Not started | — |
+| M9.1 | Observation pipeline | Not started | — |
+| M9.2 | Correlation rules | Not started | — |
+| M9.3 | Graph API and traversal | Not started | — |
+| M9.4 | Topology, inventory, review UI | Not started | — |
+| M10.1 | Pack schema and loader | Not started | — |
+| M10.2 | Pack compiler | Not started | — |
+| M10.3 | Pack catalog | Not started | — |
+| M10.4 | Detection, proposals, credential delivery | Not started | — |
+| M10.5 | Level 2 guidance | Not started | — |
+| M10.6 | Usage and limits UI | Not started | — |
+| M10.7 | Live boost | Not started | — |
+| M10.8 | Service dashboards | Not started | — |
+| M11.1 | Live tail | Not started | — |
+| M11.2 | Log-derived metrics | Not started | — |
+| M12.1 | Alert rules and compiler | Not started | — |
+| M12.2 | Alert receiver and incident engine | Not started | — |
+| M12.3 | Notifications | Not started | — |
+| M12.4 | Incident UI | Not started | — |
+| M13.1 | Google OAuth framework | Not started | — |
+| M13.2 | GA4 connector | Not started | — |
+| M13.3 | Firebase, Play, Search Console, BigQuery exports | Not started | — |
+| M13.4 | Google Ads connector (gated on developer token) | Not started | — |
+| M13.5 | Website monitoring | Not started | — |
+| M13.6 | KPI definitions and freshness | Not started | — |
+| M13.7 | Analytics, ads, website, mobile screens | Not started | — |
+| M14.1 | LLM provider layer | Not started | — |
+| M14.2 | Tool registry | Not started | — |
+| M14.3 | Orchestration loop and validation | Not started | — |
+| M14.4 | Chat UI | Not started | — |
+| M15.1 | Templates and schedules | Not started | — |
+| M15.2 | Report generator | Not started | — |
+| M15.3 | Delivery | Not started | — |
+| M16.1 | Action engine | Not started | — |
+| M16.2 | Adapters | Not started | — |
+| M16.3 | `pcp-helper` | Not started | — |
+| M16.4 | Approvals UI | Not started | — |
+| M17.1 | Fleet install UX | Not started | — |
+| M17.2 | Fleet tooling | Not started | — |
+| M17.3 | Installer runner (assisted SSH, opt-in) | Not started | — |
+| M18.1 | Retained logs | Not started | — |
+| M18.2 | Data inspection | Not started | — |
+| M18.3 | Level 1 managed exporters | Not started | — |
+| M18.4 | Long-term rollups | Not started | — |
+| M19.1 | Security hardening | Not started | — |
+| M19.2 | Load tests | Not started | — |
+| M19.3 | Backup and restore | Not started | — |
+| M19.4 | Self-hosted packaging | Not started | — |
+| M19.5 | Platform self-monitoring | Not started | — |
+| M19.6 | Documentation | Not started | — |
+| M19.7 | Pilot | Not started | — |
+| M19.8 | Tenant data export and deletion | Not started | — |
