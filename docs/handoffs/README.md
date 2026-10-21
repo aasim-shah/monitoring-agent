@@ -28,14 +28,14 @@ Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/pla
 | M1.4 | CI pipeline | Done | [M1.4](M1.4-ci.md) |
 | M2.1 | Database package, roles, RLS | Done | [M2.1](M2.1-database-rls.md) |
 | M2.2 | Tenant context and `withTenant` | Done | [M2.2](M2.2-tenant-security.md) |
-| M2.3 | Authentication | Not started | — |
+| M2.3 | Authentication | In progress | [M2.3 part 1](M2.3-identity-primitives.md) |
 | M2.4 | Organizations, products, environments, RBAC guard | Not started | — |
 | M2.5 | Audit log | Not started | — |
 | M2.6 | Members and invitations | Not started | — |
 | M3.1 | Web foundation | Not started | — |
 | M3.2 | Organization, product, environment, member, audit screens | Not started | — |
 | M3.3 | Typed API client | Not started | — |
-| M4.1 | Envelope encryption | Not started | — |
+| M4.1 | Envelope encryption | In progress | [M4.1 (with M2.3)](M2.3-identity-primitives.md) |
 | M4.2 | Connector SDK runtime | Not started | — |
 | M4.3 | Connection lifecycle and registry | Not started | — |
 | M4.4 | Job framework | Not started | — |

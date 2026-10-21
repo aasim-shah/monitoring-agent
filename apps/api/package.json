@@ -17,7 +17,13 @@
     "@pcp/health": "workspace:*",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
-    "zod": "3.25.76"
+    "zod": "3.25.76",
+    "@node-rs/argon2": "2.2.2",
+    "@pcp/database": "workspace:*",
+    "@pcp/secrets": "workspace:*",
+    "@pcp/shared-contracts": "workspace:*",
+    "@pcp/tenant-security": "workspace:*",
+    "ioredis": "5.11.1"
   },
   "devDependencies": {
     "@nestjs/testing": "11.2.7",
@@ -26,6 +32,7 @@
     "eslint": "9.39.5",
     "typescript": "5.9.3",
     "unplugin-swc": "1.5.11",
-    "vitest": "3.2.7"
+    "vitest": "3.2.7",
+    "@pcp/test-support": "workspace:*"
   }
 }
