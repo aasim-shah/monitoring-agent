@@ -4,7 +4,7 @@ Status of every master-plan task. Each started task has a handoff document in th
 
 Status values: **Done** (complete, tests green), **In progress** (work started, handoff describes current state), **Awaiting approval** (delivered, needs a human decision), **Not started**.
 
-Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/plans/2026-10-22-m0-m1-foundation.md`
+Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/plans/2026-10-22-m0-m1-foundation.md` · Execution log: [M0-M1-execution-log.md](M0-M1-execution-log.md)
 
 ## Milestone summary
 
