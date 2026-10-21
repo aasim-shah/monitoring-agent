@@ -1,0 +1,195 @@
+# Product Control Plane — Docker Compose stack (master plan M1.3, spec §17).
+# Only Caddy publishes ports. Data services live on the internal network.
+name: pcp
+
+x-node-env: &node-env
+  DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-managed}
+  BOOTSTRAP_MODE: ${BOOTSTRAP_MODE:-private_http}
+  NODE_ENV: production
+
+x-database-url: &database-url postgres://pcp:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (see .env.example)}@postgres:5432/pcp
+x-redis-url: &redis-url redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set (see .env.example)}@redis:6379
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    command: ["caddy", "run", "--config", "/etc/caddy/${CADDY_CONFIG:-Caddyfile.bootstrap}", "--adapter", "caddyfile"]
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-app.example.com}
+      AGENT_DOMAIN: ${AGENT_DOMAIN:-agent.example.com}
+      INGEST_DOMAIN: ${INGEST_DOMAIN:-ingest.example.com}
+      ACME_EMAIL: ${ACME_EMAIL:-ops@example.com}
+    volumes:
+      - ./infrastructure/caddy:/etc/caddy:ro
+      - ${AGENT_CA_DIR:-./infrastructure/caddy/agent-ca}:/etc/caddy-agent-ca:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [edge]
+    depends_on:
+      api: { condition: service_healthy }
+      web: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    environment:
+      <<: *node-env
+      PORT: "3001"
+      HOSTNAME: 0.0.0.0
+    networks: [edge]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3001/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy: { resources: { limits: { memory: 512m } } }
+    restart: unless-stopped
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    environment:
+      <<: *node-env
+      API_PORT: "3000"
+      DATABASE_URL: *database-url
+      REDIS_URL: *redis-url
+    networks: [edge, internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy: { resources: { limits: { memory: 512m } } }
+    restart: unless-stopped
+
+  worker:
+    build: { context: ., dockerfile: apps/worker/Dockerfile }
+    environment:
+      <<: *node-env
+      WORKER_HEALTH_PORT: "3002"
+      REDIS_URL: *redis-url
+    networks: [internal]
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3002/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy: { resources: { limits: { memory: 512m } } }
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: pcp
+      POSTGRES_DB: pcp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (see .env.example)}
+    volumes: [pg-data:/var/lib/postgresql/data]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pcp -d pcp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy: { resources: { limits: { memory: 1g } } }
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.6-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set (see .env.example)}", "--appendonly", "yes"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set (see .env.example)}
+    volumes: [redis-data:/data]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy: { resources: { limits: { memory: 512m } } }
+    restart: unless-stopped
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.126.0
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=15d
+      - -dedup.minScrapeInterval=1s
+      - -httpListenAddr=:8428
+    volumes: [vm-data:/storage]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8428/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy: { resources: { limits: { memory: 1g } } }
+    restart: unless-stopped
+
+  vmalert:
+    image: victoriametrics/vmalert:v1.126.0
+    command:
+      - -datasource.url=http://victoriametrics:8428
+      - -rule=/etc/vmalert/rules/*.yaml
+      - -evaluationInterval=1m
+      - -notifier.blackhole
+      - -httpListenAddr=:8880
+    volumes: [./infrastructure/telemetry/rules:/etc/vmalert/rules:ro]
+    networks: [internal]
+    depends_on:
+      victoriametrics: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8880/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  opamp-server:
+    build: { context: ., dockerfile: apps/opamp-server/Dockerfile }
+    environment:
+      OPAMP_PORT: "4320"
+    networks: [edge, internal]
+    healthcheck:
+      test: ["CMD", "/app/service", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+
+  ingest-gateway:
+    build: { context: ., dockerfile: apps/ingest-gateway/Dockerfile }
+    environment:
+      INGEST_PORT: "4318"
+    networks: [edge, internal]
+    depends_on:
+      victoriametrics: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/app/service", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+
+volumes:
+  caddy-data: {}
+  caddy-config: {}
+  pg-data: {}
+  redis-data: {}
+  vm-data: {}

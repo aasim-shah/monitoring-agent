@@ -1,0 +1,3 @@
+# Platform rule groups. Tenant rule groups are generated into this directory as
+# tenant-<orgId>.yaml by the alert rule compiler (master plan M12.1, D17).
+groups: []

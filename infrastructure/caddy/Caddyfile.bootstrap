@@ -1,0 +1,27 @@
+# Private HTTP bootstrap (master plan D2). Serves the dashboard and API over plain HTTP
+# for first-admin setup. Agent enrollment, OAuth callbacks, and webhooks are refused
+# until HTTPS is configured with Caddyfile.production.
+{
+	auto_https off
+}
+
+:80 {
+	request_header -X-Client-Cert-Fingerprint
+
+	@https_only path /agent/* /webhooks/* /api/v1/oauth/*
+	handle @https_only {
+		respond "HTTPS required: configure Caddyfile.production before enrolling agents or connecting providers" 503
+	}
+
+	handle /healthz {
+		reverse_proxy api:3000
+	}
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		reverse_proxy web:3001
+	}
+}

@@ -1,0 +1,73 @@
+# Production TLS configuration (spec §17.3, master plan D10).
+# app.    dashboard + user API + webhooks
+# agent.  agent control channel, mTLS required
+# ingest. telemetry ingest, mTLS required
+{
+	email {$ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
+
+(agent_mtls) {
+	tls {
+		client_auth {
+			mode require_and_verify
+			trust_pool file /etc/caddy-agent-ca/chain.pem
+		}
+	}
+}
+
+{$APP_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+	request_header -X-Client-Cert-Fingerprint
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle /webhooks/* {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		reverse_proxy web:3001
+	}
+}
+
+{$AGENT_DOMAIN} {
+	import agent_mtls
+	import security_headers
+
+	handle /agent/v1/opamp* {
+		reverse_proxy opamp-server:4320 {
+			header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+		}
+	}
+
+	handle /agent/v1/* {
+		reverse_proxy api:3000 {
+			header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+		}
+	}
+
+	handle {
+		respond 404
+	}
+}
+
+{$INGEST_DOMAIN} {
+	import agent_mtls
+	import security_headers
+
+	reverse_proxy ingest-gateway:4318 {
+		header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+	}
+}
