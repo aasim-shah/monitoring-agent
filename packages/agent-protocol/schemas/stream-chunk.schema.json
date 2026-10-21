@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcp.local/agent-protocol/stream-chunk.schema.json",
+  "title": "StreamChunk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sessionId", "sequence", "lines", "final", "sentAt"],
+  "properties": {
+    "sessionId": { "type": "string", "format": "uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "lines": { "type": "array", "items": { "type": "string" }, "maxItems": 1000 },
+    "final": { "type": "boolean" },
+    "sentAt": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcp.local/agent-protocol/agent-task.schema.json",
+  "title": "AgentTask",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "expiresAt", "resourceScope", "maxRuntimeSeconds", "maxResponseBytes", "payload", "signature"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "type": { "type": "string", "enum": ["live_boost", "log_tail", "inspect", "action", "pack_install", "connector_op"] },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "resourceScope": { "type": "object", "additionalProperties": { "type": "string" } },
+    "maxRuntimeSeconds": { "type": "integer", "minimum": 1 },
+    "maxResponseBytes": { "type": "integer", "minimum": 1 },
+    "approvalId": { "type": "string" },
+    "payload": { "type": "object", "additionalProperties": true },
+    "signature": { "type": "string" }
+  }
+}

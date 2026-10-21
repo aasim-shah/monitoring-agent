@@ -16,19 +16,19 @@ Multi-tenant AI Product Operations Control Plane. It connects to a customer's ex
 ## Requirements
 
 - Node.js 22 or newer (`.nvmrc`)
-- pnpm 9.15.9 through corepack: `corepack pnpm <command>` (or `corepack enable` once)
+- pnpm 9.15.9 through corepack: run `corepack enable` once so `pnpm` is on `PATH` (Turborepo needs the `pnpm` binary)
 - Docker with Compose v2
 - Go 1.23 (optional locally; `scripts/go.sh` runs Go in Docker)
 
 ## Common commands
 
 ```bash
-corepack pnpm install          # install dependencies
-corepack pnpm build            # build all packages and apps
-corepack pnpm lint             # lint
-corepack pnpm typecheck        # type-check
-corepack pnpm test             # unit tests (all packages)
-corepack pnpm test:repo        # repository checks (ADRs, threat model, OpenAPI, CI)
+pnpm install          # install dependencies
+pnpm build            # build all packages and apps
+pnpm lint             # lint
+pnpm typecheck        # type-check
+pnpm test             # unit tests (all packages)
+pnpm test:repo        # repository checks (ADRs, threat model, OpenAPI, CI)
 ```
 
 ## Repository layout

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcp.local/agent-protocol/enroll-request.schema.json",
+  "title": "EnrollRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "enrollmentToken", "agentVersion", "agentType", "csrPem", "x25519PublicKey", "host"],
+  "properties": {
+    "protocolVersion": { "type": "string", "const": "1.0" },
+    "enrollmentToken": { "type": "string", "minLength": 16 },
+    "agentVersion": { "type": "string" },
+    "agentType": { "type": "string", "enum": ["host", "private_worker"] },
+    "csrPem": { "type": "string" },
+    "x25519PublicKey": { "type": "string" },
+    "host": {
+      "title": "EnrollRequestHost",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostname", "machineId", "os", "arch"],
+      "properties": {
+        "hostname": { "type": "string" },
+        "machineId": { "type": "string" },
+        "os": { "type": "string" },
+        "arch": { "type": "string" }
+      }
+    }
+  }
+}

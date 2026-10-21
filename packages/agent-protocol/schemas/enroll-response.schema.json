@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcp.local/agent-protocol/enroll-response.schema.json",
+  "title": "EnrollResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentId", "certificatePem", "chainPem", "notAfter", "controlUrl", "ingestUrl", "opampUrl", "taskSigningPublicKey"],
+  "properties": {
+    "agentId": { "type": "string", "format": "uuid" },
+    "certificatePem": { "type": "string" },
+    "chainPem": { "type": "string" },
+    "notAfter": { "type": "string", "format": "date-time" },
+    "controlUrl": { "type": "string", "format": "uri" },
+    "ingestUrl": { "type": "string", "format": "uri" },
+    "opampUrl": { "type": "string", "format": "uri" },
+    "taskSigningPublicKey": { "type": "string" }
+  }
+}

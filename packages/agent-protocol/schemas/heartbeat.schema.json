@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcp.local/agent-protocol/heartbeat.schema.json",
+  "title": "Heartbeat",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "sequence", "agentVersion", "policyVersion", "capabilities", "health", "queueDepth", "sentAt"],
+  "properties": {
+    "protocolVersion": { "type": "string", "const": "1.0" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "agentVersion": { "type": "string" },
+    "policyVersion": { "type": "integer", "minimum": 0 },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "lastSuccessfulCollection": { "type": "string", "format": "date-time" },
+    "health": { "type": "string", "enum": ["ok", "degraded"] },
+    "queueDepth": { "type": "integer", "minimum": 0 },
+    "sentAt": { "type": "string", "format": "date-time" }
+  }
+}
