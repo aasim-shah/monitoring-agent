@@ -45,7 +45,8 @@ function goType(prop, nestedName, structs) {
         structs.push(goStruct(name, prop, structs));
         return name;
       }
-      if (prop.additionalProperties && prop.additionalProperties.type === 'string') return 'map[string]string';
+      if (prop.additionalProperties && prop.additionalProperties.type === 'string')
+        return 'map[string]string';
       return 'map[string]any';
     default:
       throw new Error(`unsupported schema type ${prop.type}`);

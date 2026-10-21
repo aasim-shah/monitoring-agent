@@ -43,7 +43,12 @@ test('every operation declares security and a unique operationId', () => {
 
 test('security schemes match the design', () => {
   const schemes = doc.components?.securitySchemes ?? {};
-  assert.deepEqual(Object.keys(schemes).sort(), ['agentMtls', 'internalToken', 'sessionCookie', 'webhookSignature']);
+  assert.deepEqual(Object.keys(schemes).sort(), [
+    'agentMtls',
+    'internalToken',
+    'sessionCookie',
+    'webhookSignature',
+  ]);
   assert.equal(schemes.sessionCookie.in, 'cookie');
   assert.equal(schemes.sessionCookie.name, 'pcp_session');
   assert.equal(schemes.agentMtls.type, 'mutualTLS');

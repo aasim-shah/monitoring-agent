@@ -38,7 +38,7 @@ paths:
       description: Sign up with email and password.
       security: []
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
+        '202': { $ref: '#/components/responses/Accepted' }
   /api/v1/auth/verify:
     post:
       operationId: authVerify
@@ -47,7 +47,7 @@ paths:
       description: Verify email address.
       security: []
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
+        '204': { $ref: '#/components/responses/NoContent' }
   /api/v1/auth/login:
     post:
       operationId: authLogin
@@ -56,41 +56,41 @@ paths:
       description: Log in with password.
       security: []
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /api/v1/auth/logout:
     post:
       operationId: authLogout
       tags: [identity]
       summary: Log out
       description: Log out.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/auth/mfa/enroll:
     post:
       operationId: authMfaEnroll
       tags: [identity]
       summary: Start TOTP enrollment
       description: Start TOTP enrollment.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/auth/mfa/verify:
     post:
       operationId: authMfaVerify
       tags: [identity]
       summary: Verify TOTP code
       description: Verify TOTP code.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/auth/password/reset-request:
     post:
       operationId: authPasswordResetRequest
@@ -99,7 +99,7 @@ paths:
       description: Request password reset email.
       security: []
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
+        '202': { $ref: '#/components/responses/Accepted' }
   /api/v1/auth/password/reset:
     post:
       operationId: authPasswordReset
@@ -108,7 +108,7 @@ paths:
       description: Reset password with token.
       security: []
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
+        '204': { $ref: '#/components/responses/NoContent' }
   /api/v1/auth/google/start:
     get:
       operationId: authGoogleStart
@@ -117,7 +117,7 @@ paths:
       description: Start Google login (openid email profile only).
       security: []
       responses:
-        '302': {$ref: '#/components/responses/Redirect'}
+        '302': { $ref: '#/components/responses/Redirect' }
   /api/v1/auth/google/callback:
     get:
       operationId: authGoogleCallback
@@ -126,580 +126,580 @@ paths:
       description: Google login callback.
       security: []
       responses:
-        '302': {$ref: '#/components/responses/Redirect'}
+        '302': { $ref: '#/components/responses/Redirect' }
   /api/v1/me:
     get:
       operationId: getMe
       tags: [identity]
       summary: Current user and memberships
       description: Current user and memberships.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations:
     post:
       operationId: createOrganization
       tags: [organizations]
       summary: Create organization
       description: Create organization.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
       operationId: getOrganization
       tags: [organizations]
       summary: Get organization
       description: Get organization.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: requestOrganizationDeletion
       tags: [organizations]
       summary: Request organization deletion (30-day grace)
       description: Request organization deletion (30-day grace).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/deletion/cancel:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
       operationId: cancelOrganizationDeletion
       tags: [organizations]
       summary: Cancel pending deletion
       description: Cancel pending deletion.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/export:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
       operationId: exportOrganization
       tags: [organizations]
       summary: Export organization data
       description: Export organization data.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/settings:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     patch:
       operationId: updateOrganizationSettings
       tags: [organizations]
       summary: Update organization settings
       description: Update organization settings.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/settings/ai:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     patch:
       operationId: updateAiSettings
       tags: [ai]
       summary: Configure AI provider, model, or disable AI
       description: Configure AI provider, model, or disable AI.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/invitations:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
       operationId: createInvitation
       tags: [members]
       summary: Invite member
       description: Invite member.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/invitations/accept:
     post:
       operationId: acceptInvitation
       tags: [members]
       summary: Accept invitation
       description: Accept invitation.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/members:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
       operationId: listMembers
       tags: [members]
       summary: List members
       description: List members.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/members/{memberId}:
-    parameters: [{$ref: '#/components/parameters/orgId'}, {$ref: '#/components/parameters/memberId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }, { $ref: '#/components/parameters/memberId' }]
     patch:
       operationId: updateMember
       tags: [members]
       summary: Change role or product scope
       description: Change role or product scope.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: removeMember
       tags: [members]
       summary: Remove member
       description: Remove member.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/audit-logs:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
       operationId: listAuditLogs
       tags: [audit]
       summary: List audit log entries
       description: List audit log entries.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/products:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
       operationId: createProduct
       tags: [products]
       summary: Create product
       description: Create product.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/organizations/{orgId}/notification-channels:
-    parameters: [{$ref: '#/components/parameters/orgId'}]
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
       operationId: listNotificationChannels
       tags: [notifications]
       summary: List notification channels
       description: List notification channels.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
     post:
       operationId: createNotificationChannel
       tags: [notifications]
       summary: Create notification channel
       description: Create notification channel.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/notification-channels/{id}/test:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: testNotificationChannel
       tags: [notifications]
       summary: Send test notification
       description: Send test notification.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{productId}:
-    parameters: [{$ref: '#/components/parameters/productId'}]
+    parameters: [{ $ref: '#/components/parameters/productId' }]
     get:
       operationId: getProduct
       tags: [products]
       summary: Get product
       description: Get product.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{productId}/environments:
-    parameters: [{$ref: '#/components/parameters/productId'}]
+    parameters: [{ $ref: '#/components/parameters/productId' }]
     post:
       operationId: createEnvironment
       tags: [products]
       summary: Create environment
       description: Create environment.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{productId}/overview:
-    parameters: [{$ref: '#/components/parameters/productId'}]
+    parameters: [{ $ref: '#/components/parameters/productId' }]
     get:
       operationId: getProductOverview
       tags: [products]
       summary: Product overview
       description: Product overview.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connectors/catalog:
     get:
       operationId: getConnectorCatalog
       tags: [connections]
       summary: Connector catalog with capabilities
       description: Connector catalog with capabilities.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connections:
     post:
       operationId: createConnection
       tags: [connections]
       summary: Create connection (draft)
       description: Create connection (draft).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connections/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     delete:
       operationId: deleteConnection
       tags: [connections]
       summary: Delete connection (crypto-shred secrets)
       description: Delete connection (crypto-shred secrets).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connections/{id}/authorize:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: authorizeConnection
       tags: [connections]
       summary: Submit token or start OAuth
       description: Submit token or start OAuth.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/oauth/{provider}/callback:
-    parameters: [{$ref: '#/components/parameters/provider'}]
+    parameters: [{ $ref: '#/components/parameters/provider' }]
     get:
       operationId: oauthCallback
       tags: [connections]
       summary: Provider OAuth callback (state + PKCE validated)
       description: Provider OAuth callback (state + PKCE validated).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '302': {$ref: '#/components/responses/Redirect'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '302': { $ref: '#/components/responses/Redirect' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connections/{id}/validate:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: validateConnection
       tags: [connections]
       summary: Queue validation
       description: Queue validation.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connections/{id}/resources:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listConnectionResources
       tags: [connections]
       summary: Accessible provider resources
       description: Accessible provider resources.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connections/{id}/resource-scopes:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: setConnectionResourceScopes
       tags: [connections]
       summary: Assign resources to products/environments
       description: Assign resources to products/environments.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connections/{id}/discover:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: discoverConnection
       tags: [connections]
       summary: Queue discovery
       description: Queue discovery.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/connections/{id}/sync-runs:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listSyncRuns
       tags: [connections]
       summary: Sync history
       description: Sync history.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agent-enrollments:
     post:
       operationId: createAgentEnrollment
       tags: [agents]
       summary: Create enrollment token (shown once)
       description: Create enrollment token (shown once).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents:
     get:
       operationId: listAgents
       tags: [agents]
       summary: Fleet list
       description: Fleet list.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getAgent
       tags: [agents]
       summary: Agent detail
       description: Agent detail.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}/revoke:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: revokeAgent
       tags: [agents]
       summary: Revoke agent
       description: Revoke agent.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/monitoring-packs:
     get:
       operationId: listMonitoringPacks
       tags: [packs]
       summary: Monitoring pack catalog
       description: Monitoring pack catalog.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}/pack-proposals:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listPackProposals
       tags: [packs]
       summary: Detected services and proposed packs
       description: Detected services and proposed packs.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}/packs:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: enablePack
       tags: [packs]
       summary: Enable pack (sealed credentials)
       description: Enable pack (sealed credentials).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}/packs/{packId}:
-    parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/packId'}]
+    parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/packId' }]
     delete:
       operationId: disablePack
       tags: [packs]
       summary: Disable pack
       description: Disable pack.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}/packs/{packId}/inspection:
-    parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/packId'}]
+    parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/packId' }]
     patch:
       operationId: updatePackInspection
       tags: [logs]
       summary: Enable or disable data inspection for a pack
       description: Enable or disable data inspection for a pack.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}/live-boost:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: startLiveBoost
       tags: [packs]
       summary: 5 s collection for 10 min
       description: 5 s collection for 10 min.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}/logs/tail:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: tailLogs
       tags: [logs]
       summary: Live log tail (WebSocket upgrade)
       description: Live log tail (WebSocket upgrade).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '101': {$ref: '#/components/responses/SwitchingProtocols'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '101': { $ref: '#/components/responses/SwitchingProtocols' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/agents/{id}/inspections:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: createInspection
       tags: [logs]
       summary: Run allowlisted data inspection
       description: Run allowlisted data inspection.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/inspections/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getInspection
       tags: [logs]
       summary: Inspection result
       description: Inspection result.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/logs/search:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: searchLogs
       tags: [logs]
       summary: Search retained logs
       description: Search retained logs.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/install-sessions:
     post:
       operationId: createInstallSession
       tags: [agents]
       summary: Start assisted SSH install
       description: Start assisted SSH install.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/install-sessions/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getInstallSession
       tags: [agents]
       summary: Install session status and output (SSE)
       description: Install session status and output (SSE).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: abortInstallSession
       tags: [agents]
       summary: Abort session and clean up
       description: Abort session and clean up.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/install-sessions/{id}/hosts/{hostId}/confirm-fingerprint:
-    parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/hostId'}]
+    parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/hostId' }]
     post:
       operationId: confirmInstallFingerprint
       tags: [agents]
       summary: Confirm host-key fingerprint
       description: Confirm host-key fingerprint.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /agent/v1/enroll:
-    servers: [{url: 'https://agent.example.com', description: Agent control channel (mTLS)}]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
       operationId: agentEnroll
       tags: [agent-protocol]
@@ -707,703 +707,755 @@ paths:
       description: Exchange enrollment token + CSR for certificate.
       security: []
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /agent/v1/heartbeat:
-    servers: [{url: 'https://agent.example.com', description: Agent control channel (mTLS)}]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
       operationId: agentHeartbeat
       tags: [agent-protocol]
       summary: Heartbeat
       description: Heartbeat.
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /agent/v1/rotate:
-    servers: [{url: 'https://agent.example.com', description: Agent control channel (mTLS)}]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
       operationId: agentRotate
       tags: [agent-protocol]
       summary: Rotate certificate
       description: Rotate certificate.
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /agent/v1/tasks:
-    servers: [{url: 'https://agent.example.com', description: Agent control channel (mTLS)}]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     get:
       operationId: agentPollTasks
       tags: [agent-protocol]
       summary: Long-poll signed tasks (wait=25)
       description: Long-poll signed tasks (wait=25).
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /agent/v1/tasks/{id}/result:
-    servers: [{url: 'https://agent.example.com', description: Agent control channel (mTLS)}]
-    parameters: [{$ref: '#/components/parameters/id'}]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: agentTaskResult
       tags: [agent-protocol]
       summary: Submit task result
       description: Submit task result.
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /agent/v1/streams/{sessionId}/chunks:
-    servers: [{url: 'https://agent.example.com', description: Agent control channel (mTLS)}]
-    parameters: [{$ref: '#/components/parameters/sessionId'}]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
+    parameters: [{ $ref: '#/components/parameters/sessionId' }]
     post:
       operationId: agentStreamChunk
       tags: [agent-protocol]
       summary: Submit stream chunk
       description: Submit stream chunk.
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /agent/v1/stream:
-    servers: [{url: 'https://agent.example.com', description: Agent control channel (mTLS)}]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     get:
       operationId: agentStream
       tags: [agent-protocol]
       summary: Long-lived control stream (reserved)
       description: Long-lived control stream (reserved).
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '101': {$ref: '#/components/responses/SwitchingProtocols'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '101': { $ref: '#/components/responses/SwitchingProtocols' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /agent/v1/opamp:
-    servers: [{url: 'https://agent.example.com', description: Agent control channel (mTLS)}]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     get:
       operationId: agentOpamp
       tags: [agent-protocol]
       summary: OpAMP over WebSocket (opamp-server)
       description: OpAMP over WebSocket (opamp-server).
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '101': {$ref: '#/components/responses/SwitchingProtocols'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '101': { $ref: '#/components/responses/SwitchingProtocols' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /otlp/v1/metrics:
-    servers: [{url: 'https://ingest.example.com', description: Telemetry ingest (mTLS)}]
+    servers: [{ url: 'https://ingest.example.com', description: Telemetry ingest (mTLS) }]
     post:
       operationId: ingestOtlpMetrics
       tags: [ingest]
       summary: OTLP metrics
       description: OTLP metrics.
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /otlp/v1/logs:
-    servers: [{url: 'https://ingest.example.com', description: Telemetry ingest (mTLS)}]
+    servers: [{ url: 'https://ingest.example.com', description: Telemetry ingest (mTLS) }]
     post:
       operationId: ingestOtlpLogs
       tags: [ingest]
       summary: OTLP logs
       description: OTLP logs.
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /otlp/v1/traces:
-    servers: [{url: 'https://ingest.example.com', description: Telemetry ingest (mTLS)}]
+    servers: [{ url: 'https://ingest.example.com', description: Telemetry ingest (mTLS) }]
     post:
       operationId: ingestOtlpTraces
       tags: [ingest]
       summary: OTLP traces (501 until traces ship)
       description: OTLP traces (501 until traces ship).
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '501': {$ref: '#/components/responses/NotImplemented'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '501': { $ref: '#/components/responses/NotImplemented' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /prometheus/api/v1/write:
-    servers: [{url: 'https://ingest.example.com', description: Telemetry ingest (mTLS)}]
+    servers: [{ url: 'https://ingest.example.com', description: Telemetry ingest (mTLS) }]
     post:
       operationId: ingestRemoteWrite
       tags: [ingest]
       summary: Prometheus remote_write
       description: Prometheus remote_write.
-      security: [{agentMtls: []}]
+      security: [{ agentMtls: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /internal/alertmanager/api/v2/alerts:
     post:
       operationId: receiveAlerts
       tags: [internal]
       summary: vmalert notifications
       description: vmalert notifications.
-      security: [{internalToken: []}]
+      security: [{ internalToken: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /internal/agents/{id}/effective-config:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getEffectiveConfig
       tags: [internal]
       summary: Compiled agent configuration for OpAMP
       description: Compiled agent configuration for OpAMP.
-      security: [{internalToken: []}]
+      security: [{ internalToken: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /internal/agents/{id}/opamp-status:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: reportOpampStatus
       tags: [internal]
       summary: OpAMP status from opamp-server
       description: OpAMP status from opamp-server.
-      security: [{internalToken: []}]
+      security: [{ internalToken: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /internal/agents/by-fingerprint/{fp}:
-    parameters: [{$ref: '#/components/parameters/fp'}]
+    parameters: [{ $ref: '#/components/parameters/fp' }]
     get:
       operationId: getAgentByFingerprint
       tags: [internal]
       summary: Resolve agent from certificate fingerprint
       description: Resolve agent from certificate fingerprint.
-      security: [{internalToken: []}]
+      security: [{ internalToken: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /webhooks/{provider}/{connectionId}:
-    parameters: [{$ref: '#/components/parameters/provider'}, {$ref: '#/components/parameters/connectionId'}]
+    parameters:
+      [{ $ref: '#/components/parameters/provider' }, { $ref: '#/components/parameters/connectionId' }]
     post:
       operationId: receiveWebhook
       tags: [webhooks]
       summary: Provider webhook (signature + replay checks)
       description: Provider webhook (signature + replay checks).
-      security: [{webhookSignature: []}]
+      security: [{ webhookSignature: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /api/v1/products/{id}/assets:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listProductAssets
       tags: [assets]
       summary: Product assets
       description: Product assets.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/assets:
     post:
       operationId: createAsset
       tags: [assets]
       summary: Create manual asset
       description: Create manual asset.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/assets/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getAsset
       tags: [assets]
       summary: Asset detail
       description: Asset detail.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/assets/{id}/relationships:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listAssetRelationships
       tags: [assets]
       summary: Asset relationships
       description: Asset relationships.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/assets/{id}/impact:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getAssetImpact
       tags: [assets]
       summary: Blast radius
       description: Blast radius.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/assets/{id}/live:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: streamAssetLive
       tags: [assets]
       summary: Live panel updates (SSE)
       description: Live panel updates (SSE).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/assets/{id}/retire:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: retireAsset
       tags: [assets]
       summary: Retire asset
       description: Retire asset.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/asset-aliases/{id}/resolve:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: resolveAssetAlias
       tags: [assets]
       summary: Merge or keep separate
       description: Merge or keep separate.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/relationships:
     post:
       operationId: createRelationship
       tags: [assets]
       summary: Create manual relationship
       description: Create manual relationship.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/relationships/{id}/verify:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: verifyRelationship
       tags: [assets]
       summary: Confirm relationship
       description: Confirm relationship.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/relationships/{id}/reject:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: rejectRelationship
       tags: [assets]
       summary: Reject relationship
       description: Reject relationship.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/topology:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getProductTopology
       tags: [assets]
       summary: Product topology graph
       description: Product topology graph.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/coverage:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getProductCoverage
       tags: [assets]
       summary: Coverage report
       description: Coverage report.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/metrics/query:
     post:
       operationId: queryMetrics
       tags: [telemetry]
       summary: Tenant-scoped metric query
       description: Tenant-scoped metric query.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/incidents:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listIncidents
       tags: [incidents]
       summary: Incidents
       description: Incidents.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/incidents/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getIncident
       tags: [incidents]
       summary: Incident detail
       description: Incident detail.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/incidents/{id}/acknowledge:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: acknowledgeIncident
       tags: [incidents]
       summary: Acknowledge
       description: Acknowledge.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/incidents/{id}/resolve:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: resolveIncident
       tags: [incidents]
       summary: Resolve
       description: Resolve.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/incidents/{id}/postmortem:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     patch:
       operationId: updateIncidentPostmortem
       tags: [incidents]
       summary: Postmortem metadata
       description: Postmortem metadata.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/alert-rules:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listAlertRules
       tags: [incidents]
       summary: Alert rules
       description: Alert rules.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
     post:
       operationId: createAlertRule
       tags: [incidents]
       summary: Create alert rule
       description: Create alert rule.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/alert-rules/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     patch:
       operationId: updateAlertRule
       tags: [incidents]
       summary: Update alert rule
       description: Update alert rule.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: deleteAlertRule
       tags: [incidents]
       summary: Delete alert rule
       description: Delete alert rule.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/ai/conversations:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: createConversation
       tags: [ai]
       summary: Start conversation
       description: Start conversation.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/ai/conversations/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getConversation
       tags: [ai]
       summary: Conversation
       description: Conversation.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/ai/conversations/{id}/messages:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: sendMessage
       tags: [ai]
       summary: Send message (SSE stream)
       description: Send message (SSE stream).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/ai/runs/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getAiRun
       tags: [ai]
       summary: AI run with tool executions
       description: AI run with tool executions.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/report-schedules:
     post:
       operationId: createReportSchedule
       tags: [reports]
       summary: Create report schedule
       description: Create report schedule.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/report-schedules/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     patch:
       operationId: updateReportSchedule
       tags: [reports]
       summary: Update schedule
       description: Update schedule.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: deleteReportSchedule
       tags: [reports]
       summary: Delete schedule
       description: Delete schedule.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '204': {$ref: '#/components/responses/NoContent'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/report-schedules:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listReportSchedules
       tags: [reports]
       summary: Report schedules
       description: Report schedules.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/reports:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listReports
       tags: [reports]
       summary: Report history
       description: Report history.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/reports/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getReport
       tags: [reports]
       summary: Report
       description: Report.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/reports/{id}/regenerate:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: regenerateReport
       tags: [reports]
       summary: Regenerate (new version)
       description: Regenerate (new version).
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '202': {$ref: '#/components/responses/Accepted'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/action-policies:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listActionPolicies
       tags: [actions]
       summary: Action policies
       description: Action policies.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/products/{id}/action-policies/{type}:
-    parameters: [{$ref: '#/components/parameters/id'}, {$ref: '#/components/parameters/type'}]
+    parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/type' }]
     put:
       operationId: putActionPolicy
       tags: [actions]
       summary: Set action policy
       description: Set action policy.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/actions/proposals:
     post:
       operationId: proposeAction
       tags: [actions]
       summary: Propose action
       description: Propose action.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '201': {$ref: '#/components/responses/Created'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201': { $ref: '#/components/responses/Created' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/actions/{id}:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getAction
       tags: [actions]
       summary: Action request
       description: Action request.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/actions/{id}/approve:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: approveAction
       tags: [actions]
       summary: Approve
       description: Approve.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/actions/{id}/reject:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: rejectAction
       tags: [actions]
       summary: Reject
       description: Reject.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/actions/{id}/executions:
-    parameters: [{$ref: '#/components/parameters/id'}]
+    parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listActionExecutions
       tags: [actions]
       summary: Executions
       description: Executions.
-      security: [{sessionCookie: []}]
+      security: [{ sessionCookie: [] }]
       responses:
-        '200': {$ref: '#/components/responses/Ok'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
 components:
   securitySchemes:
-    sessionCookie: {type: apiKey, in: cookie, name: pcp_session, description: 'Session cookie (httpOnly, Secure, SameSite=Lax)'}
-    agentMtls: {type: mutualTLS, description: Agent client certificate issued at enrollment}
-    webhookSignature: {type: apiKey, in: header, name: X-Webhook-Signature, description: Provider-specific signature header verified per connection}
-    internalToken: {type: apiKey, in: header, name: X-Internal-Token, description: Shared secret for private-network service calls}
+    sessionCookie:
+      {
+        type: apiKey,
+        in: cookie,
+        name: pcp_session,
+        description: 'Session cookie (httpOnly, Secure, SameSite=Lax)',
+      }
+    agentMtls: { type: mutualTLS, description: Agent client certificate issued at enrollment }
+    webhookSignature:
+      {
+        type: apiKey,
+        in: header,
+        name: X-Webhook-Signature,
+        description: Provider-specific signature header verified per connection,
+      }
+    internalToken:
+      {
+        type: apiKey,
+        in: header,
+        name: X-Internal-Token,
+        description: Shared secret for private-network service calls,
+      }
   parameters:
-    orgId: {name: orgId, in: path, required: true, description: Organization ID, schema: {type: string}}
-    productId: {name: productId, in: path, required: true, description: Product ID, schema: {type: string}}
-    id: {name: id, in: path, required: true, description: Resource ID, schema: {type: string}}
-    memberId: {name: memberId, in: path, required: true, description: Membership ID, schema: {type: string}}
-    packId: {name: packId, in: path, required: true, description: Monitoring pack ID, schema: {type: string}}
-    provider: {name: provider, in: path, required: true, description: 'Provider key (e.g. google, github, cloudflare)', schema: {type: string}}
-    connectionId: {name: connectionId, in: path, required: true, description: Connection ID, schema: {type: string}}
-    hostId: {name: hostId, in: path, required: true, description: Install-session host ID, schema: {type: string}}
-    fp: {name: fp, in: path, required: true, description: Client certificate SHA-256 fingerprint, schema: {type: string}}
-    sessionId: {name: sessionId, in: path, required: true, description: Stream session ID, schema: {type: string}}
-    type: {name: type, in: path, required: true, description: Action type (e.g. cloudflare.purge_cache), schema: {type: string}}
+    orgId: { name: orgId, in: path, required: true, description: Organization ID, schema: { type: string } }
+    productId:
+      { name: productId, in: path, required: true, description: Product ID, schema: { type: string } }
+    id: { name: id, in: path, required: true, description: Resource ID, schema: { type: string } }
+    memberId:
+      { name: memberId, in: path, required: true, description: Membership ID, schema: { type: string } }
+    packId:
+      { name: packId, in: path, required: true, description: Monitoring pack ID, schema: { type: string } }
+    provider:
+      {
+        name: provider,
+        in: path,
+        required: true,
+        description: 'Provider key (e.g. google, github, cloudflare)',
+        schema: { type: string },
+      }
+    connectionId:
+      { name: connectionId, in: path, required: true, description: Connection ID, schema: { type: string } }
+    hostId:
+      {
+        name: hostId,
+        in: path,
+        required: true,
+        description: Install-session host ID,
+        schema: { type: string },
+      }
+    fp:
+      {
+        name: fp,
+        in: path,
+        required: true,
+        description: Client certificate SHA-256 fingerprint,
+        schema: { type: string },
+      }
+    sessionId:
+      { name: sessionId, in: path, required: true, description: Stream session ID, schema: { type: string } }
+    type:
+      {
+        name: type,
+        in: path,
+        required: true,
+        description: Action type (e.g. cloudflare.purge_cache),
+        schema: { type: string },
+      }
   schemas:
     Error:
       type: object
       required: [code, message]
       properties:
-        code: {type: string}
-        message: {type: string}
-        requestId: {type: string}
+        code: { type: string }
+        message: { type: string }
+        requestId: { type: string }
   responses:
-    Ok: {description: Success}
-    Created: {description: Created}
-    Accepted: {description: Accepted for asynchronous processing}
-    NoContent: {description: No content}
-    Redirect: {description: Redirect}
-    SwitchingProtocols: {description: Protocol upgrade (WebSocket)}
-    NotImplemented: {description: Not implemented yet}
+    Ok: { description: Success }
+    Created: { description: Created }
+    Accepted: { description: Accepted for asynchronous processing }
+    NoContent: { description: No content }
+    Redirect: { description: Redirect }
+    SwitchingProtocols: { description: Protocol upgrade (WebSocket) }
+    NotImplemented: { description: Not implemented yet }
     Unauthorized:
       description: Authentication required or failed
-      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
     NotFound:
       description: Not found or not in caller scope (never 403, to avoid existence leaks)
-      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

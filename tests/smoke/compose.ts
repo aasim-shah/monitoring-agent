@@ -32,7 +32,12 @@ export function run(cmd: string, args: string[], env: Record<string, string> = {
 export function envFile(vars: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'pcp-smoke-'));
   const file = join(dir, '.env');
-  writeFileSync(file, Object.entries(vars).map(([k, v]) => `${k}=${v}`).join('\n') + '\n');
+  writeFileSync(
+    file,
+    Object.entries(vars)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n') + '\n',
+  );
   return file;
 }
 

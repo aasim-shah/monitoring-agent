@@ -2,35 +2,25 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "outputs": [
-        "dist/**",
-        ".next/**",
-        "!.next/cache/**"
-      ]
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "lint": {
-      "dependsOn": [
-        "^build"
-      ]
+      "dependsOn": ["^build"]
     },
     "typecheck": {
-      "dependsOn": [
-        "^build"
-      ]
+      "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": [
-        "^build"
-      ]
+      "dependsOn": ["^build"]
     },
     "@pcp/web#typecheck": {
-      "dependsOn": [
-        "^build",
-        "@pcp/web#build"
-      ]
+      "dependsOn": ["^build", "@pcp/web#build"]
+    },
+    "test:live": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "env": ["LIVE_*"]
     }
   }
 }

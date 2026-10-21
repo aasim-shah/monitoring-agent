@@ -21,5 +21,10 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`invalid configuration: ${issues}`);
   }
   const c = parsed.data;
-  return { deploymentMode: c.DEPLOYMENT_MODE, port: c.API_PORT, databaseUrl: c.DATABASE_URL, redisUrl: c.REDIS_URL };
+  return {
+    deploymentMode: c.DEPLOYMENT_MODE,
+    port: c.API_PORT,
+    databaseUrl: c.DATABASE_URL,
+    redisUrl: c.REDIS_URL,
+  };
 }

@@ -6,6 +6,16 @@ Status values: **Done** (complete, tests green), **In progress** (work started, 
 
 Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/plans/2026-10-22-m0-m1-foundation.md`
 
+## Milestone summary
+
+| Milestone | Status | Notes |
+|---|---|---|
+| M0 Contracts and decisions | Delivered, awaiting approval | ADRs (M0.1) and threat model (M0.3) need tech lead + security owner acceptance; M0.2, M0.4 done |
+| M1 Monorepo, CI, Compose | Done | Exit gate met locally (clean clone → `docker compose up` healthy); first GitHub CI run pending a remote |
+| M2–M19 | Not started | Next: M2.1 |
+
+## Tasks
+
 | Task | Title | Status | Handoff |
 |---|---|---|---|
 | M0.1 | Repository bootstrap and ADRs | Awaiting approval | [M0.1](M0.1-adrs.md) |
@@ -15,7 +25,7 @@ Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/pla
 | M1.1 | Monorepo tooling | Done | [M1.1](M1.1-monorepo-tooling.md) |
 | M1.2 | Application skeletons | Done | [M1.2](M1.2-app-skeletons.md) |
 | M1.3 | Compose and Caddy | Done | [M1.3](M1.3-compose-caddy.md) |
-| M1.4 | CI pipeline | Not started | — |
+| M1.4 | CI pipeline | Done | [M1.4](M1.4-ci.md) |
 | M2.1 | Database package, roles, RLS | Not started | — |
 | M2.2 | Tenant context and `withTenant` | Not started | — |
 | M2.3 | Authentication | Not started | — |

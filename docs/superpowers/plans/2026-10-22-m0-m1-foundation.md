@@ -38,11 +38,11 @@
 **Interfaces:**
 - Produces: root scripts `build`, `lint`, `typecheck`, `test` (Turborepo), `test:repo` (`node --test scripts/__tests__/`), `format:check`; workspace globs `apps/*`, `packages/*`, `packages/connectors/*`, `agents/*`, `tests`; `tsconfig.base.json` (strict, ES2022, NodeNext).
 
-- [ ] **Step 1: Write the failing test** — `workspace.test.mjs` asserts: `package.json` has `packageManager: "pnpm@9.15.9"`, `engines.node: ">=22"`, no dependency version starting with `^` or `~`; `pnpm-workspace.yaml` lists the five globs; `turbo.json` defines tasks `build`, `lint`, `typecheck`, `test`; `tsconfig.base.json` has `strict: true` and `module: "NodeNext"`.
-- [ ] **Step 2: Run it** — `node --test scripts/__tests__/` → Expected: FAIL (`ENOENT package.json`).
-- [ ] **Step 3: Create the files** with the versions in Tech Stack; `turbo.json` `build.dependsOn: ["^build"]`, outputs `dist/**`, `.next/**` (excluding `.next/cache/**`).
-- [ ] **Step 4: Run** — `node --test scripts/__tests__/` → PASS; `corepack pnpm install` → lockfile created; `corepack pnpm turbo run lint typecheck test` → exits 0 (no packages yet).
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M1.1-monorepo-tooling.md`, board `docs/handoffs/README.md`; `git commit -m "build: add monorepo tooling (M1.1)"`.
+- [x] **Step 1: Write the failing test** — `workspace.test.mjs` asserts: `package.json` has `packageManager: "pnpm@9.15.9"`, `engines.node: ">=22"`, no dependency version starting with `^` or `~`; `pnpm-workspace.yaml` lists the five globs; `turbo.json` defines tasks `build`, `lint`, `typecheck`, `test`; `tsconfig.base.json` has `strict: true` and `module: "NodeNext"`.
+- [x] **Step 2: Run it** — `node --test scripts/__tests__/` → Expected: FAIL (`ENOENT package.json`).
+- [x] **Step 3: Create the files** with the versions in Tech Stack; `turbo.json` `build.dependsOn: ["^build"]`, outputs `dist/**`, `.next/**` (excluding `.next/cache/**`).
+- [x] **Step 4: Run** — `node --test scripts/__tests__/` → PASS; `corepack pnpm install` → lockfile created; `corepack pnpm turbo run lint typecheck test` → exits 0 (no packages yet).
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M1.1-monorepo-tooling.md`, board `docs/handoffs/README.md`; `git commit -m "build: add monorepo tooling (M1.1)"`.
 
 ### Task 2: Architecture decision records (master M0.1)
 
@@ -53,11 +53,11 @@
 **Interfaces:**
 - Produces: ADR numbering 0001–0015 exactly as master plan M0.1 lists; each ADR has `Status:` line and `## Context`, `## Decision`, `## Consequences`, `## References` sections.
 
-- [ ] **Step 1: Write the failing test** — asserts 16 files exist (template + 15), names match `NNNN-slug.md`, each non-template ADR has a `Status: Proposed` or `Status: Accepted` line, the four sections, and at least one master-plan decision (`D\d+`) or spec section (`§\d+`) reference.
-- [ ] **Step 2: Run** — `node --test scripts/__tests__/adrs.test.mjs` → FAIL (`docs/adr` missing).
-- [ ] **Step 3: Write the ADRs** from master plan §2 decisions. Status `Proposed` (human acceptance by tech lead and security owner is the M0 exit gate).
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M0.1-adrs.md`; `git commit -m "docs: add ADRs 0001-0015 (M0.1)"`.
+- [x] **Step 1: Write the failing test** — asserts 16 files exist (template + 15), names match `NNNN-slug.md`, each non-template ADR has a `Status: Proposed` or `Status: Accepted` line, the four sections, and at least one master-plan decision (`D\d+`) or spec section (`§\d+`) reference.
+- [x] **Step 2: Run** — `node --test scripts/__tests__/adrs.test.mjs` → FAIL (`docs/adr` missing).
+- [x] **Step 3: Write the ADRs** from master plan §2 decisions. Status `Proposed` (human acceptance by tech lead and security owner is the M0 exit gate).
+- [x] **Step 4: Run** → PASS.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M0.1-adrs.md`; `git commit -m "docs: add ADRs 0001-0015 (M0.1)"`.
 
 ### Task 3: Shared contracts and agent protocol (master M0.2)
 
@@ -70,14 +70,14 @@
 - Produces (`@pcp/shared-contracts`): constants `ROLES` (5), `PERMISSIONS` (master §4.1 list), `CONNECTOR_CAPABILITIES` (11, spec §9), `CONNECTION_STATUSES` (7), `CONNECTION_REASONS` (4), `ASSET_LIFECYCLES` (6), `RELATION_TYPES` (14), `VERIFICATION_STATES` (4), `IMPACT_CLASSES` (3), `TOOL_NAMES` (18); Zod schemas `connectorCapabilitySchema`, `observationSchema`, `relationTypeSchema`, `metricQuerySchema`, `evidenceSchema`, `packManifestSchema`; types `Role`, `Permission`, `TenantContext`, `ConnectorCapability`, `ConnectionStatus`, `ConnectionReason`, `Observation`, `DiscoveryPage`, `MetricQuery`, `MetricResult`, `AssetLifecycle`, `RelationType`, `VerificationState`, `ImpactClass`, `PackManifest`, `ToolName`, `Evidence`, `ToolResult<O>`, `EncryptedSecret`.
 - Produces (`@pcp/agent-protocol`): `validateMessage(kind: MessageKind, data: unknown): { ok: true } | { ok: false; errors: string[] }` where `MessageKind = 'enroll-request' | 'enroll-response' | 'heartbeat' | 'agent-task' | 'stream-chunk'`; generated TS interfaces `EnrollRequest`, `EnrollResponse`, `Heartbeat`, `AgentTask`, `StreamChunk`; Go package `agentprotocol` (module `pcp.local/agentprotocol`) with the same structs.
 
-- [ ] **Step 1: Write failing tests** —
+- [x] **Step 1: Write failing tests** —
   - `contracts.test.ts`: `connectorCapabilitySchema.safeParse('teleport').success === false`; `CONNECTOR_CAPABILITIES.length === 11`; observation with `confidence: 1.5` and `-0.1` rejected, `0.95` accepted; `relationTypeSchema` accepts `DEPLOYS`, rejects `FOO`; `RELATION_TYPES.length === 14`; `TOOL_NAMES` has 18 entries including `getApplicationMetrics`; a Redis pack manifest parses; `changeLevel: 3` rejected.
   - `validate.test.ts`: valid `EnrollRequest` → ok; same with `organizationId` → not ok; heartbeat without `sequence` → not ok; agent task with unknown `type` → not ok.
   - `generate.test.ts`: running `generate.mjs --check` exits 0 (generated TS and Go equal committed files).
-- [ ] **Step 2: Run** — `corepack pnpm --filter @pcp/shared-contracts --filter @pcp/agent-protocol test` → FAIL (modules missing).
-- [ ] **Step 3: Implement** contracts and schemas per master §4; JSON Schemas draft 2020-12 with `additionalProperties: false`; generator maps `string→string`, `integer→int64`, `number→float64`, `boolean→bool`, string arrays → `[]string`, objects with `additionalProperties` → `map[string]any`, nested objects → named structs, `json:"<name>,omitempty"` for optional fields.
-- [ ] **Step 4: Run** tests → PASS; `scripts/go.sh vet ./packages/agent-protocol/go/...` → exit 0.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M0.2-shared-contracts.md`; `git commit -m "feat(contracts): add shared contracts and agent protocol schemas (M0.2)"`.
+- [x] **Step 2: Run** — `corepack pnpm --filter @pcp/shared-contracts --filter @pcp/agent-protocol test` → FAIL (modules missing).
+- [x] **Step 3: Implement** contracts and schemas per master §4; JSON Schemas draft 2020-12 with `additionalProperties: false`; generator maps `string→string`, `integer→int64`, `number→float64`, `boolean→bool`, string arrays → `[]string`, objects with `additionalProperties` → `map[string]any`, nested objects → named structs, `json:"<name>,omitempty"` for optional fields.
+- [x] **Step 4: Run** tests → PASS; `scripts/go.sh vet ./packages/agent-protocol/go/...` → exit 0.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M0.2-shared-contracts.md`; `git commit -m "feat(contracts): add shared contracts and agent protocol schemas (M0.2)"`.
 
 ### Task 4: Threat model and data classification (master M0.3)
 
@@ -89,11 +89,11 @@
 - Consumes: spec §18.1 threat table; master plan task headings `**M<n>.<k> …**`.
 - Produces: one `### <threat>` section per spec §18.1 threat with an `Owning tasks:` line; data-class table with an `LLM eligible` column.
 
-- [ ] **Step 1: Failing test** — parses spec §18.1 table rows; asserts each threat name appears as a `### ` heading in `threat-model.md`; each section's `Owning tasks:` IDs all exist in the master plan; `data-classification.md` lists every spec §11.1 data class.
-- [ ] **Step 2: Run** → FAIL (file missing).
-- [ ] **Step 3: Write** STRIDE per component and the data classification.
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M0.3-threat-model.md`; `git commit -m "docs(security): add threat model and data classification (M0.3)"`.
+- [x] **Step 1: Failing test** — parses spec §18.1 table rows; asserts each threat name appears as a `### ` heading in `threat-model.md`; each section's `Owning tasks:` IDs all exist in the master plan; `data-classification.md` lists every spec §11.1 data class.
+- [x] **Step 2: Run** → FAIL (file missing).
+- [x] **Step 3: Write** STRIDE per component and the data classification.
+- [x] **Step 4: Run** → PASS.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M0.3-threat-model.md`; `git commit -m "docs(security): add threat model and data classification (M0.3)"`.
 
 ### Task 5: OpenAPI v1 draft (master M0.4)
 
@@ -106,11 +106,11 @@
 - Consumes: spec §15 route blocks; workbook routes (WB-01, WB-03, WB-05, WB-10–WB-16).
 - Produces: OpenAPI 3.1 document; security schemes `sessionCookie` (apiKey cookie `pcp_session`), `agentMtls` (mutualTLS), `webhookSignature` (apiKey header), `internalToken` (apiKey header `X-Internal-Token`).
 
-- [ ] **Step 1: Failing test** — parses every `METHOD /path` line inside spec §15 code blocks; converts `:param` → `{param}`; asserts each exists in `openapi-v1.yaml`; asserts every operation has a `security` key (public ones use `[]`) and a unique `operationId`.
-- [ ] **Step 2: Run** → FAIL (file missing).
-- [ ] **Step 3: Write** the OpenAPI draft and Spectral ruleset (`extends: spectral:oas`, custom error rule `operation-security-declared`).
-- [ ] **Step 4: Run** test → PASS; `corepack pnpm lint:openapi` → `No results with a severity of 'error'`.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M0.4-openapi.md`; `git commit -m "docs(api): add OpenAPI v1 draft and lint (M0.4)"`.
+- [x] **Step 1: Failing test** — parses every `METHOD /path` line inside spec §15 code blocks; converts `:param` → `{param}`; asserts each exists in `openapi-v1.yaml`; asserts every operation has a `security` key (public ones use `[]`) and a unique `operationId`.
+- [x] **Step 2: Run** → FAIL (file missing).
+- [x] **Step 3: Write** the OpenAPI draft and Spectral ruleset (`extends: spectral:oas`, custom error rule `operation-security-declared`).
+- [x] **Step 4: Run** test → PASS; `corepack pnpm lint:openapi` → `No results with a severity of 'error'`.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M0.4-openapi.md`; `git commit -m "docs(api): add OpenAPI v1 draft and lint (M0.4)"`.
 
 ### Task 6: Application skeletons (master M1.2)
 
@@ -128,11 +128,11 @@
 - Produces (web): `GET /healthz` → 200 `{ status: 'ok', service: 'web' }`; port 3001.
 - Produces (Go): `GET /healthz` → 200 `{"status":"ok","service":"<name>"}`; subcommand `healthcheck` probes `http://127.0.0.1:<port>/healthz` and exits 0/1; ports `OPAMP_PORT` 4320, `INGEST_PORT` 4318.
 
-- [ ] **Step 1: Failing tests** — `runChecks` reports a throwing check as `ok:false` with its message and a hanging check as timed out; api `/readyz` returns 503 naming `postgres` when that check throws while `/healthz` stays 200 and includes `deploymentMode`; worker server same contract; web route returns 200 JSON; Go `TestHealthz` 200 body and `TestProbe` failure on closed port.
-- [ ] **Step 2: Run** — `corepack pnpm turbo run test --filter @pcp/health --filter @pcp/api --filter @pcp/worker --filter @pcp/web` and `scripts/go.sh test ./apps/...` → FAIL.
-- [ ] **Step 3: Implement** minimal services.
-- [ ] **Step 4: Run** → PASS; `corepack pnpm turbo run build lint typecheck` → exit 0.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M1.2-app-skeletons.md`; `git commit -m "feat: add api, worker, web, opamp-server, ingest-gateway skeletons (M1.2)"`.
+- [x] **Step 1: Failing tests** — `runChecks` reports a throwing check as `ok:false` with its message and a hanging check as timed out; api `/readyz` returns 503 naming `postgres` when that check throws while `/healthz` stays 200 and includes `deploymentMode`; worker server same contract; web route returns 200 JSON; Go `TestHealthz` 200 body and `TestProbe` failure on closed port.
+- [x] **Step 2: Run** — `corepack pnpm turbo run test --filter @pcp/health --filter @pcp/api --filter @pcp/worker --filter @pcp/web` and `scripts/go.sh test ./apps/...` → FAIL.
+- [x] **Step 3: Implement** minimal services.
+- [x] **Step 4: Run** → PASS; `corepack pnpm turbo run build lint typecheck` → exit 0.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M1.2-app-skeletons.md`; `git commit -m "feat: add api, worker, web, opamp-server, ingest-gateway skeletons (M1.2)"`.
 
 ### Task 7: Compose stack and Caddy (master M1.3)
 
@@ -144,15 +144,15 @@
 - Consumes: Task 6 health contracts.
 - Produces: Compose services `caddy`, `web`, `api`, `worker`, `postgres`, `redis`, `victoriametrics`, `vmalert`, `opamp-server`, `ingest-gateway`; networks `edge`, `internal` (`internal: true`); env `DEPLOYMENT_MODE` (`managed` | `self_hosted`), `BOOTSTRAP_MODE` (`private_http` | `off`), `CADDY_CONFIG`.
 
-- [ ] **Step 1: Failing tests** —
+- [x] **Step 1: Failing tests** —
   - `compose refuses to start without POSTGRES_PASSWORD`: `docker compose config` with empty env exits non-zero and stderr names `POSTGRES_PASSWORD`.
   - `storage ports are not published`: `docker compose config --format json` has no `ports` on `postgres`, `redis`, `victoriametrics`, `vmalert`, `api`, `worker`, `web`, `opamp-server`, `ingest-gateway`; only `caddy` publishes.
   - `stack becomes healthy in <mode>` for `managed` and `self_hosted`: `docker compose up -d --build --wait --wait-timeout 300` succeeds; `GET http://localhost:${HTTP_PORT}/healthz` through Caddy returns api JSON with matching `deploymentMode`; `GET /` returns web 200.
   - `caddy configs validate`: `caddy validate` passes for both Caddyfiles.
-- [ ] **Step 2: Run** — `corepack pnpm --filter @pcp/tests test:smoke` → FAIL (`compose.yaml` missing).
-- [ ] **Step 3: Implement** Compose, Dockerfiles, Caddyfiles, env template.
-- [ ] **Step 4: Run** → PASS (both modes).
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M1.3-compose-caddy.md`; `git commit -m "build: add compose stack, dockerfiles, caddy (M1.3)"`.
+- [x] **Step 2: Run** — `corepack pnpm --filter @pcp/tests test:smoke` → FAIL (`compose.yaml` missing).
+- [x] **Step 3: Implement** Compose, Dockerfiles, Caddyfiles, env template.
+- [x] **Step 4: Run** → PASS (both modes).
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M1.3-compose-caddy.md`; `git commit -m "build: add compose stack, dockerfiles, caddy (M1.3)"`.
 
 ### Task 8: CI pipeline (master M1.4)
 
@@ -164,8 +164,8 @@
 - Consumes: root scripts (Task 1), `lint:openapi` (Task 5), `scripts/go.sh` equivalents via `actions/setup-go`, `test:smoke` (Task 7).
 - Produces: CI jobs `node` (install, lint, typecheck, unit, repo tests), `go` (vet, test), `openapi`, `smoke` (matrix `managed`, `self_hosted`), `sbom`, `osv-scan`, `secret-scan`.
 
-- [ ] **Step 1: Failing test** — asserts `ci.yml` exists, triggers on `pull_request` and `push` to `main`, has the seven jobs, `smoke` matrix includes both modes, every `uses:` is pinned to a version tag, and `nightly-live.yml` has a `schedule`.
-- [ ] **Step 2: Run** → FAIL.
-- [ ] **Step 3: Write** workflows.
-- [ ] **Step 4: Run** test → PASS; `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.7 -color=never` → no output, exit 0.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M1.4-ci.md`; update master plan status, workbook checklists (WB-17); `git commit -m "ci: add CI and nightly workflows (M1.4)"`.
+- [x] **Step 1: Failing test** — asserts `ci.yml` exists, triggers on `pull_request` and `push` to `main`, has the seven jobs, `smoke` matrix includes both modes, every `uses:` is pinned to a version tag, and `nightly-live.yml` has a `schedule`.
+- [x] **Step 2: Run** → FAIL.
+- [x] **Step 3: Write** workflows.
+- [x] **Step 4: Run** test → PASS; `docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.7 -no-color` → no output, exit 0.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M1.4-ci.md`; update master plan status, workbook checklists (WB-17); `git commit -m "ci: add CI and nightly workflows (M1.4)"`.

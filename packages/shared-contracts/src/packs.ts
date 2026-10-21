@@ -40,7 +40,10 @@ export const packManifestSchema = z
         edges: z.array(z.object({ type: relationTypeSchema, from: z.string() }).strict()),
       })
       .strict(),
-    inspection: z.object({ allowedCommands: z.array(z.string()) }).strict().optional(),
+    inspection: z
+      .object({ allowedCommands: z.array(z.string()) })
+      .strict()
+      .optional(),
     guidance: z.string().optional(),
   })
   .strict();

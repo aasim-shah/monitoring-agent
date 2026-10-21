@@ -3,7 +3,13 @@ import { Ajv2020 } from 'ajv/dist/2020.js';
 import addFormatsModule from 'ajv-formats';
 import type { ValidateFunction } from 'ajv';
 
-export const MESSAGE_KINDS = ['enroll-request', 'enroll-response', 'heartbeat', 'agent-task', 'stream-chunk'] as const;
+export const MESSAGE_KINDS = [
+  'enroll-request',
+  'enroll-response',
+  'heartbeat',
+  'agent-task',
+  'stream-chunk',
+] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
 export type ValidationResult = { ok: true } | { ok: false; errors: string[] };
@@ -16,7 +22,9 @@ addFormats(ajv);
 
 const validators = new Map<MessageKind, ValidateFunction>(
   MESSAGE_KINDS.map((kind) => {
-    const schema = JSON.parse(readFileSync(new URL(`../schemas/${kind}.schema.json`, import.meta.url), 'utf8'));
+    const schema = JSON.parse(
+      readFileSync(new URL(`../schemas/${kind}.schema.json`, import.meta.url), 'utf8'),
+    );
     return [kind, ajv.compile(schema)];
   }),
 );

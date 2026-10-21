@@ -42,7 +42,9 @@ describe('HealthController', () => {
   });
 
   it('GET /readyz returns 200 when checks pass', async () => {
-    const res = await (await start([{ name: 'redis', check: async () => {} }])).inject({
+    const res = await (
+      await start([{ name: 'redis', check: async () => {} }])
+    ).inject({
       method: 'GET',
       url: '/readyz',
     });

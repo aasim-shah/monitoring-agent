@@ -25,7 +25,9 @@ const EXPECTED = [
 
 test('ADR directory contains template and ADRs 0001-0015', () => {
   assert.ok(existsSync(dir), 'docs/adr missing');
-  const files = readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith('.md'))
+    .sort();
   assert.deepEqual(files, EXPECTED);
 });
 

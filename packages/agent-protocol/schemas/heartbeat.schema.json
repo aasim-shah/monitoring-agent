@@ -4,7 +4,16 @@
   "title": "Heartbeat",
   "type": "object",
   "additionalProperties": false,
-  "required": ["protocolVersion", "sequence", "agentVersion", "policyVersion", "capabilities", "health", "queueDepth", "sentAt"],
+  "required": [
+    "protocolVersion",
+    "sequence",
+    "agentVersion",
+    "policyVersion",
+    "capabilities",
+    "health",
+    "queueDepth",
+    "sentAt"
+  ],
   "properties": {
     "protocolVersion": { "type": "string", "const": "1.0" },
     "sequence": { "type": "integer", "minimum": 0 },

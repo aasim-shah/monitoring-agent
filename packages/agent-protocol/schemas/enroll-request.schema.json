@@ -4,7 +4,15 @@
   "title": "EnrollRequest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["protocolVersion", "enrollmentToken", "agentVersion", "agentType", "csrPem", "x25519PublicKey", "host"],
+  "required": [
+    "protocolVersion",
+    "enrollmentToken",
+    "agentVersion",
+    "agentType",
+    "csrPem",
+    "x25519PublicKey",
+    "host"
+  ],
   "properties": {
     "protocolVersion": { "type": "string", "const": "1.0" },
     "enrollmentToken": { "type": "string", "minLength": 16 },

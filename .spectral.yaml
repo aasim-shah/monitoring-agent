@@ -3,7 +3,7 @@ rules:
   operation-security-declared:
     description: Every operation must declare security explicitly (use [] for intentionally public endpoints).
     severity: error
-    given: "$.paths[*][get,put,post,delete,patch]"
+    given: '$.paths[*][get,put,post,delete,patch]'
     then:
       field: security
       function: defined

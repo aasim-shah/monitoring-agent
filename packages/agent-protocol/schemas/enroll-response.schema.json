@@ -4,7 +4,16 @@
   "title": "EnrollResponse",
   "type": "object",
   "additionalProperties": false,
-  "required": ["agentId", "certificatePem", "chainPem", "notAfter", "controlUrl", "ingestUrl", "opampUrl", "taskSigningPublicKey"],
+  "required": [
+    "agentId",
+    "certificatePem",
+    "chainPem",
+    "notAfter",
+    "controlUrl",
+    "ingestUrl",
+    "opampUrl",
+    "taskSigningPublicKey"
+  ],
   "properties": {
     "agentId": { "type": "string", "format": "uuid" },
     "certificatePem": { "type": "string" },

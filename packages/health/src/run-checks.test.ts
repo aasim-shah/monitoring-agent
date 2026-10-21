@@ -30,6 +30,9 @@ describe('runChecks', () => {
   it('times out a hanging check', async () => {
     const hanging: ReadinessCheck = { name: 'redis', check: () => new Promise(() => {}) };
     const result = await runChecks([hanging], 50);
-    expect(result).toEqual({ ok: false, results: [{ name: 'redis', ok: false, error: 'timed out after 50 ms' }] });
+    expect(result).toEqual({
+      ok: false,
+      results: [{ name: 'redis', ok: false, error: 'timed out after 50 ms' }],
+    });
   });
 });

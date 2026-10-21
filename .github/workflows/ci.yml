@@ -1,0 +1,117 @@
+# CI pipeline (master plan M1.4, §6.2). Integration (Testcontainers) and agent
+# end-to-end jobs are added by the milestones that introduce those suites (M2, M6).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+  TURBO_TELEMETRY_DISABLED: '1'
+
+jobs:
+  node:
+    name: lint, typecheck, unit, repo checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build lint typecheck test
+      - run: pnpm test:repo
+      - run: pnpm format:check
+
+  go:
+    name: go vet, test, gofmt
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/setup-go@v5.6.0
+        with:
+          go-version: '1.23.12'
+          cache: false
+      - run: go vet ./apps/opamp-server/... ./apps/ingest-gateway/... ./packages/go-platform/... ./packages/agent-protocol/go/...
+      - run: go test ./apps/opamp-server/... ./apps/ingest-gateway/... ./packages/go-platform/... ./packages/agent-protocol/go/...
+      - name: gofmt
+        run: test -z "$(gofmt -l apps packages)"
+
+  openapi:
+    name: openapi lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint:openapi
+
+  smoke:
+    name: compose smoke (${{ matrix.deployment_mode }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        deployment_mode: [managed, self_hosted]
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: smoke
+        run: pnpm --filter @pcp/tests exec vitest run -t "${{ matrix.deployment_mode }}|compose configuration|caddy"
+
+  sbom:
+    name: sbom
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: anchore/sbom-action@v0.24.3
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: sbom.spdx.json
+
+  osv-scan:
+    name: dependency vulnerability scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: google/osv-scanner-action/osv-scanner-action@v2.7.0
+        with:
+          scan-args: |-
+            --recursive
+            ./
+
+  secret-scan:
+    name: secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

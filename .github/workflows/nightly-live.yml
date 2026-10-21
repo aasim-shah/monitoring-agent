@@ -1,0 +1,30 @@
+# Nightly live-provider tests (master plan §6.2). Each connector adds a `test:live`
+# script that runs only when LIVE_TESTS=1 and its provider credentials are present.
+name: nightly-live
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: live provider tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      LIVE_TESTS: '1'
+      LIVE_CLOUDFLARE_TOKEN: ${{ secrets.LIVE_CLOUDFLARE_TOKEN }}
+      LIVE_GITHUB_APP_ID: ${{ secrets.LIVE_GITHUB_APP_ID }}
+      LIVE_GITHUB_APP_PRIVATE_KEY: ${{ secrets.LIVE_GITHUB_APP_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4.4.0
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run test:live

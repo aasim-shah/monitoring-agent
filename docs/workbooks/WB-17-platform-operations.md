@@ -130,8 +130,8 @@ Settings → Data retention, Security, AI providers; Organization → Export dat
 
 ## 9. Task checklist
 
-- [ ] M1.3 Compose and Caddy
-- [ ] M1.4 CI pipeline
+- [x] M1.3 Compose and Caddy
+- [x] M1.4 CI pipeline
 - [ ] M19.1 Security hardening
 - [ ] M19.2 Load tests
 - [ ] M19.3 Backup and restore

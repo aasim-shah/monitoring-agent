@@ -7,8 +7,21 @@ import { repoRoot, run } from './compose.js';
 async function selfSignedCa(): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), 'pcp-ca-'));
   const r = await run('openssl', [
-    'req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes', '-days', '1',
-    '-subj', '/CN=pcp-test-agent-ca', '-keyout', join(dir, 'ca.key'), '-out', join(dir, 'chain.pem'),
+    'req',
+    '-x509',
+    '-newkey',
+    'ec',
+    '-pkeyopt',
+    'ec_paramgen_curve:prime256v1',
+    '-nodes',
+    '-days',
+    '1',
+    '-subj',
+    '/CN=pcp-test-agent-ca',
+    '-keyout',
+    join(dir, 'ca.key'),
+    '-out',
+    join(dir, 'chain.pem'),
   ]);
   expect(r.status, r.stderr).toBe(0);
   writeFileSync(join(dir, '.keep'), '');
@@ -17,12 +30,26 @@ async function selfSignedCa(): Promise<string> {
 
 function validate(config: string, extraArgs: string[] = []) {
   return run('docker', [
-    'run', '--rm',
-    '-v', `${repoRoot}infrastructure/caddy:/etc/caddy:ro`,
+    'run',
+    '--rm',
+    '-v',
+    `${repoRoot}infrastructure/caddy:/etc/caddy:ro`,
     ...extraArgs,
-    '-e', 'APP_DOMAIN=app.example.com', '-e', 'AGENT_DOMAIN=agent.example.com',
-    '-e', 'INGEST_DOMAIN=ingest.example.com', '-e', 'ACME_EMAIL=ops@example.com',
-    'caddy:2.10.2-alpine', 'caddy', 'validate', '--config', `/etc/caddy/${config}`, '--adapter', 'caddyfile',
+    '-e',
+    'APP_DOMAIN=app.example.com',
+    '-e',
+    'AGENT_DOMAIN=agent.example.com',
+    '-e',
+    'INGEST_DOMAIN=ingest.example.com',
+    '-e',
+    'ACME_EMAIL=ops@example.com',
+    'caddy:2.10.2-alpine',
+    'caddy',
+    'validate',
+    '--config',
+    `/etc/caddy/${config}`,
+    '--adapter',
+    'caddyfile',
   ]);
 }
 

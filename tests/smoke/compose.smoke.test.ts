@@ -1,7 +1,17 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { SECRETS, compose, envFile } from './compose.js';
 
-const STORAGE_AND_APP = ['postgres', 'redis', 'victoriametrics', 'vmalert', 'api', 'worker', 'web', 'opamp-server', 'ingest-gateway'];
+const STORAGE_AND_APP = [
+  'postgres',
+  'redis',
+  'victoriametrics',
+  'vmalert',
+  'api',
+  'worker',
+  'web',
+  'opamp-server',
+  'ingest-gateway',
+];
 
 describe('compose configuration', () => {
   it('compose refuses to start without POSTGRES_PASSWORD', async () => {
@@ -29,7 +39,12 @@ describe.each([
   ['self_hosted', '18081'],
 ])('stack in %s mode', (mode, httpPort) => {
   const project = `pcp-smoke-${mode.replace('_', '-')}`;
-  const file = envFile({ ...SECRETS, DEPLOYMENT_MODE: mode, HTTP_PORT: httpPort, HTTPS_PORT: String(Number(httpPort) + 400) });
+  const file = envFile({
+    ...SECRETS,
+    DEPLOYMENT_MODE: mode,
+    HTTP_PORT: httpPort,
+    HTTPS_PORT: String(Number(httpPort) + 400),
+  });
 
   afterAll(async () => {
     await compose(project, file, ['down', '-v', '--remove-orphans']);

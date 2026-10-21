@@ -15,6 +15,7 @@
 - This is the **master plan**. It fixes milestones, task boundaries, files, shared interfaces, tests, pinned values, and exit gates for the whole product.
 - The product contains about 15 independent subsystems. Before executing a milestone, expand that milestone into a step-level TDD plan at `docs/superpowers/plans/<date>-m<N>-<slug>.md` (write failing test → run → implement → run → commit). The expansion may add detail. It must not change a §4 interface or a §3 value without first updating this master plan.
 - Feature behavior (use cases, flows, rules, test cases) is documented per area in `docs/workbooks/` (index: `docs/workbooks/README.md`). Expansion plans cite workbook use-case and test-case IDs.
+- Progress and per-task handoffs: `docs/handoffs/README.md` (status board). Execution plans per milestone live next to this file (first: `2026-10-22-m0-m1-foundation.md`).
 - Task IDs are `M<milestone>.<task>`. Every task's requirements implicitly include **Global Constraints**, **§3 Pinned defaults**, and the **Definition of Done** in §6.
 
 ## Global Constraints

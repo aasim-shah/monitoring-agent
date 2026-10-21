@@ -12,7 +12,10 @@ export class AppModule {
       controllers: [HealthController],
       providers: [
         { provide: APP_CONFIG, useValue: config },
-        { provide: READINESS_CHECKS, useValue: [postgresCheck(config.databaseUrl), redisCheck(config.redisUrl)] },
+        {
+          provide: READINESS_CHECKS,
+          useValue: [postgresCheck(config.databaseUrl), redisCheck(config.redisUrl)],
+        },
       ],
     };
   }
