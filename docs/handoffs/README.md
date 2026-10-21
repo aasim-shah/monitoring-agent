@@ -11,7 +11,7 @@ Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/pla
 | M0.1 | Repository bootstrap and ADRs | Awaiting approval | [M0.1](M0.1-adrs.md) |
 | M0.2 | Shared contracts packages | Done | [M0.2](M0.2-shared-contracts.md) |
 | M0.3 | Threat model and data classification | Awaiting approval | [M0.3](M0.3-threat-model.md) |
-| M0.4 | OpenAPI v1 draft | Not started | — |
+| M0.4 | OpenAPI v1 draft | Done | [M0.4](M0.4-openapi.md) |
 | M1.1 | Monorepo tooling | Done | [M1.1](M1.1-monorepo-tooling.md) |
 | M1.2 | Application skeletons | Not started | — |
 | M1.3 | Compose and Caddy | Not started | — |
