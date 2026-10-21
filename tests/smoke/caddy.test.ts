@@ -4,9 +4,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { repoRoot, run } from './compose.js';
 
-function selfSignedCa(): string {
+async function selfSignedCa(): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), 'pcp-ca-'));
-  const r = run('openssl', [
+  const r = await run('openssl', [
     'req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1', '-nodes', '-days', '1',
     '-subj', '/CN=pcp-test-agent-ca', '-keyout', join(dir, 'ca.key'), '-out', join(dir, 'chain.pem'),
   ]);
@@ -27,14 +27,14 @@ function validate(config: string, extraArgs: string[] = []) {
 }
 
 describe('caddy configs validate', () => {
-  it('bootstrap config is valid', () => {
-    const r = validate('Caddyfile.bootstrap');
+  it('bootstrap config is valid', async () => {
+    const r = await validate('Caddyfile.bootstrap');
     expect(r.status, r.stderr + r.stdout).toBe(0);
   });
 
-  it('production config is valid with an agent CA chain', () => {
-    const ca = selfSignedCa();
-    const r = validate('Caddyfile.production', ['-v', `${ca}:/etc/caddy-agent-ca:ro`]);
+  it('production config is valid with an agent CA chain', async () => {
+    const ca = await selfSignedCa();
+    const r = await validate('Caddyfile.production', ['-v', `${ca}:/etc/caddy-agent-ca:ro`]);
     expect(r.status, r.stderr + r.stdout).toBe(0);
   });
 });
