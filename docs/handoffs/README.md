@@ -13,7 +13,7 @@ Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/pla
 | M0.3 | Threat model and data classification | Awaiting approval | [M0.3](M0.3-threat-model.md) |
 | M0.4 | OpenAPI v1 draft | Done | [M0.4](M0.4-openapi.md) |
 | M1.1 | Monorepo tooling | Done | [M1.1](M1.1-monorepo-tooling.md) |
-| M1.2 | Application skeletons | Not started | — |
+| M1.2 | Application skeletons | Done | [M1.2](M1.2-app-skeletons.md) |
 | M1.3 | Compose and Caddy | Not started | — |
 | M1.4 | CI pipeline | Not started | — |
 | M2.1 | Database package, roles, RLS | Not started | — |

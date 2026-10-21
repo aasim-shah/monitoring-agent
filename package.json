@@ -13,7 +13,9 @@
     "test": "turbo run test",
     "test:repo": "node --test 'scripts/__tests__/*.test.mjs'",
     "format:check": "prettier --check .",
-    "lint:openapi": "spectral lint docs/architecture/openapi-v1.yaml --fail-severity error"
+    "lint:openapi": "spectral lint docs/architecture/openapi-v1.yaml --fail-severity error",
+    "test:go": "scripts/go.sh test ./apps/opamp-server/... ./apps/ingest-gateway/... ./packages/go-platform/... ./packages/agent-protocol/go/...",
+    "vet:go": "scripts/go.sh vet ./apps/opamp-server/... ./apps/ingest-gateway/... ./packages/go-platform/... ./packages/agent-protocol/go/..."
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

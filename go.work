@@ -1,0 +1,8 @@
+go 1.23
+
+use (
+	./apps/ingest-gateway
+	./apps/opamp-server
+	./packages/agent-protocol/go
+	./packages/go-platform
+)
