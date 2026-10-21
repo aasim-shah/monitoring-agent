@@ -8,7 +8,7 @@ Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/pla
 
 | Task | Title | Status | Handoff |
 |---|---|---|---|
-| M0.1 | Repository bootstrap and ADRs | Not started | — |
+| M0.1 | Repository bootstrap and ADRs | Awaiting approval | [M0.1](M0.1-adrs.md) |
 | M0.2 | Shared contracts packages | Not started | — |
 | M0.3 | Threat model and data classification | Not started | — |
 | M0.4 | OpenAPI v1 draft | Not started | — |
