@@ -24,6 +24,7 @@ import (
 	"pcp.local/hostagent/internal/collector"
 	"pcp.local/hostagent/internal/control"
 	"pcp.local/hostagent/internal/discovery"
+	"pcp.local/hostagent/internal/packs"
 )
 
 // Set at build time with -ldflags "-X main.version=…".
@@ -79,7 +80,7 @@ func enroll(args []string) error {
 		return errors.New("--token and --control-url are required")
 	}
 	if *force {
-		for _, f := range []string{"agent.key", "x25519.key", "agent.crt", "chain.pem", "state.json"} {
+		for _, f := range []string{"agent.key", "x25519.key", "agent.crt", "chain.pem", "state.json", packs.StoreFile} {
 			_ = os.Remove(*dir + "/" + f)
 		}
 	}
@@ -150,19 +151,51 @@ func run(args []string) error {
 	defer stop()
 	started := time.Now()
 	// Millisecond timestamps keep the sequence increasing across restarts and stay below 2^53.
+	store, err := packs.LoadStore(*dir)
+	if err != nil {
+		log.Printf("ignoring unreadable %s: %v", packs.StoreFile, err)
+		store = packs.Store{}
+	}
+	// A new agent starts at policy version 1 with no packs.
+	var applied atomic.Int64
+	applied.Store(int64(max(store.PolicyVersion, 1)))
+	restart := make(chan struct{}, 1)
+	collectorErr := startCollector(ctx, *collectorBin, *dir, st, store.Packs, restart)
+	if collectorErr != nil {
+		log.Printf("metrics disabled: %v", collectorErr)
+	}
+	applier := &packs.Applier{
+		Dir:      *dir,
+		Base:     collectorInput(*dir, st),
+		Open:     func(sealed string) (map[string]string, error) { return control.OpenSealed(sealed, id) },
+		Validate: packs.Validator(*collectorBin),
+		Restart: func() {
+			select {
+			case restart <- struct{}{}:
+			default:
+			}
+		},
+	}
+	pending := make(chan struct{}, 1)
 	beat := func() {
-		ok, err := client.Load().Heartbeat(ctx, proto.Heartbeat{Sequence: time.Now().UnixMilli(), AgentVersion: version, PolicyVersion: 1, Capabilities: []string{"host.health", "host.inventory"}, Health: "ok"})
+		hb, err := client.Load().Heartbeat(ctx, proto.Heartbeat{Sequence: time.Now().UnixMilli(), AgentVersion: version, PolicyVersion: applied.Load(), Capabilities: []string{"host.health", "host.inventory", "packs"}, Health: "ok"})
 		if err != nil {
 			log.Printf("heartbeat: %v", err)
-		} else if !ok {
+			return
+		}
+		if !hb.Accepted {
 			log.Printf("heartbeat not accepted")
 		}
+		if int64(hb.PolicyVersion) != applied.Load() {
+			select {
+			case pending <- struct{}{}:
+			default:
+			}
+		}
 	}
+	go applyPacks(ctx, &client, applier, collectorErr, pending, &applied)
 	beat()
 	log.Printf("agent %s running; heartbeats every 30 s", st.AgentID)
-	if err := startCollector(ctx, *collectorBin, *dir, st); err != nil {
-		log.Printf("metrics disabled: %v", err)
-	}
 	go func() {
 		t := time.NewTicker(30 * time.Second)
 		defer t.Stop()
@@ -227,6 +260,42 @@ func reportInventory(ctx context.Context, client *atomic.Pointer[control.Client]
 		case <-ctx.Done():
 			return
 		case <-t.C:
+		}
+	}
+}
+
+// applyPacks fetches, applies, and acknowledges the pack configuration whenever a
+// heartbeat reports a policy version other than the applied one. A failed fetch or ack
+// leaves the applied version unchanged, so the next heartbeat retries.
+func applyPacks(ctx context.Context, client *atomic.Pointer[control.Client], a *packs.Applier, collectorErr error, pending <-chan struct{}, applied *atomic.Int64) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-pending:
+		}
+		c := client.Load()
+		cfg, err := c.Config(ctx)
+		if err != nil {
+			log.Printf("pack configuration: %v", err)
+			continue
+		}
+		var ack control.ConfigAck
+		if collectorErr != nil {
+			ack = control.ConfigAck{PolicyVersion: cfg.PolicyVersion, Results: []control.PackResult{}}
+			for _, p := range cfg.Packs {
+				ack.Results = append(ack.Results, control.PackResult{PackId: p.PackId, Status: "failed", Message: "the collector is not installed on this host: " + collectorErr.Error()})
+			}
+		} else {
+			ack = a.Apply(*cfg)
+		}
+		if err := c.AckConfig(ctx, ack); err != nil {
+			log.Printf("pack acknowledgement: %v", err)
+			continue
+		}
+		applied.Store(int64(cfg.PolicyVersion))
+		for _, r := range ack.Results {
+			log.Printf("pack %s: %s %s", r.PackId, r.Status, r.Message)
 		}
 	}
 }
@@ -297,7 +366,16 @@ func printCollectorConfig(args []string) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := collector.Config(collectorInput(*dir, st))
+	in := collectorInput(*dir, st)
+	if store, err := packs.LoadStore(*dir); err == nil {
+		for _, p := range store.Packs {
+			for k := range p.Credentials {
+				p.Credentials[k] = "<redacted>"
+			}
+			in.Packs = append(in.Packs, p)
+		}
+	}
+	cfg, err := collector.Config(in)
 	if err != nil {
 		return err
 	}
@@ -305,16 +383,23 @@ func printCollectorConfig(args []string) error {
 	return nil
 }
 
-// startCollector writes collector.yaml and keeps pcp-otelcol running until ctx ends.
-func startCollector(ctx context.Context, bin, dir string, st *control.State) error {
+// startCollector writes collector.yaml (host metrics and the packs applied last time)
+// and keeps pcp-otelcol running until ctx ends; restart makes it reload the file.
+func startCollector(ctx context.Context, bin, dir string, st *control.State, applied []collector.PackConfig, restart <-chan struct{}) error {
 	if _, err := os.Stat(bin); err != nil {
 		return fmt.Errorf("collector binary %s not found", bin)
 	}
-	cfg, err := collector.Config(collectorInput(dir, st))
+	in := collectorInput(dir, st)
+	in.Packs = applied
+	cfg, err := collector.Config(in)
 	if err != nil {
-		return err
+		log.Printf("stored packs ignored: %v", err)
+		in.Packs = nil
+		if cfg, err = collector.Config(in); err != nil {
+			return err
+		}
 	}
-	path := dir + "/collector.yaml"
+	path := dir + "/" + packs.ConfigFile
 	if err := os.WriteFile(path, cfg, 0o600); err != nil {
 		return err
 	}
@@ -324,8 +409,9 @@ func startCollector(ctx context.Context, bin, dir string, st *control.State) err
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 			return cmd
 		},
-		Sleep: collector.SleepContext,
-		Logf:  log.Printf,
+		Sleep:   collector.SleepContext,
+		Logf:    log.Printf,
+		Restart: restart,
 	}
 	go sup.Run(ctx)
 	log.Printf("collector started; host metrics every 30 s to %s", st.IngestURL)

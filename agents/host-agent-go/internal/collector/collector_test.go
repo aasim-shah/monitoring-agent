@@ -122,3 +122,29 @@ func TestSuperviseStopsTheProcessOnCancel(t *testing.T) {
 		t.Fatal("running collector was not stopped")
 	}
 }
+
+func TestSuperviseRestartsImmediatelyOnRequest(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{}, 4)
+	restart := make(chan struct{}, 1)
+	var sleeps atomic.Int32
+	s := Supervisor{
+		Command: func() *exec.Cmd { started <- struct{}{}; return exec.Command("sleep", "30") },
+		Sleep:   func(context.Context, time.Duration) { sleeps.Add(1) },
+		Logf:    t.Logf,
+		Restart: restart,
+	}
+	go s.Run(ctx)
+	<-started
+	time.Sleep(100 * time.Millisecond)
+	restart <- struct{}{}
+	select {
+	case <-started:
+	case <-time.After(15 * time.Second):
+		t.Fatal("collector was not restarted")
+	}
+	if sleeps.Load() != 0 {
+		t.Error("a requested restart must not back off")
+	}
+}

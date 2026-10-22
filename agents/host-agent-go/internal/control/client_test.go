@@ -78,9 +78,9 @@ func TestClientFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	accepted, err := c.Heartbeat(ctx, proto.Heartbeat{Sequence: 1, AgentVersion: "1.0.0", PolicyVersion: 1, Capabilities: []string{}, Health: "ok"})
-	if err != nil || !accepted {
-		t.Fatalf("heartbeat accepted=%v err=%v", accepted, err)
+	hb, err := c.Heartbeat(ctx, proto.Heartbeat{Sequence: 1, AgentVersion: "1.0.0", PolicyVersion: 1, Capabilities: []string{}, Health: "ok"})
+	if err != nil || !hb.Accepted {
+		t.Fatalf("heartbeat accepted=%v err=%v", hb.Accepted, err)
 	}
 	key, _ := base64.StdEncoding.DecodeString(enrolled.TaskSigningPublicKey)
 	tasks, rejected, err := c.PollTasks(ctx, 0, ed25519.PublicKey(key))

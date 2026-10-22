@@ -13,6 +13,9 @@ type Supervisor struct {
 	Command func() *exec.Cmd
 	Sleep   func(context.Context, time.Duration)
 	Logf    func(format string, args ...any)
+	// Restart, when signalled, stops the collector and starts it again at once
+	// (a new configuration was written).
+	Restart <-chan struct{}
 }
 
 const healthyAfter = 5 * time.Minute
@@ -36,14 +39,12 @@ func (s Supervisor) Run(ctx context.Context) {
 			select {
 			case err := <-done:
 				s.Logf("collector exited: %v", err)
+			case <-s.Restart:
+				s.Logf("restarting the collector with a new configuration")
+				stop(cmd, done)
+				continue
 			case <-ctx.Done():
-				_ = cmd.Process.Signal(syscall.SIGTERM)
-				select {
-				case <-done:
-				case <-time.After(10 * time.Second):
-					_ = cmd.Process.Kill()
-					<-done
-				}
+				stop(cmd, done)
 				return
 			}
 		}
@@ -52,6 +53,17 @@ func (s Supervisor) Run(ctx context.Context) {
 		}
 		s.Sleep(ctx, backoff(failures))
 		failures++
+	}
+}
+
+// stop sends SIGTERM, then SIGKILL after 10 s, and waits for the process to exit.
+func stop(cmd *exec.Cmd, done <-chan error) {
+	_ = cmd.Process.Signal(syscall.SIGTERM)
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		_ = cmd.Process.Kill()
+		<-done
 	}
 }
 

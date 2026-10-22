@@ -105,8 +105,15 @@ func (c *Client) Enroll(ctx context.Context, token string, id *Identity, host pr
 	return &out, nil
 }
 
-// Heartbeat reports liveness; accepted is false for a replayed or reordered sequence.
-func (c *Client) Heartbeat(ctx context.Context, hb proto.Heartbeat) (bool, error) {
+// HeartbeatAck is the control plane's answer: accepted is false for a replayed or
+// reordered sequence; policyVersion is the configuration the agent should run.
+type HeartbeatAck struct {
+	Accepted      bool `json:"accepted"`
+	PolicyVersion int  `json:"policyVersion"`
+}
+
+// Heartbeat reports liveness.
+func (c *Client) Heartbeat(ctx context.Context, hb proto.Heartbeat) (HeartbeatAck, error) {
 	hb.ProtocolVersion = protocolVersion
 	if hb.SentAt == "" {
 		hb.SentAt = c.now().UTC().Format(time.RFC3339)
@@ -114,13 +121,9 @@ func (c *Client) Heartbeat(ctx context.Context, hb proto.Heartbeat) (bool, error
 	if hb.Capabilities == nil {
 		hb.Capabilities = []string{}
 	}
-	var out struct {
-		Accepted bool `json:"accepted"`
-	}
-	if err := c.do(ctx, http.MethodPost, "/agent/v1/heartbeat", hb, &out); err != nil {
-		return false, err
-	}
-	return out.Accepted, nil
+	var out HeartbeatAck
+	err := c.do(ctx, http.MethodPost, "/agent/v1/heartbeat", hb, &out)
+	return out, err
 }
 
 // PollTasks long-polls for tasks. Tasks whose signature does not verify against the

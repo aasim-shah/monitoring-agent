@@ -59,8 +59,8 @@ func TestLiveControlFlow(t *testing.T) {
 	if got, err := c.Whoami(ctx); err != nil || got != enrolled.AgentId {
 		t.Fatalf("whoami = %q, %v; want %s", got, err, enrolled.AgentId)
 	}
-	if ok, err := c.Heartbeat(ctx, proto.Heartbeat{Sequence: 1, AgentVersion: "1.0.0", PolicyVersion: 1, Capabilities: []string{"host.health"}, Health: "ok"}); err != nil || !ok {
-		t.Fatalf("heartbeat accepted=%v err=%v", ok, err)
+	if hb, err := c.Heartbeat(ctx, proto.Heartbeat{Sequence: 1, AgentVersion: "1.0.0", PolicyVersion: 1, Capabilities: []string{"host.health"}, Health: "ok"}); err != nil || !hb.Accepted {
+		t.Fatalf("heartbeat accepted=%v err=%v", hb.Accepted, err)
 	}
 
 	key, _ := base64.StdEncoding.DecodeString(enrolled.TaskSigningPublicKey)
