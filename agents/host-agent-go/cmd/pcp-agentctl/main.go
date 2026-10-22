@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strings"
@@ -19,10 +20,12 @@ import (
 	"time"
 
 	proto "pcp.local/agentprotocol"
+	"pcp.local/hostagent/internal/collector"
 	"pcp.local/hostagent/internal/control"
 )
 
-const version = "0.1.0"
+// Set at build time with -ldflags "-X main.version=…".
+var version = "0.1.0"
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
@@ -37,6 +40,8 @@ func main() {
 		err = run(os.Args[2:])
 	case "status":
 		err = status(os.Args[2:])
+	case "collector-config":
+		err = printCollectorConfig(os.Args[2:])
 	default:
 		usage()
 	}
@@ -49,7 +54,8 @@ func usage() {
 	fmt.Fprintln(os.Stderr, `usage:
   pcp-agentctl enroll --token TOKEN --control-url URL [--state-dir DIR] [--server-name NAME] [--ca-file FILE] [--force]
   pcp-agentctl run    [--state-dir DIR]
-  pcp-agentctl status [--state-dir DIR]`)
+  pcp-agentctl status [--state-dir DIR]
+  pcp-agentctl collector-config [--state-dir DIR]   print the collector configuration`)
 	os.Exit(2)
 }
 
@@ -64,6 +70,7 @@ func enroll(args []string) error {
 	url := fs.String("control-url", "", "control plane URL, e.g. https://agent.example.com")
 	serverName := fs.String("server-name", "", "TLS server name when connecting by IP (development)")
 	caFile := fs.String("ca-file", "", "extra TLS root for a development control plane")
+	ingestURL := fs.String("ingest-url", "", "override the ingest URL from enrollment (development)")
 	force := fs.Bool("force", false, "replace an existing identity on this host")
 	_ = fs.Parse(args)
 	if *token == "" || *url == "" {
@@ -103,8 +110,12 @@ func enroll(args []string) error {
 	if err := id.SaveCertificate(res.CertificatePem, res.ChainPem); err != nil {
 		return err
 	}
+	ingest := res.IngestUrl
+	if *ingestURL != "" {
+		ingest = *ingestURL
+	}
 	if err := control.SaveState(*dir, &control.State{
-		AgentID: res.AgentId, ControlURL: *url, IngestURL: res.IngestUrl, OpampURL: res.OpampUrl,
+		AgentID: res.AgentId, ControlURL: *url, IngestURL: ingest, OpampURL: res.OpampUrl,
 		TaskSigningPublicKey: res.TaskSigningPublicKey, NotAfter: res.NotAfter, ServerName: *serverName, CAFile: *caFile,
 	}); err != nil {
 		return err
@@ -116,6 +127,7 @@ func enroll(args []string) error {
 func run(args []string) error {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	dir := stateDirFlag(fs)
+	collectorBin := fs.String("collector", "/usr/local/bin/pcp-otelcol", "collector binary; metrics are skipped when it is missing")
 	_ = fs.Parse(args)
 	st, err := control.LoadState(*dir)
 	if err != nil {
@@ -143,6 +155,9 @@ func run(args []string) error {
 	}
 	beat()
 	log.Printf("agent %s running; heartbeats every 30 s", st.AgentID)
+	if err := startCollector(ctx, *collectorBin, *dir, st); err != nil {
+		log.Printf("metrics disabled: %v", err)
+	}
 	go func() {
 		t := time.NewTicker(30 * time.Second)
 		defer t.Stop()
@@ -226,6 +241,65 @@ func rotateIfDue(ctx context.Context, c *control.Client, id *control.Identity, s
 	log.Printf("certificate rotated; valid until %s", res.NotAfter)
 	next, _, err := control.Connect(dir, st)
 	return next, err
+}
+
+func collectorInput(dir string, st *control.State) collector.Input {
+	serverName := ""
+	if st.ServerName != "" {
+		serverName = "ingest." + strings.TrimPrefix(st.ServerName, "agent.")
+	}
+	return collector.Input{
+		IngestURL:  st.IngestURL,
+		CertFile:   dir + "/agent.crt",
+		KeyFile:    dir + "/agent.key",
+		CAFile:     st.CAFile,
+		ServerName: serverName,
+		StorageDir: dir,
+	}
+}
+
+// printCollectorConfig shows the configuration `run` would give the collector.
+func printCollectorConfig(args []string) error {
+	fs := flag.NewFlagSet("collector-config", flag.ExitOnError)
+	dir := stateDirFlag(fs)
+	_ = fs.Parse(args)
+	st, err := control.LoadState(*dir)
+	if err != nil {
+		return err
+	}
+	cfg, err := collector.Config(collectorInput(*dir, st))
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(cfg))
+	return nil
+}
+
+// startCollector writes collector.yaml and keeps pcp-otelcol running until ctx ends.
+func startCollector(ctx context.Context, bin, dir string, st *control.State) error {
+	if _, err := os.Stat(bin); err != nil {
+		return fmt.Errorf("collector binary %s not found", bin)
+	}
+	cfg, err := collector.Config(collectorInput(dir, st))
+	if err != nil {
+		return err
+	}
+	path := dir + "/collector.yaml"
+	if err := os.WriteFile(path, cfg, 0o600); err != nil {
+		return err
+	}
+	sup := collector.Supervisor{
+		Command: func() *exec.Cmd {
+			cmd := exec.Command(bin, "--config", path)
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+			return cmd
+		},
+		Sleep: collector.SleepContext,
+		Logf:  log.Printf,
+	}
+	go sup.Run(ctx)
+	log.Printf("collector started; host metrics every 30 s to %s", st.IngestURL)
+	return nil
 }
 
 func status(args []string) error {
