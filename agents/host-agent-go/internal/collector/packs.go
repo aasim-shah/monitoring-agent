@@ -57,6 +57,14 @@ var packReceivers = map[string]packReceiver{
 				"include":                 map[string]any{"names": []string{"^(node|nodejs)$"}, "match_type": "regexp"},
 				"mute_process_all_errors": true,
 				"metrics":                 map[string]any{"process.cpu.utilization": map[string]any{"enabled": true}},
+				// pid and executable name label each process; command lines may carry secrets.
+				"resource_attributes": map[string]any{
+					"process.command":         map[string]any{"enabled": false},
+					"process.command_line":    map[string]any{"enabled": false},
+					"process.executable.path": map[string]any{"enabled": false},
+					"process.owner":           map[string]any{"enabled": false},
+					"process.parent_pid":      map[string]any{"enabled": false},
+				},
 			}},
 		}
 	}},

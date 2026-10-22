@@ -93,3 +93,19 @@ func toStrings(v any) []string {
 	}
 	return out
 }
+
+// Per-process labels come from resource attributes; command lines may carry secrets.
+func TestNodeProcessesAreLabelledWithoutCommandLines(t *testing.T) {
+	cfg, _ := packConfig(t, PackConfig{ID: "nodejs", Settings: map[string]any{}})
+	proc := cfg["receivers"].(map[string]any)["host_metrics/nodejs"].(map[string]any)["scrapers"].(map[string]any)["process"].(map[string]any)
+	attrs := proc["resource_attributes"].(map[string]any)
+	for _, a := range []string{"process.command", "process.command_line", "process.executable.path", "process.owner", "process.parent_pid"} {
+		if attrs[a].(map[string]any)["enabled"] != false {
+			t.Errorf("%s must be disabled", a)
+		}
+	}
+	exp := cfg["exporters"].(map[string]any)["prometheus_remote_write"].(map[string]any)
+	if exp["resource_to_telemetry_conversion"].(map[string]any)["enabled"] != true {
+		t.Error("resource attributes (process.pid, process.executable.name) must become labels")
+	}
+}

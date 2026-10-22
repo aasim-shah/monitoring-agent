@@ -75,6 +75,8 @@ func Config(in Input) ([]byte, error) {
 				"remote_write_queue":   map[string]any{"enabled": true, "queue_size": 10000},
 				"max_batch_size_bytes": 3000000,
 				"target_info":          map[string]any{"enabled": false},
+				// Resource attributes (host.name, process.pid, …) become labels.
+				"resource_to_telemetry_conversion": enabled,
 			},
 		},
 		"service": map[string]any{
