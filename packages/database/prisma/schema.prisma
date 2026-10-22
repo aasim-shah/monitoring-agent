@@ -230,7 +230,9 @@ model Environment {
   name           String
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  product Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  product          Product           @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  agentEnrollments AgentEnrollment[]
+  agents           Agent[]
 
   @@unique([organizationId, id])
   @@unique([productId, name])
@@ -403,4 +405,203 @@ model JobExecution {
 
   @@index([organizationId, jobId])
   @@map("job_executions")
+}
+
+enum AgentType {
+  host
+  private_worker
+
+  @@map("agent_type")
+}
+
+/// Stored status; `degraded` and `stale` are derived from heartbeats at read time.
+enum AgentStatus {
+  active
+  revoked
+
+  @@map("agent_status")
+}
+
+enum AgentTaskStatus {
+  queued
+  delivered
+  succeeded
+  failed
+  expired
+
+  @@map("agent_task_status")
+}
+
+enum StreamSessionStatus {
+  open
+  closed
+
+  @@map("stream_session_status")
+}
+
+model AgentEnrollment {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  productId       String    @map("product_id") @db.Uuid
+  environmentId   String    @map("environment_id") @db.Uuid
+  agentType       AgentType @default(host) @map("agent_type")
+  /// HMAC-SHA-256 of the token with the server pepper; the token itself is never stored.
+  tokenHash       String    @unique @map("token_hash")
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz(6)
+  maxUses         Int       @default(1) @map("max_uses")
+  uses            Int       @default(0)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  environment Environment @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Cascade)
+  agents      Agent[]
+
+  @@unique([organizationId, id])
+  @@index([environmentId, createdAt(sort: Desc)])
+  @@map("agent_enrollments")
+}
+
+model Agent {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String      @map("organization_id") @db.Uuid
+  productId        String      @map("product_id") @db.Uuid
+  environmentId    String      @map("environment_id") @db.Uuid
+  enrollmentId     String      @map("enrollment_id") @db.Uuid
+  agentType        AgentType   @map("agent_type")
+  status           AgentStatus @default(active)
+  hostname         String
+  machineId        String      @map("machine_id")
+  os               String
+  arch             String
+  agentVersion     String      @map("agent_version")
+  capabilities     String[]    @default([])
+  policyVersion    Int         @default(1) @map("policy_version")
+  lastHeartbeatAt  DateTime?   @map("last_heartbeat_at") @db.Timestamptz(6)
+  lastSequence     BigInt?     @map("last_sequence")
+  clockSkewSeconds Int?        @map("clock_skew_seconds")
+  revokedAt        DateTime?   @map("revoked_at") @db.Timestamptz(6)
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  enrollment     AgentEnrollment      @relation(fields: [organizationId, enrollmentId], references: [organizationId, id], onDelete: Cascade)
+  environment    Environment          @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Cascade)
+  credentials    AgentCredential[]
+  publicKeys     AgentPublicKey[]
+  heartbeats     AgentHeartbeat[]
+  tasks          AgentTask[]
+  streamSessions AgentStreamSession[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, productId])
+  @@index([machineId])
+  @@map("agents")
+}
+
+model AgentCredential {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  agentId           String    @map("agent_id") @db.Uuid
+  /// SHA-256 of the certificate DER, lowercase hex (what Caddy forwards).
+  fingerprintSha256 String    @unique @map("fingerprint_sha256")
+  serial            String
+  notAfter          DateTime  @map("not_after") @db.Timestamptz(6)
+  /// Set when the agent rotates; the old certificate stays valid for 1 h after this.
+  supersededAt      DateTime? @map("superseded_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@map("agent_credentials")
+}
+
+model AgentPublicKey {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  agentId        String   @map("agent_id") @db.Uuid
+  /// `x25519` (pack credential sealing, D24).
+  kind           String
+  publicKey      String   @map("public_key")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([agentId, kind])
+  @@map("agent_public_keys")
+}
+
+model AgentHeartbeat {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  agentId        String   @map("agent_id") @db.Uuid
+  receivedAt     DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+  sentAt         DateTime @map("sent_at") @db.Timestamptz(6)
+  sequence       BigInt
+  health         String
+  queueDepth     Int      @map("queue_depth")
+  agentVersion   String   @map("agent_version")
+  policyVersion  Int      @map("policy_version")
+
+  agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([agentId, receivedAt(sort: Desc)])
+  @@map("agent_heartbeats")
+}
+
+model AgentTask {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String          @map("organization_id") @db.Uuid
+  agentId           String          @map("agent_id") @db.Uuid
+  type              String
+  payload           Json            @default("{}")
+  resourceScope     Json            @default("{}") @map("resource_scope")
+  expiresAt         DateTime        @map("expires_at") @db.Timestamptz(6)
+  maxRuntimeSeconds Int             @map("max_runtime_seconds")
+  maxResponseBytes  Int             @map("max_response_bytes")
+  approvalId        String?         @map("approval_id") @db.Uuid
+  signature         String
+  status            AgentTaskStatus @default(queued)
+  deliveredAt       DateTime?       @map("delivered_at") @db.Timestamptz(6)
+  createdByUserId   String?         @map("created_by_user_id") @db.Uuid
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  agent          Agent                @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Cascade)
+  result         AgentTaskResult?
+  streamSessions AgentStreamSession[]
+
+  @@unique([organizationId, id])
+  @@index([agentId, status, expiresAt])
+  @@map("agent_tasks")
+}
+
+model AgentTaskResult {
+  taskId         String   @id @map("task_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  agentId        String   @map("agent_id") @db.Uuid
+  /// `succeeded` or `failed`.
+  status         String
+  result         Json?
+  error          String?
+  receivedAt     DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  task AgentTask @relation(fields: [organizationId, taskId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, taskId])
+  @@map("agent_task_results")
+}
+
+model AgentStreamSession {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  agentId        String              @map("agent_id") @db.Uuid
+  taskId         String              @map("task_id") @db.Uuid
+  status         StreamSessionStatus @default(open)
+  expiresAt      DateTime            @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  agent Agent     @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Cascade)
+  task  AgentTask @relation(fields: [organizationId, taskId], references: [organizationId, id], onDelete: Cascade)
+
+  @@map("agent_stream_sessions")
 }

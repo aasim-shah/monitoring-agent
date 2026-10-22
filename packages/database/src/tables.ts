@@ -14,6 +14,14 @@ export const TENANT_TABLES = [
   'sync_runs',
   'job_definitions',
   'job_executions',
+  'agent_enrollments',
+  'agents',
+  'agent_credentials',
+  'agent_public_keys',
+  'agent_heartbeats',
+  'agent_tasks',
+  'agent_task_results',
+  'agent_stream_sessions',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];

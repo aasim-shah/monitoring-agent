@@ -43,9 +43,10 @@ beforeAll(async () => {
       await c.query(`INSERT INTO organizations (id, name) VALUES ($1, $2)`, [org, name]);
       const product = randomUUID();
       await c.query(`INSERT INTO products (id, organization_id, name) VALUES ($1, $2, 'P')`, [product, org]);
+      const environment = randomUUID();
       await c.query(
         `INSERT INTO environments (id, organization_id, product_id, name) VALUES ($1, $2, $3, 'Production')`,
-        [randomUUID(), org, product],
+        [environment, org, product],
       );
       await c.query(`INSERT INTO teams (id, organization_id, name) VALUES ($1, $2, 'Core')`, [
         randomUUID(),
@@ -90,6 +91,46 @@ beforeAll(async () => {
       await c.query(
         `INSERT INTO job_executions (id, organization_id, job_id, kind, status, attempts) VALUES ($1, $2, 'j', 'connection-validate', 'succeeded', 1)`,
         [randomUUID(), org],
+      );
+      const enrollment = randomUUID();
+      await c.query(
+        `INSERT INTO agent_enrollments (id, organization_id, product_id, environment_id, token_hash, expires_at)
+         VALUES ($1, $2, $3, $4, $5, now() + interval '1 hour')`,
+        [enrollment, org, product, environment, `enr-${org}`],
+      );
+      const agent = randomUUID();
+      await c.query(
+        `INSERT INTO agents (id, organization_id, product_id, environment_id, enrollment_id, agent_type, hostname, machine_id, os, arch, agent_version)
+         VALUES ($1, $2, $3, $4, $5, 'host', 'h', 'm', 'linux', 'amd64', '1.0.0')`,
+        [agent, org, product, environment, enrollment],
+      );
+      await c.query(
+        `INSERT INTO agent_credentials (id, organization_id, agent_id, fingerprint_sha256, serial, not_after)
+         VALUES ($1, $2, $3, $4, 's', now() + interval '30 days')`,
+        [randomUUID(), org, agent, `fp-${org}`],
+      );
+      await c.query(
+        `INSERT INTO agent_public_keys (id, organization_id, agent_id, kind, public_key) VALUES ($1, $2, $3, 'x25519', 'k')`,
+        [randomUUID(), org, agent],
+      );
+      await c.query(
+        `INSERT INTO agent_heartbeats (id, organization_id, agent_id, sent_at, sequence, health, queue_depth, agent_version, policy_version)
+         VALUES ($1, $2, $3, now(), 1, 'ok', 0, '1.0.0', 1)`,
+        [randomUUID(), org, agent],
+      );
+      const task = randomUUID();
+      await c.query(
+        `INSERT INTO agent_tasks (id, organization_id, agent_id, type, expires_at, max_runtime_seconds, max_response_bytes, signature)
+         VALUES ($1, $2, $3, 'inspect', now() + interval '10 minutes', 60, 65536, 'sig')`,
+        [task, org, agent],
+      );
+      await c.query(
+        `INSERT INTO agent_task_results (task_id, organization_id, agent_id, status) VALUES ($1, $2, $3, 'succeeded')`,
+        [task, org, agent],
+      );
+      await c.query(
+        `INSERT INTO agent_stream_sessions (id, organization_id, agent_id, task_id, expires_at) VALUES ($1, $2, $3, $4, now() + interval '10 minutes')`,
+        [randomUUID(), org, agent, task],
       );
     }
     await c.query(
