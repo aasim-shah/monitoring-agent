@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { MetricChart, toRows } from './metric-chart';
+import { MetricChart, isIsolated, toRows } from './metric-chart';
 
 afterEach(cleanup);
 
@@ -82,5 +82,24 @@ describe('MetricChart', () => {
   it('says so when there is no data at all', () => {
     render(<MetricChart title="Disk" unit="percent" series={[]} />);
     expect(screen.getByText(/No data in this range/)).toBeInTheDocument();
+  });
+});
+
+describe('isIsolated', () => {
+  it('marks points with no neighbouring sample, so a lone reading is still drawn as a dot', () => {
+    const rows = toRows([
+      {
+        key: 'cpu',
+        label: 'CPU',
+        points: [
+          [t0, null],
+          [t0 + 60, 5],
+          [t0 + 120, null],
+          [t0 + 180, 6],
+          [t0 + 240, 7],
+        ],
+      },
+    ]);
+    expect(rows.map((_, i) => isIsolated(rows, 'cpu', i))).toEqual([false, true, false, false, false]);
   });
 });

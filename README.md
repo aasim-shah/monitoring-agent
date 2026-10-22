@@ -60,10 +60,13 @@ docker compose up -d --build --wait
 In the dashboard open a product → **Add your servers** → **Add server**, copy the token from the install command, then attach a demo agent that connects through Caddy's mTLS edge:
 
 ```bash
-scripts/dev-agent.sh <token> demo-vps-1        # docker logs -f pcp-dev-agent-demo-vps-1
+scripts/dev-host.sh <token> demo-host-1        # Ubuntu + systemd, real install.sh: agent and metrics
+scripts/dev-agent.sh <token> demo-vps-1        # control channel only (no collector)
 ```
 
-`install.sh` for real VPS hosts arrives in M6; the control channel, certificates, heartbeats, signed tasks, rotation, and revocation work today. `pnpm test:agent-e2e` runs the whole agent flow against a fresh stack.
+`dev-host.sh` gives a server that appears under **Infrastructure** with CPU, memory, and network charts (disk usage is only reported on real hosts).
+
+For real VPS hosts, deploy the platform on a public domain: see `docs/runbooks/deploy-control-plane.md`. `pnpm test:agent-e2e` runs the whole agent flow against a fresh stack.
 
 ## Repository layout
 

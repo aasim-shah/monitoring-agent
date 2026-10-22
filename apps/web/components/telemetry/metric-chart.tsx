@@ -31,6 +31,14 @@ export function toRows(series: Series[]): Row[] {
   return sorted;
 }
 
+/** A sample with no sample on either side draws no line segment, so it gets a dot instead. */
+export function isIsolated(rows: Row[], key: string, i: number): boolean {
+  if (rows[i]?.[key] === null || rows[i]?.[key] === undefined) return false;
+  const prev = rows[i - 1]?.[key];
+  const next = rows[i + 1]?.[key];
+  return (prev === null || prev === undefined) && (next === null || next === undefined);
+}
+
 /**
  * Line chart for one host metric. Missing samples are gaps (connectNulls off), never
  * zero (BR-04-07). Single series: the title names it. Several: legend plus a data table.
@@ -113,7 +121,23 @@ export function MetricChart({
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  dot={false}
+                  dot={(props: { cx?: number; cy?: number; index?: number }) =>
+                    props.index !== undefined &&
+                    isIsolated(rows, s.key, props.index) &&
+                    props.cx !== undefined ? (
+                      <circle
+                        key={`${s.key}-${props.index}`}
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={4}
+                        fill={SLOTS[i]}
+                        stroke="var(--card)"
+                        strokeWidth={2}
+                      />
+                    ) : (
+                      <g key={`${s.key}-${props.index}`} />
+                    )
+                  }
                   activeDot={{ r: 4, stroke: 'var(--card)', strokeWidth: 2 }}
                   connectNulls={false}
                   isAnimationActive={false}
