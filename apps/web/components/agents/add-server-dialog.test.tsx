@@ -91,4 +91,37 @@ describe('AddServerDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Create install command' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Agent enrollment is not configured');
   });
+
+  it('warns when the control URL cannot be reached from another machine', async () => {
+    const user = userEvent.setup();
+    const local = {
+      ...created,
+      installCommand: 'curl ... --token t --control-url https://agent.localhost:8490',
+    };
+    render(
+      <AddServerDialog
+        environments={environments}
+        onCreate={vi.fn().mockResolvedValue(local)}
+        connected={[]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Add server' }));
+    await user.click(screen.getByRole('button', { name: 'Create install command' }));
+    expect(await screen.findByText(/Remote servers cannot reach/)).toBeInTheDocument();
+  });
+
+  it('does not warn for a public control URL', async () => {
+    const user = userEvent.setup();
+    render(
+      <AddServerDialog
+        environments={environments}
+        onCreate={vi.fn().mockResolvedValue(created)}
+        connected={[]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Add server' }));
+    await user.click(screen.getByRole('button', { name: 'Create install command' }));
+    await screen.findByText(created.installCommand);
+    expect(screen.queryByText(/Remote servers cannot reach/)).toBeNull();
+  });
 });

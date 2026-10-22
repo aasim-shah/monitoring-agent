@@ -14,6 +14,7 @@ import {
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { errorMessage } from '@/lib/api';
+import { isLocalControlUrl } from '@/lib/reachability';
 import { InstallCommand } from './install-command';
 
 export interface EnrollmentInput {
@@ -106,6 +107,13 @@ export function AddServerDialog({
           <Alert tone="info">Add an environment (for example Production) on the product page first.</Alert>
         ) : created ? (
           <div className="space-y-4">
+            {isLocalControlUrl(created.installCommand) ? (
+              <Alert tone="info">
+                Remote servers cannot reach this control URL (it is local to this machine). To add a VPS, run
+                the platform on a public domain and set AGENT_CONTROL_URL to it. For local testing use
+                scripts/dev-agent.sh with this token.
+              </Alert>
+            ) : null}
             <InstallCommand command={created.installCommand} />
             <p className="text-xs text-muted-foreground">
               Works for {created.maxUses} server{created.maxUses === 1 ? '' : 's'} until{' '}
