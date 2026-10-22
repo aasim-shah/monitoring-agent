@@ -15,7 +15,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M2 Identity, tenancy, RLS, RBAC, audit | Done | Branch `feat/m2-identity-tenancy`; also delivered M4.1 envelope encryption |
 | M3 Dashboard shell | Done | Branch `feat/m3-dashboard-shell`; Playwright journeys pass against the Compose stack |
 | M4 Connectors and jobs | Done | Branch `feat/m4-connectors`; data model, SDK, runtime, jobs, connections API, [Compose](M4-compose.md); [execution log](M4-execution-log.md) |
-| M5 Agent enrollment and identity | In progress | Branch `feat/m5-onboarding-agents`; [plan](../superpowers/plans/2026-10-22-m5-agent-identity.md); [data model](M5-data-model.md) done; product setup checklist shipped |
+| M5 Agent enrollment and identity | Done | Branch `feat/m5-onboarding-agents`; exit gate passes through Caddy mTLS and from the dashboard; [execution log](M5-execution-log.md) |
 | M6–M19 | Not started | |
 
 ## Maintenance
