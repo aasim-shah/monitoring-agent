@@ -3,8 +3,7 @@ info:
   title: Product Control Plane API
   version: 0.1.0-draft
   description: >
-    Draft v1 contract (master plan M0.4). Request and response schemas are added by the milestone that implements
-    each route; every route already declares its security. Sources: spec §15 and workbooks WB-01 to WB-17.
+    Draft v1 contract (master plan M0.4). Request and response schemas are added by the milestone that implements each route; every route already declares its security. Sources: spec §15 and workbooks WB-01 to WB-17.
 servers:
   - url: https://app.example.com
     description: Dashboard and user API
@@ -38,7 +37,23 @@ paths:
       description: Sign up with email and password.
       security: []
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Accepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
   /api/v1/auth/verify:
     post:
       operationId: authVerify
@@ -47,7 +62,17 @@ paths:
       description: Verify email address.
       security: []
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
+        '204':
+          description: Success
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
   /api/v1/auth/login:
     post:
       operationId: authLogin
@@ -56,8 +81,24 @@ paths:
       description: Log in with password.
       security: []
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
   /api/v1/auth/logout:
     post:
       operationId: authLogout
@@ -66,9 +107,11 @@ paths:
       description: Log out.
       security: [{ sessionCookie: [] }]
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
+        '204':
+          description: Success
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M2
   /api/v1/auth/mfa/enroll:
     post:
       operationId: authMfaEnroll
@@ -77,9 +120,17 @@ paths:
       description: Start TOTP enrollment.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaEnrollResponse'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          $ref: '#/components/responses/Conflict'
+      x-implemented-in: M2
   /api/v1/auth/mfa/verify:
     post:
       operationId: authMfaVerify
@@ -88,9 +139,25 @@ paths:
       description: Verify TOTP code.
       security: [{ sessionCookie: [] }]
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaVerifyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaVerifyRequest'
   /api/v1/auth/password/reset-request:
     post:
       operationId: authPasswordResetRequest
@@ -99,7 +166,21 @@ paths:
       description: Request password reset email.
       security: []
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Accepted'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
   /api/v1/auth/password/reset:
     post:
       operationId: authPasswordReset
@@ -108,7 +189,19 @@ paths:
       description: Reset password with token.
       security: []
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
+        '204':
+          description: Success
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
   /api/v1/auth/google/start:
     get:
       operationId: authGoogleStart
@@ -117,7 +210,9 @@ paths:
       description: Start Google login (openid email profile only).
       security: []
       responses:
-        '302': { $ref: '#/components/responses/Redirect' }
+        '302':
+          description: Success
+      x-implemented-in: M2
   /api/v1/auth/google/callback:
     get:
       operationId: authGoogleCallback
@@ -126,7 +221,13 @@ paths:
       description: Google login callback.
       security: []
       responses:
-        '302': { $ref: '#/components/responses/Redirect' }
+        '302':
+          description: Success
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-implemented-in: M2
   /api/v1/me:
     get:
       operationId: getMe
@@ -135,9 +236,15 @@ paths:
       description: Current user and memberships.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M2
   /api/v1/organizations:
     post:
       operationId: createOrganization
@@ -146,9 +253,23 @@ paths:
       description: Create organization.
       security: [{ sessionCookie: [] }]
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
   /api/v1/organizations/{orgId}:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
@@ -158,9 +279,17 @@ paths:
       description: Get organization.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-implemented-in: M2
     delete:
       operationId: requestOrganizationDeletion
       tags: [organizations]
@@ -204,9 +333,23 @@ paths:
       description: Update organization settings.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
   /api/v1/organizations/{orgId}/settings/ai:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     patch:
@@ -228,9 +371,25 @@ paths:
       description: Invite member.
       security: [{ sessionCookie: [] }]
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvitationRequest'
   /api/v1/invitations/accept:
     post:
       operationId: acceptInvitation
@@ -239,9 +398,27 @@ paths:
       description: Accept invitation.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptInvitationResponse'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
   /api/v1/organizations/{orgId}/members:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
@@ -251,9 +428,11 @@ paths:
       description: List members.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M2
   /api/v1/organizations/{orgId}/members/{memberId}:
     parameters: [{ $ref: '#/components/parameters/orgId' }, { $ref: '#/components/parameters/memberId' }]
     patch:
@@ -263,9 +442,27 @@ paths:
       description: Change role or product scope.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRequest'
     delete:
       operationId: removeMember
       tags: [members]
@@ -273,9 +470,15 @@ paths:
       description: Remove member.
       security: [{ sessionCookie: [] }]
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
+        '204':
+          description: Success
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      x-implemented-in: M2
   /api/v1/organizations/{orgId}/audit-logs:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
@@ -285,9 +488,15 @@ paths:
       description: List audit log entries.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPage'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M2
   /api/v1/organizations/{orgId}/products:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
@@ -297,9 +506,25 @@ paths:
       description: Create product.
       security: [{ sessionCookie: [] }]
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
   /api/v1/organizations/{orgId}/notification-channels:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
@@ -343,9 +568,15 @@ paths:
       description: Get product.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M2
   /api/v1/products/{productId}/environments:
     parameters: [{ $ref: '#/components/parameters/productId' }]
     post:
@@ -355,9 +586,25 @@ paths:
       description: Create environment.
       security: [{ sessionCookie: [] }]
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      x-implemented-in: M2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEnvironmentRequest'
   /api/v1/products/{productId}/overview:
     parameters: [{ $ref: '#/components/parameters/productId' }]
     get:
@@ -367,9 +614,11 @@ paths:
       description: Product overview.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M2
   /api/v1/connectors/catalog:
     get:
       operationId: getConnectorCatalog
@@ -1445,6 +1694,424 @@ components:
         code: { type: string }
         message: { type: string }
         requestId: { type: string }
+    SignupRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 12
+          maxLength: 256
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      required:
+        - mfaRequired
+      properties:
+        mfaRequired:
+          type: boolean
+    TokenRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+    EmailRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - password
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 12
+    Accepted:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          const: accepted
+    MfaEnrollResponse:
+      type: object
+      required:
+        - secret
+        - otpauthUri
+      properties:
+        secret: &a1
+          type: string
+        otpauthUri: *a1
+    MfaVerifyRequest:
+      type: object
+      required: []
+      properties:
+        code:
+          type: string
+          pattern: ^\d{6}$
+        recoveryCode:
+          type: string
+    MfaVerifyResponse:
+      type: object
+      required: []
+      properties:
+        recoveryCodes:
+          type: array
+          items: &a2
+            type: string
+        status: *a2
+    Me:
+      type: object
+      required:
+        - user
+        - memberships
+        - session
+      properties:
+        user:
+          type: object
+          required:
+            - id
+            - email
+            - mfaEnabled
+          properties:
+            id: &a3
+              type: string
+              format: uuid
+            email: &a4
+              type: string
+            mfaEnabled:
+              type: boolean
+        memberships:
+          type: array
+          items:
+            type: object
+            required:
+              - organizationId
+              - organizationName
+              - role
+              - productIds
+            properties:
+              organizationId: *a3
+              organizationName: *a4
+              role:
+                type: string
+                enum:
+                  - owner
+                  - admin
+                  - operator
+                  - analyst
+                  - viewer
+              productIds:
+                oneOf:
+                  - type: string
+                    const: all
+                  - type: array
+                    items: *a3
+        session:
+          type: object
+          required:
+            - mfaVerified
+          properties:
+            mfaVerified:
+              type: boolean
+    CreateOrganizationRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        timezone:
+          type: string
+          description: IANA timezone; default UTC
+    UpdateSettingsRequest:
+      type: object
+      required: []
+      properties:
+        name: &a5
+          type: string
+        timezone: *a5
+        settings:
+          type: object
+          required: []
+          properties:
+            dataRetentionDays:
+              type: integer
+              minimum: 1
+              maximum: 3650
+    Organization:
+      type: object
+      required:
+        - id
+        - name
+        - timezone
+        - settings
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name: &a6
+          type: string
+        timezone: *a6
+        settings:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - operator
+            - analyst
+            - viewer
+    CreateProductRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name: &a7
+          type: string
+        description: *a7
+        domains:
+          type: array
+          items: *a7
+        repositories:
+          type: array
+          items: *a7
+    Environment:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - domains
+        - repositories
+      properties:
+        id:
+          type: string
+          format: uuid
+        name: &a8
+          type: string
+        description: *a8
+        domains:
+          type: array
+          items: *a8
+        repositories:
+          type: array
+          items: *a8
+        environments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Environment'
+    CreateEnvironmentRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+    CreateInvitationRequest:
+      type: object
+      required:
+        - email
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - operator
+            - analyst
+            - viewer
+        productIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Omit for all products
+    Invitation:
+      type: object
+      required:
+        - id
+        - email
+        - role
+        - expiresAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - operator
+            - analyst
+            - viewer
+        expiresAt:
+          type: string
+          format: date-time
+    AcceptInvitationResponse:
+      type: object
+      required:
+        - organizationId
+        - role
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - operator
+            - analyst
+            - viewer
+    Member:
+      type: object
+      required:
+        - id
+        - userId
+        - email
+        - role
+        - productIds
+        - createdAt
+      properties:
+        id: &a9
+          type: string
+          format: uuid
+        userId: *a9
+        email:
+          type: string
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - operator
+            - analyst
+            - viewer
+        productIds:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items: *a9
+        createdAt:
+          type: string
+          format: date-time
+    UpdateMemberRequest:
+      type: object
+      required: []
+      properties:
+        role:
+          type: string
+          enum:
+            - owner
+            - admin
+            - operator
+            - analyst
+            - viewer
+        productIds:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items:
+                type: string
+                format: uuid
+    AuditEntry:
+      type: object
+      required:
+        - id
+        - action
+        - actorType
+        - targetType
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        action: &a10
+          type: string
+        actorType: *a10
+        actorId: *a10
+        targetType: *a10
+        targetId: *a10
+        metadata:
+          type: object
+        requestId: *a10
+        createdAt:
+          type: string
+          format: date-time
+    AuditPage:
+      type: object
+      required:
+        - entries
+        - nextBefore
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEntry'
+        nextBefore:
+          type:
+            - string
+            - 'null'
   responses:
     Ok: { description: Success }
     Created: { description: Created }
@@ -1459,3 +2126,27 @@ components:
     NotFound:
       description: Not found or not in caller scope (never 403, to avoid existence leaks)
       content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    BadRequest:
+      description: Validation failed or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Authenticated but refused (e.g. mfa_required, email_not_verified, role_above_actor, forbidden_origin)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Conflict (e.g. product_exists, environment_exists, last_owner, already_member)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Rate limited; see Retry-After
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

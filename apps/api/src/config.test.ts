@@ -16,4 +16,15 @@ describe('loadConfig', () => {
   it('requires DATABASE_URL', () => {
     expect(() => loadConfig({ REDIS_URL: base.REDIS_URL })).toThrow(/DATABASE_URL/);
   });
+  it('treats empty optional values as unset (Compose passes "" for unset ${VAR:-})', () => {
+    const c = loadConfig({
+      ...base,
+      SMTP_URL: '',
+      GOOGLE_CLIENT_ID: '',
+      GOOGLE_CLIENT_SECRET: '',
+      GOOGLE_REDIRECT_URI: '',
+    });
+    expect(c.smtpUrl).toBeUndefined();
+    expect(c.google).toBeUndefined();
+  });
 });

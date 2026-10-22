@@ -31,6 +31,17 @@ pnpm test             # unit tests (all packages)
 pnpm test:repo        # repository checks (ADRs, threat model, OpenAPI, CI)
 ```
 
+## Run the stack locally
+
+```bash
+cp .env.example .env
+# Fill in the secrets block: hex passwords (openssl rand -hex 32) and MASTER_KEY (openssl rand -base64 32)
+docker compose up -d --build --wait
+curl http://localhost:8080/healthz
+```
+
+Sign-up emails need `SMTP_URL` (for example a local Mailpit at `smtp://mailpit:1025`); without it no mail is sent.
+
 ## Repository layout
 
 See master plan §5. `apps/` holds deployable services, `packages/` shared libraries and connectors, `agents/` customer-side agents, `infrastructure/` Compose, Caddy, and telemetry configuration, `tests/` cross-service suites.

@@ -14,12 +14,15 @@ const STORAGE_AND_APP = [
 ];
 
 describe('compose configuration', () => {
-  it('compose refuses to start without POSTGRES_PASSWORD', async () => {
-    const file = envFile({ REDIS_PASSWORD: SECRETS.REDIS_PASSWORD });
-    const r = await compose('pcp-smoke-config', file, ['config']);
-    expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain('POSTGRES_PASSWORD');
-  });
+  it.each(['POSTGRES_SUPERUSER_PASSWORD', 'PCP_APP_PASSWORD', 'MASTER_KEY'])(
+    'compose refuses to start without %s',
+    async (name) => {
+      const { [name as keyof typeof SECRETS]: _omit, ...rest } = SECRETS;
+      const r = await compose('pcp-smoke-config', envFile(rest), ['config']);
+      expect(r.status).not.toBe(0);
+      expect(r.stderr).toContain(name);
+    },
+  );
 
   it('storage ports are not published; only caddy publishes', async () => {
     const file = envFile(SECRETS);
@@ -61,6 +64,22 @@ describe.each([
     const home = await fetch(`http://127.0.0.1:${httpPort}/`);
     expect(home.status).toBe(200);
     expect(await home.text()).toContain('Product Control Plane');
+  });
+
+  it('migrations ran and sign-up works through Caddy', async () => {
+    const ps = await compose(project, file, ['ps', '-a', '--format', 'json', 'migrate']);
+    const migrate = ps.stdout
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l) as { State: string; ExitCode: number });
+    expect(migrate[0]).toMatchObject({ State: 'exited', ExitCode: 0 });
+
+    const res = await fetch(`http://127.0.0.1:${httpPort}/api/v1/auth/signup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: `smoke-${mode}@example.com`, password: 'smoke test password' }),
+    });
+    expect(res.status).toBe(202);
   });
 
   it('bootstrap mode refuses agent, OAuth, and webhook routes', async () => {

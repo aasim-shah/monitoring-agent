@@ -4,7 +4,7 @@ Status of every master-plan task. Each started task has a handoff document in th
 
 Status values: **Done** (complete, tests green), **In progress** (work started, handoff describes current state), **Awaiting approval** (delivered, needs a human decision), **Not started**.
 
-Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/plans/2026-10-22-m0-m1-foundation.md` · Execution log: [M0-M1-execution-log.md](M0-M1-execution-log.md)
+Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, stacked). Execution plans: `docs/superpowers/plans/2026-10-22-m0-m1-foundation.md`, `2026-10-22-m2-identity-tenancy.md`. Logs: [M0-M1](M0-M1-execution-log.md), [M2](M2-execution-log.md). Platform runbook for M2 deployment: [M2-compose-migrate](M2-compose-migrate.md).
 
 ## Milestone summary
 
@@ -12,7 +12,8 @@ Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/pla
 |---|---|---|
 | M0 Contracts and decisions | Delivered, awaiting approval | ADRs (M0.1) and threat model (M0.3) need tech lead + security owner acceptance; M0.2, M0.4 done |
 | M1 Monorepo, CI, Compose | Done | Exit gate met locally (clean clone → `docker compose up` healthy); first GitHub CI run pending a remote |
-| M2–M19 | Not started | Next: M2.1 |
+| M2 Identity, tenancy, RLS, RBAC, audit | Done | Branch `feat/m2-identity-tenancy`; also delivered M4.1 envelope encryption (in progress: connection secrets model pending) |
+| M3–M19 | Not started | Next: M3 dashboard shell |
 
 ## Tasks
 

@@ -227,12 +227,12 @@ Login, Sign up, Verify email, Reset password, MFA enrollment, Organization creat
 
 ## 12. Task checklist
 
-- [ ] M2.1 Database package, roles, RLS
-- [ ] M2.2 Tenant context and `withTenant`
-- [ ] M2.3 Authentication (password, Google login, MFA, sessions)
-- [ ] M2.4 Organizations, products, environments, RBAC guard, tenant matrix test
-- [ ] M2.5 Audit log
-- [ ] M2.6 Members and invitations
+- [x] M2.1 Database package, roles, RLS
+- [x] M2.2 Tenant context and `withTenant`
+- [x] M2.3 Authentication (password, Google login, MFA, sessions)
+- [x] M2.4 Organizations, products, environments, RBAC guard, tenant matrix test
+- [x] M2.5 Audit log
+- [x] M2.6 Members and invitations
 - [ ] M3.1 Web foundation (auth pages, layout, navigation, state components)
 - [ ] M3.2 Organization, product, environment, member, audit screens
 - [ ] M3.3 Typed API client

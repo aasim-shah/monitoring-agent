@@ -7,7 +7,7 @@ x-node-env: &node-env
   BOOTSTRAP_MODE: ${BOOTSTRAP_MODE:-private_http}
   NODE_ENV: production
 
-x-database-url: &database-url postgres://pcp:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (see .env.example)}@postgres:5432/pcp
+x-database-url: &database-url postgres://pcp_app:${PCP_APP_PASSWORD:?PCP_APP_PASSWORD must be set (see .env.example)}@postgres:5432/pcp
 x-redis-url: &redis-url redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set (see .env.example)}@redis:6379
 
 services:
@@ -61,16 +61,33 @@ services:
     deploy: { resources: { limits: { memory: 512m } } }
     restart: unless-stopped
 
+  migrate:
+    # One-shot: bootstraps database roles as superuser, then applies migrations as pcp_migrator.
+    build: { context: ., dockerfile: packages/database/Dockerfile }
+    environment:
+      DATABASE_SUPERUSER_URL: postgres://postgres:${POSTGRES_SUPERUSER_PASSWORD:?POSTGRES_SUPERUSER_PASSWORD must be set (see .env.example)}@postgres:5432/pcp
+      PCP_MIGRATOR_PASSWORD: ${PCP_MIGRATOR_PASSWORD:?PCP_MIGRATOR_PASSWORD must be set (see .env.example)}
+      PCP_APP_PASSWORD: ${PCP_APP_PASSWORD:?PCP_APP_PASSWORD must be set (see .env.example)}
+      PCP_SCHEDULER_PASSWORD: ${PCP_SCHEDULER_PASSWORD:?PCP_SCHEDULER_PASSWORD must be set (see .env.example)}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+
   api:
     build: { context: ., dockerfile: apps/api/Dockerfile }
     environment:
       <<: *node-env
       API_PORT: '3000'
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
       DATABASE_URL: *database-url
       REDIS_URL: *redis-url
+      MASTER_KEY: ${MASTER_KEY:?MASTER_KEY must be set (see .env.example)}
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-Product Control Plane <no-reply@localhost>}
     networks: [edge, internal]
     depends_on:
-      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3000/readyz']
@@ -100,13 +117,13 @@ services:
   postgres:
     image: postgres:17.6-alpine
     environment:
-      POSTGRES_USER: pcp
+      POSTGRES_USER: postgres
       POSTGRES_DB: pcp
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set (see .env.example)}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?POSTGRES_SUPERUSER_PASSWORD must be set (see .env.example)}
     volumes: [pg-data:/var/lib/postgresql/data]
     networks: [internal]
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U pcp -d pcp']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d pcp']
       interval: 5s
       timeout: 3s
       retries: 20

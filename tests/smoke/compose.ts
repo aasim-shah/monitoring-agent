@@ -46,6 +46,10 @@ export function compose(project: string, file: string, args: string[]): Promise<
 }
 
 export const SECRETS = {
-  POSTGRES_PASSWORD: 'smoke0postgres0password0hex',
+  POSTGRES_SUPERUSER_PASSWORD: 'smoke0superuser0password0hex',
+  PCP_MIGRATOR_PASSWORD: 'smoke0migrator0password0hex',
+  PCP_APP_PASSWORD: 'smoke0app0password0hex',
+  PCP_SCHEDULER_PASSWORD: 'smoke0scheduler0password0hex',
   REDIS_PASSWORD: 'smoke0redis0password0hex',
+  MASTER_KEY: Buffer.alloc(32, 7).toString('base64'),
 };

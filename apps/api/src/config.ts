@@ -43,7 +43,9 @@ export interface AppConfig {
 }
 
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
-  const parsed = schema.safeParse(env);
+  // Compose passes "" for `${VAR:-}`; treat empty values as unset.
+  const cleaned = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== ''));
+  const parsed = schema.safeParse(cleaned);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`invalid configuration: ${issues}`);
