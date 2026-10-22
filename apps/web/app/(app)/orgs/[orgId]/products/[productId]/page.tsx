@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { unwrap } from '@pcp/api-client';
 import type { Role } from '@pcp/shared-contracts';
 import { SimpleForm } from '@/components/auth/simple-form';
+import { SetupChecklist } from '@/components/products/setup-checklist';
 import { Empty } from '@/components/states/empty';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,7 @@ import { api } from '@/lib/api';
 import { QueryState } from '@/lib/page-guard';
 import { roleCan } from '@/lib/permissions';
 import { useOrganization } from '@/lib/queries';
+import { buildSetupSteps } from '@/lib/setup-steps';
 import { useApiQuery } from '@/lib/use-api-query';
 
 const envSchema = z.object({ name: z.string().trim().min(1, 'Enter a name').max(50) });
@@ -95,12 +97,14 @@ export default function ProductPage() {
               </Card>
             ) : null}
           </section>
-          <Card>
-            <CardTitle className="text-base">Health</CardTitle>
-            <CardDescription>
-              No data sources yet. Health appears once agents (M5–M6) and integrations (M7+) are connected.
-            </CardDescription>
-          </Card>
+          <SetupChecklist
+            steps={buildSetupSteps({
+              orgId,
+              productId,
+              environments: (p.environments ?? []).length,
+              canManage,
+            })}
+          />
         </div>
       ) : null}
     </QueryState>

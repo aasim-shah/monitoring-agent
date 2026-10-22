@@ -33,7 +33,7 @@ export function SideNav({ title, items }: { title: string; items: NavItem[] }) {
               className="flex items-center justify-between px-2 py-1.5 text-sm text-muted-foreground"
             >
               <span>{item.label}</span>
-              <Badge title={`Arrives in milestone ${item.milestone}`}>{item.milestone}</Badge>
+              <Badge title={`Coming soon (${item.milestone})`}>Soon</Badge>
             </li>
           ),
         )}
