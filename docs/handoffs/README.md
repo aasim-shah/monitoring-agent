@@ -16,7 +16,9 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M3 Dashboard shell | Done | Branch `feat/m3-dashboard-shell`; Playwright journeys pass against the Compose stack |
 | M4 Connectors and jobs | Done | Branch `feat/m4-connectors`; data model, SDK, runtime, jobs, connections API, [Compose](M4-compose.md); [execution log](M4-execution-log.md) |
 | M5 Agent enrollment and identity | Done | Branch `feat/m5-onboarding-agents`; exit gate passes through Caddy mTLS and from the dashboard; [execution log](M5-execution-log.md) |
-| M6–M19 | Not started | |
+| M6a Host metrics path | Done | Branch `feat/m6-host-agent`; install.sh → metrics in Infrastructure; [execution log](M6a-execution-log.md) |
+| M6b Remote config, discovery, logs | Not started | |
+| M7–M19 | Not started | |
 
 ## Maintenance
 

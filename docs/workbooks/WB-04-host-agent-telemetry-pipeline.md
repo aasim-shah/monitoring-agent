@@ -166,12 +166,12 @@ Infrastructure → Hosts list (status, CPU/memory/disk summary, last seen), Host
 
 ## 12. Task checklist
 
-- [ ] M6.1 Agent distribution build
-- [ ] M6.3 `pcpcontrol` extension (heartbeat, tasks, discovery)
-- [ ] M6.4 OpAMP server and supervisor
-- [ ] M6.5 Ingest gateway
-- [ ] M6.6 Telemetry query module
-- [ ] M6.8 Host overview UI
+- [x] M6.1 Agent distribution build — M6a scope: host metrics collector, amd64/arm64 ([M6.1](../handoffs/M6.1-collector-dist.md)); size/RSS budget check in M6b
+- [ ] M6.3 `pcpcontrol` extension (heartbeat, tasks, discovery) — heartbeat and tasks run in `pcp-agentctl` today; discovery in M6b
+- [ ] M6.4 OpAMP server and supervisor — M6b; `pcp-agentctl` supervises the collector until then
+- [x] M6.5 Ingest gateway — remote_write ([M6.5](../handoffs/M6.5-ingest-gateway.md)); OTLP in M6b/M10
+- [x] M6.6 Telemetry query module ([M6.6](../handoffs/M6.6-telemetry-query.md))
+- [x] M6.8 Host overview UI ([M6.8](../handoffs/M6.8-infrastructure-ui.md))
 
 ## 13. Acceptance criteria
 
