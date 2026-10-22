@@ -3356,7 +3356,12 @@ export interface operations {
     };
     listAuditLogs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Page size (1–100, default 50) */
+                limit?: number;
+                /** @description Opaque cursor from a previous page (nextBefore) */
+                before?: string;
+            };
             header?: never;
             path: {
                 /** @description Organization ID */

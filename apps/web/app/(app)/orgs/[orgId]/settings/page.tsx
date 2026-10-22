@@ -1,0 +1,72 @@
+'use client';
+
+import { useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'next/navigation';
+import { useState } from 'react';
+import { z } from 'zod';
+import { ApiError, unwrap } from '@pcp/api-client';
+import type { Role } from '@pcp/shared-contracts';
+import { SimpleForm } from '@/components/auth/simple-form';
+import { Loading } from '@/components/states/loading';
+import { NotFoundState } from '@/components/states/not-found-state';
+import { Alert } from '@/components/ui/alert';
+import { Card } from '@/components/ui/card';
+import { api } from '@/lib/api';
+import { roleCan } from '@/lib/permissions';
+import { useOrganization } from '@/lib/queries';
+
+const schema = z.object({
+  name: z.string().trim().min(1, 'Enter a name').max(100),
+  timezone: z.string().min(1, 'Enter a timezone'),
+  dataRetentionDays: z.coerce.number().int().min(1, 'At least 1 day').max(3650),
+});
+
+export default function SettingsPage() {
+  const { orgId } = useParams<{ orgId: string }>();
+  const queryClient = useQueryClient();
+  const org = useOrganization(orgId);
+  const [saved, setSaved] = useState(false);
+  if (org.visibleError instanceof ApiError && org.visibleError.status === 404) return <NotFoundState />;
+  if (!org.data) return <Loading label="Loading settings" />;
+  // Settings require org.settings.manage; others get the same page as a missing one.
+  if (!roleCan(org.data.role as Role, 'org.settings.manage')) return <NotFoundState />;
+  const settings = (org.data.settings ?? {}) as { dataRetentionDays?: number };
+  return (
+    <section className="max-w-lg space-y-3">
+      <h1 className="text-xl font-semibold">Settings</h1>
+      {saved ? <Alert tone="success">Settings saved.</Alert> : null}
+      <Card>
+        <SimpleForm
+          schema={schema}
+          defaults={{
+            name: org.data.name,
+            timezone: org.data.timezone,
+            dataRetentionDays: settings.dataRetentionDays ?? 90,
+          }}
+          fields={[
+            { name: 'name', label: 'Organization name' },
+            { name: 'timezone', label: 'Timezone', hint: 'IANA name, e.g. Europe/Berlin' },
+            { name: 'dataRetentionDays', label: 'Data retention (days)', type: 'number' },
+          ]}
+          submitLabel="Save settings"
+          pendingLabel="Saving…"
+          onSubmit={async (v) => {
+            setSaved(false);
+            unwrap(
+              await api.PATCH('/api/v1/organizations/{orgId}/settings', {
+                params: { path: { orgId } },
+                body: {
+                  name: v.name,
+                  timezone: v.timezone,
+                  settings: { dataRetentionDays: v.dataRetentionDays },
+                },
+              }),
+            );
+            await queryClient.invalidateQueries({ queryKey: ['org', orgId] });
+            setSaved(true);
+          }}
+        />
+      </Card>
+    </section>
+  );
+}
