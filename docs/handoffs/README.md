@@ -41,7 +41,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M2.6 | Members and invitations | Done | [M2.6](M2.6-members-invitations.md) |
 | M3.1 | Web foundation | Not started | — |
 | M3.2 | Organization, product, environment, member, audit screens | Not started | — |
-| M3.3 | Typed API client | Not started | — |
+| M3.3 | Typed API client | Done | [M3.3](M3.3-api-client.md) |
 | M4.1 | Envelope encryption | In progress | [M4.1 (with M2.3)](M2.3-identity-primitives.md) |
 | M4.2 | Connector SDK runtime | Not started | — |
 | M4.3 | Connection lifecycle and registry | Not started | — |
