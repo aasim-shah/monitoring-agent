@@ -26,7 +26,7 @@ describe('agent enrollment (WB-03)', () => {
     const { environmentId } = await environmentFor(t, owner);
     const e = await createEnrollment(t, owner, environmentId, { agentType: 'private_worker' });
     expect(e.installCommand).toContain(
-      'curl -fsSL http://localhost:8080/downloads/pcp-private-worker.tar.gz | docker load',
+      'curl -fsSL http://localhost:8080/downloads/worker/pcp-private-worker.tar.gz | docker load',
     );
     expect(e.installCommand).toContain('-v /etc/pcp-worker/secrets:/etc/pcp-worker/secrets:ro');
     expect(e.installCommand).toContain(`enroll-and-run --token ${e.token} --control-url`);

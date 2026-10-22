@@ -36,6 +36,9 @@ services:
     deploy: { resources: { limits: { memory: 64m } } }
 
   downloads:
+    # Private connector worker image (docker save | gzip), served at /downloads/worker/.
+    volumes:
+      - ./worker-image:/srv/downloads/worker:ro
     deploy: { resources: { limits: { memory: 32m } } }
 
   # Until real SMTP is configured, sign-up and invitation mail lands here. It listens on

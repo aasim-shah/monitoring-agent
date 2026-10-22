@@ -52,6 +52,7 @@ Three A records to the VPS IP, for example `monitor`, `agent.monitor`, `ingest.m
 | Status | `docker compose -p pcp ps` |
 | Logs | `docker compose -p pcp logs -f api` |
 | Real email | `SMTP_URL=smtp://resend:<key>@smtp.resend.com:587` (STARTTLS; many VPS providers block outbound 465), `MAIL_FROM="Product Control Plane <alerts@<domain>>"` |
+| Private worker image | `docker save pcp-private-worker:0.1.0 \| gzip > /opt/pcp/worker-image/pcp-private-worker.tar.gz` (amd64 build); served at `/downloads/worker/` |
 | Back up before an upgrade | `docker compose -p pcp exec -T postgres pg_dump -U postgres -Fc pcp > backups/pcp-$(date -u +%Y%m%dT%H%M%SZ).dump` |
 | Read sign-up mail (until SMTP is set) | `ssh -L 18225:127.0.0.1:18225 root@<vps>`, then open http://localhost:18225 |
 | Stop everything (other apps unaffected) | `docker compose -p pcp down` (add `-v` only to delete platform data) |
