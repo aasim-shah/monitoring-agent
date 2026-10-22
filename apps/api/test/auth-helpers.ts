@@ -49,7 +49,7 @@ export async function enrollMfa(t: TestApp, cookie: string): Promise<string> {
     url: '/api/v1/auth/mfa/verify',
     headers: { ...json, cookie },
     remoteAddress: uniqueIp(),
-    payload: { code: totp(secret, Math.floor(Date.now() / 1000)) },
+    payload: { code: totp(secret, Math.floor(t.now().getTime() / 1000)) },
   });
   return secret;
 }

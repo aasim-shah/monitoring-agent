@@ -21,6 +21,8 @@ export interface TestApp {
   prisma: PrismaClient;
   config: AppConfig;
   close(): Promise<void>;
+  /** The app's clock (frozen in some tests); helpers that compute TOTP codes use it. */
+  now: () => Date;
 }
 
 export async function createTestApp(
@@ -50,7 +52,14 @@ export async function createTestApp(
   await app.register(fastifyCookie);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
-  return { app, mailer, prisma: app.get(PRISMA), config, close: () => app.close() };
+  return {
+    app,
+    mailer,
+    prisma: app.get(PRISMA),
+    config,
+    now: opts.clock ?? (() => new Date()),
+    close: () => app.close(),
+  };
 }
 
 /** Unique email and an IP so rate limits never collide between tests. */
