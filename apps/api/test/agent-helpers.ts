@@ -88,3 +88,34 @@ export async function createEnrollment(
   if (res.statusCode !== 201) throw new Error(`enrollment failed ${res.statusCode} ${res.body}`);
   return res.json();
 }
+
+export interface EnrolledAgent {
+  agentId: string;
+  fingerprint: string;
+  certificatePem: string;
+}
+
+/** Enrolls a fresh agent through the API; the fingerprint is what Caddy would forward. */
+export async function enrolledAgent(
+  t: TestApp,
+  owner: Owner,
+  environmentId: string,
+  host: Partial<{ hostname: string; machineId: string }> = {},
+): Promise<EnrolledAgent> {
+  const { createHash } = await import('node:crypto');
+  const e = await createEnrollment(t, owner, environmentId);
+  const res = await t.app.inject({
+    method: 'POST',
+    url: '/agent/v1/enroll',
+    payload: await enrollRequest(e.token, host),
+  });
+  if (res.statusCode !== 201) throw new Error(`enroll failed ${res.statusCode} ${res.body}`);
+  const body = res.json() as { agentId: string; certificatePem: string };
+  const der = Buffer.from(body.certificatePem.replace(/-----[^-]+-----|\s/g, ''), 'base64');
+  return { ...body, fingerprint: createHash('sha256').update(der).digest('hex') };
+}
+
+/** A request as Caddy forwards it: from Caddy's address with the client certificate fingerprint. */
+export function asAgent(fingerprint: string, from = CADDY_ADDRESS) {
+  return { remoteAddress: from, headers: { 'x-client-cert-fingerprint': fingerprint } };
+}

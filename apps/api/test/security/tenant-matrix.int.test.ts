@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto';
 import { RequestMethod } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner, Reflector } from '@nestjs/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { IS_PUBLIC, REQUIRED_PERMISSION, SESSION_ONLY, TENANT_SCOPE } from '../../src/common/decorators.js';
+import {
+  AGENT_ENROLL,
+  AGENT_ROUTE,
+  IS_PUBLIC,
+  REQUIRED_PERMISSION,
+  SESSION_ONLY,
+  TENANT_SCOPE,
+} from '../../src/common/decorators.js';
 import { createTestApp, type TestApp } from '../app-factory.js';
 import { createProduct, headers, ownerWithOrg } from '../auth-helpers.js';
 
@@ -14,6 +21,7 @@ interface Route {
   method: string;
   path: string;
   isPublic: boolean;
+  agent: boolean;
   sessionOnly: boolean;
   permission?: string;
   scope?: unknown;
@@ -41,6 +49,9 @@ function routes(): Route[] {
         path:
           `/${[base, String(path)].filter(Boolean).join('/')}`.replace(/\/+/g, '/').replace(/\/$/, '') || '/',
         isPublic: Boolean(reflector.getAllAndOverride(IS_PUBLIC, targets)),
+        agent:
+          Boolean(reflector.getAllAndOverride(AGENT_ROUTE, targets)) ||
+          Boolean(reflector.getAllAndOverride(AGENT_ENROLL, targets)),
         sessionOnly: Boolean(reflector.getAllAndOverride(SESSION_ONLY, targets)),
         permission: reflector.getAllAndOverride(REQUIRED_PERMISSION, targets),
         scope: reflector.getAllAndOverride(TENANT_SCOPE, targets),
@@ -68,6 +79,13 @@ describe('route enumeration (Review Focus #5)', () => {
       .filter((r) => !r.isPublic && !r.sessionOnly && !(r.permission && r.scope))
       .map((r) => `${r.method} ${r.path}`);
     expect(unguarded).toEqual([]);
+  });
+
+  it('agent protocol routes, and only they, live under /agent/ and use agent authentication', () => {
+    const mismatched = routes()
+      .filter((r) => r.agent !== r.path.startsWith('/agent/'))
+      .map((r) => `${r.method} ${r.path}`);
+    expect(mismatched).toEqual([]);
   });
 
   it('a tenant-B owner gets 404 on every tenant-A resource route', async () => {

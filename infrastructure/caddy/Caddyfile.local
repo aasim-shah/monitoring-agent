@@ -1,0 +1,64 @@
+# Laptop configuration for testing agents end to end (M5). Caddy's internal CA issues
+# certificates for agent.localhost and ingest.localhost; the dashboard stays on plain HTTP.
+# Use with CADDY_CONFIG=Caddyfile.local and AGENT_CA_DIR pointing at a dev PKI
+# (pnpm --filter @pcp/api agent:pki --out ./.pki).
+{
+	local_certs
+	auto_https disable_redirects
+}
+
+:80 {
+	request_header -X-Client-Cert-Fingerprint
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle /healthz {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		reverse_proxy web:3001
+	}
+}
+
+agent.localhost {
+	tls internal {
+		client_auth {
+			mode verify_if_given
+			trust_pool file /etc/caddy-agent-ca/chain.pem
+		}
+	}
+	request_header -X-Client-Cert-Fingerprint
+
+	handle /agent/v1/opamp* {
+		reverse_proxy opamp-server:4320 {
+			header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+		}
+	}
+
+	handle /agent/v1/* {
+		reverse_proxy api:3000 {
+			header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+		}
+	}
+
+	handle {
+		respond 404
+	}
+}
+
+ingest.localhost {
+	tls internal {
+		client_auth {
+			mode require_and_verify
+			trust_pool file /etc/caddy-agent-ca/chain.pem
+		}
+	}
+	request_header -X-Client-Cert-Fingerprint
+
+	reverse_proxy ingest-gateway:4318 {
+		header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+	}
+}

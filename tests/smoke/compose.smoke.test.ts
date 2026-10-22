@@ -38,15 +38,18 @@ describe('compose configuration', () => {
 });
 
 describe.each([
-  ['managed', '18080'],
-  ['self_hosted', '18081'],
-])('stack in %s mode', (mode, httpPort) => {
+  ['managed', '18080', '172.31.1'],
+  ['self_hosted', '18081', '172.31.2'],
+])('stack in %s mode', (mode, httpPort, subnet) => {
   const project = `pcp-smoke-${mode.replace('_', '-')}`;
   const file = envFile({
     ...SECRETS,
     DEPLOYMENT_MODE: mode,
     HTTP_PORT: httpPort,
     HTTPS_PORT: String(Number(httpPort) + 400),
+    // Each stack gets its own edge subnet so it can run beside a dev stack.
+    EDGE_SUBNET: `${subnet}.0/24`,
+    CADDY_ADDRESS: `${subnet}.10`,
   });
 
   afterAll(async () => {

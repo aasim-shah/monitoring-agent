@@ -33,3 +33,9 @@ export const TenantScope = (scope: TenantScopeOptions) => SetMetadata(TENANT_SCO
 
 /** Agent bootstrap (`POST /agent/v1/enroll`): no session and no certificate yet; the token is the credential. */
 export const AgentEnroll = () => applyDecorators(Public(), SetMetadata(AGENT_ENROLL, true));
+
+/**
+ * Agent control route: authenticated by the client-certificate fingerprint Caddy forwards
+ * (AgentAuthGuard), never by a session. Marked public so the user guards skip it.
+ */
+export const AgentRoute = () => applyDecorators(Public(), SetMetadata(AGENT_ROUTE, true));

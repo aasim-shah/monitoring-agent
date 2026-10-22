@@ -51,7 +51,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M4.4 | Job framework | Done | [M4.4](M4.4-jobs.md) |
 | M5.1 | Agent CA and certificate issuance | Done | [M5.1](M5.1-agent-ca.md) |
 | M5.2 | Enrollment | Done | [M5.2](M5.2-enrollment.md) |
-| M5.3 | mTLS edge and agent authentication | Not started | — |
+| M5.3 | mTLS edge and agent authentication | Done | [M5.3](M5.3-agent-auth.md) |
 | M5.4 | Heartbeats and fleet status | Not started | — |
 | M5.5 | Tasks and streams | Not started | — |
 | M5.6 | Rotation and revocation | Not started | — |

@@ -7,6 +7,7 @@ import { OriginGuard } from './common/origin.guard.js';
 import { TenantGuard } from './common/tenant.guard.js';
 import type { AppConfig } from './config.js';
 import { DatabaseModule } from './database/database.module.js';
+import { AgentAuthGuard } from './modules/agents/agent-auth.guard.js';
 import { AgentsModule } from './modules/agents/agents.module.js';
 import { AuditingModule } from './modules/auditing/auditing.module.js';
 import { ConnectionsModule } from './modules/connections/connections.module.js';
@@ -65,6 +66,7 @@ export class AppModule {
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
         // Guards run in this order.
         { provide: APP_GUARD, useClass: OriginGuard },
+        { provide: APP_GUARD, useExisting: AgentAuthGuard },
         { provide: APP_GUARD, useExisting: CurrentUserGuard },
         { provide: APP_GUARD, useClass: TenantGuard },
       ],

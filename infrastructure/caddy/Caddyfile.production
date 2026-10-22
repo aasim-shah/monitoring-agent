@@ -15,10 +15,23 @@
 	}
 }
 
+# Ingest: every request must present an agent certificate.
 (agent_mtls) {
 	tls {
 		client_auth {
 			mode require_and_verify
+			trust_pool file /etc/caddy-agent-ca/chain.pem
+		}
+	}
+}
+
+# Control channel: a certificate is verified when presented, but not required, because
+# POST /agent/v1/enroll runs before the agent has one. The API rejects every other agent
+# route without a forwarded fingerprint (M5 ruling on D10).
+(agent_mtls_optional) {
+	tls {
+		client_auth {
+			mode verify_if_given
 			trust_pool file /etc/caddy-agent-ca/chain.pem
 		}
 	}
@@ -43,7 +56,8 @@
 }
 
 {$AGENT_DOMAIN} {
-	import agent_mtls
+	import agent_mtls_optional
+	request_header -X-Client-Cert-Fingerprint
 	import security_headers
 
 	handle /agent/v1/opamp* {
@@ -65,6 +79,7 @@
 
 {$INGEST_DOMAIN} {
 	import agent_mtls
+	request_header -X-Client-Cert-Fingerprint
 	import security_headers
 
 	reverse_proxy ingest-gateway:4318 {

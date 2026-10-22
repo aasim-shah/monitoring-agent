@@ -51,6 +51,8 @@ export default async function globalSetup() {
       MASTER_KEY: Buffer.alloc(32, 9).toString('base64'),
       HTTP_PORT: String(E2E_HTTP_PORT),
       HTTPS_PORT: String(E2E_HTTP_PORT + 400),
+      EDGE_SUBNET: '172.31.9.0/24',
+      CADDY_ADDRESS: '172.31.9.10',
       MAILPIT_PORT: String(MAILPIT_PORT),
       APP_ORIGIN: BASE_URL,
     })

@@ -1165,6 +1165,23 @@ paths:
           description: Agent enrollment is not configured on this deployment
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
       x-implemented-in: M5
+  /agent/v1/whoami:
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
+    get:
+      operationId: agentWhoami
+      tags: [agent-protocol]
+      summary: Confirm the client certificate is accepted
+      description: Confirm the client certificate is accepted (used by pcp-agentctl status).
+      security: [{ agentMtls: [] }]
+      responses:
+        '200':
+          description: Authenticated agent
+          content:
+            application/json:
+              schema:
+                { type: object, required: [agentId], properties: { agentId: { type: string, format: uuid } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M5
   /agent/v1/heartbeat:
     servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:

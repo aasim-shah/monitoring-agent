@@ -35,7 +35,9 @@ services:
       - ${AGENT_CA_DIR:-./infrastructure/caddy/agent-ca}:/etc/caddy-agent-ca:ro
       - caddy-data:/data
       - caddy-config:/config
-    networks: [edge]
+    networks:
+      edge:
+        ipv4_address: ${CADDY_ADDRESS:-172.30.0.10}
     depends_on:
       api: { condition: service_healthy }
       web: { condition: service_healthy }
@@ -85,6 +87,14 @@ services:
       MASTER_KEY: ${MASTER_KEY:?MASTER_KEY must be set (see .env.example)}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Product Control Plane <no-reply@localhost>}
+      AGENT_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
+      AGENT_CA_CERT: ${AGENT_CA_CERT:-}
+      AGENT_CA_KEY: ${AGENT_CA_KEY:-}
+      AGENT_CA_CHAIN: ${AGENT_CA_CHAIN:-}
+      TASK_SIGNING_KEY: ${TASK_SIGNING_KEY:-}
+      AGENT_CONTROL_URL: ${AGENT_CONTROL_URL:-}
+      AGENT_INGEST_URL: ${AGENT_INGEST_URL:-}
+      AGENT_OPAMP_URL: ${AGENT_OPAMP_URL:-}
     networks: [edge, internal]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -219,7 +229,11 @@ services:
     restart: unless-stopped
 
 networks:
-  edge: {}
+  # Fixed subnet so the API can trust X-Client-Cert-Fingerprint only from Caddy's address (D10).
+  edge:
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.30.0.0/24}
   internal:
     internal: true
 
