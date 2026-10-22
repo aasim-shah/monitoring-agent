@@ -27,6 +27,13 @@ export default function ProductPage() {
     unwrap(await api.GET('/api/v1/products/{productId}', { params: { path: { productId } } })),
   );
   const canManage = org.data ? roleCan(org.data.role as Role, 'product.manage') : false;
+  const canViewAgents = org.data ? roleCan(org.data.role as Role, 'agent.view') : false;
+  const agents = useApiQuery(
+    ['agents', productId],
+    async () =>
+      unwrap(await api.GET('/api/v1/products/{productId}/agents', { params: { path: { productId } } })),
+    { enabled: canViewAgents },
+  );
   const p = product.data;
   return (
     <QueryState query={product} label="Loading product">
@@ -102,6 +109,7 @@ export default function ProductPage() {
               orgId,
               productId,
               environments: (p.environments ?? []).length,
+              agents: agents.data?.agents.length ?? 0,
               canManage,
             })}
           />

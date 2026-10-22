@@ -12,7 +12,8 @@ if (i < 0 || !process.argv[i + 1]) {
   console.error('usage: agent-pki --out <dir>');
   process.exit(2);
 }
-const out = resolve(process.argv[i + 1]);
+// pnpm runs scripts from apps/api; resolve --out against the caller's directory (INIT_CWD).
+const out = resolve(process.env.INIT_CWD ?? process.cwd(), process.argv[i + 1]);
 mkdirSync(out, { recursive: true });
 const pki = await generateDevPki();
 writeFileSync(join(out, 'root.pem'), pki.rootCertPem);

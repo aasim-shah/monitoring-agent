@@ -38,8 +38,16 @@ describe('product navigation (spec §21)', () => {
       'Audit Log',
     ]);
     expect(items[0]).toEqual({ label: 'Health Overview', href: '/orgs/o/products/p' });
-    expect(items.find((i) => i.label === 'Agents')).toEqual({ label: 'Agents', milestone: 'M5' });
-    expect(items.filter((i) => i.href).map((i) => i.label)).toEqual(['Health Overview', 'Audit Log']);
+    expect(items.find((i) => i.label === 'Agents')).toEqual({
+      label: 'Agents',
+      href: '/orgs/o/products/p/agents',
+    });
+    expect(items.find((i) => i.label === 'Integrations')).toEqual({ label: 'Integrations', milestone: 'M7' });
+    expect(items.filter((i) => i.href).map((i) => i.label)).toEqual([
+      'Health Overview',
+      'Agents',
+      'Audit Log',
+    ]);
   });
 
   it('omits the audit log for roles without audit.view', () => {

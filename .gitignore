@@ -12,3 +12,4 @@ coverage/
 *.tsbuildinfo
 tests/agent-e2e/.tmp-*
 .pki/
+tests/e2e/.tmp/

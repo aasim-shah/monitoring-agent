@@ -16,6 +16,7 @@ interface SetupInput {
   orgId: string;
   productId: string;
   environments: number;
+  agents: number;
   canManage: boolean;
 }
 
@@ -38,7 +39,9 @@ export function buildSetupSteps(input: SetupInput): SetupStep[] {
       description:
         'Copy one install command and run it on each VPS. The agent appears within a minute and detects Redis, Kafka, PostgreSQL, Node.js, and other services.',
       collects: 'CPU, memory, disk, network, service health and metrics, and logs you choose.',
-      status: 'soon',
+      status: input.agents > 0 ? 'done' : 'todo',
+      href: `/orgs/${input.orgId}/products/${input.productId}/agents`,
+      actionLabel: 'Add server',
     },
     {
       id: 'google',

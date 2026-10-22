@@ -55,9 +55,9 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M5.4 | Heartbeats and fleet status | Done | [M5.4](M5.4-heartbeats.md) |
 | M5.5 | Tasks and streams | Done | [M5.5](M5.5-tasks.md) |
 | M5.6 | Rotation and revocation | Done | [M5.6](M5.6-rotation-revocation.md) |
-| M5.7 | Fleet UI | Not started | — |
+| M5.7 | Fleet UI | Done | [M5.7](M5.7-fleet-ui.md) |
 | M6.1 | Agent distribution build | Not started | — |
-| M6.2 | `pcp-agentctl` | Not started | — |
+| M6.2 | `pcp-agentctl` | In progress | enroll/run/status in [M5.7](M5.7-fleet-ui.md); packaging pending |
 | M6.3 | `pcpcontrol` extension (heartbeat, tasks, discovery) | Not started | — |
 | M6.4 | OpAMP server and supervisor | Not started | — |
 | M6.5 | Ingest gateway | Not started | — |

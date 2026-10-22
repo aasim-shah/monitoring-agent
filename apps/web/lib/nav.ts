@@ -35,7 +35,7 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
   const items: Array<NavItem & { permission?: Permission }> = [
     { label: 'Health Overview', href: `/orgs/${orgId}/products/${productId}` },
     { label: 'Integrations', milestone: 'M7' },
-    { label: 'Agents', milestone: 'M5' },
+    { label: 'Agents', href: `/orgs/${orgId}/products/${productId}/agents`, permission: 'agent.view' },
     { label: 'Assets', milestone: 'M9' },
     { label: 'Infrastructure', milestone: 'M6' },
     { label: 'Websites & APIs', milestone: 'M13' },
