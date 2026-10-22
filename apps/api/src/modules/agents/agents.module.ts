@@ -14,6 +14,7 @@ import { EnrollService } from './enroll.service.js';
 import { EnrollmentsController } from './enrollments.controller.js';
 import { EnrollmentsService } from './enrollments.service.js';
 import { HeartbeatController } from './heartbeat.controller.js';
+import { InternalAgentsController } from './internal.controller.js';
 import { agentSettingsProvider } from './settings.provider.js';
 import { RevocationBus } from './revocation.bus.js';
 import { RotateController } from './rotate.controller.js';
@@ -41,6 +42,7 @@ class RevocationShutdown implements OnApplicationShutdown {
     TasksController,
     AgentTasksController,
     RotateController,
+    InternalAgentsController,
   ],
   providers: [
     agentSettingsProvider,

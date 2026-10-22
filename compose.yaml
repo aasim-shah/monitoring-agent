@@ -88,6 +88,7 @@ services:
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Product Control Plane <no-reply@localhost>}
       AGENT_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-}
       AGENT_CA_CERT: ${AGENT_CA_CERT:-}
       AGENT_CA_KEY: ${AGENT_CA_KEY:-}
       AGENT_CA_CHAIN: ${AGENT_CA_CHAIN:-}

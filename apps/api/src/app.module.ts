@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD, DiscoveryModule } from '@nestjs/core';
 import { postgresCheck, redisCheck } from '@pcp/health';
 import { loadKeyRing } from '@pcp/secrets';
 import { ApiExceptionFilter } from './common/errors.js';
+import { InternalGuard } from './common/internal.guard.js';
 import { OriginGuard } from './common/origin.guard.js';
 import { TenantGuard } from './common/tenant.guard.js';
 import type { AppConfig } from './config.js';
@@ -67,6 +68,7 @@ export class AppModule {
         // Guards run in this order.
         { provide: APP_GUARD, useClass: OriginGuard },
         { provide: APP_GUARD, useExisting: AgentAuthGuard },
+        { provide: APP_GUARD, useClass: InternalGuard },
         { provide: APP_GUARD, useExisting: CurrentUserGuard },
         { provide: APP_GUARD, useClass: TenantGuard },
       ],

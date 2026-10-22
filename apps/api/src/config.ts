@@ -32,6 +32,7 @@ const schema = z
     AGENT_INGEST_URL: z.string().url().optional(),
     AGENT_OPAMP_URL: z.string().url().optional(),
     AGENT_PROXY_ADDRESSES: z.string().optional(),
+    INTERNAL_TOKEN: z.string().min(24).optional(),
   })
   .refine(
     (c) =>
@@ -78,6 +79,8 @@ export interface AppConfig {
   mailFrom: string;
   google?: GoogleConfig;
   agents?: AgentConfig;
+  /** Shared secret for private-network service calls; internal routes are off without it. */
+  internalToken?: string;
 }
 
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
@@ -105,6 +108,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
           redirectUri: c.GOOGLE_REDIRECT_URI!,
         }
       : undefined,
+    internalToken: c.INTERNAL_TOKEN,
     agents: c.AGENT_CA_CERT
       ? {
           caCertPem: fromBase64(c.AGENT_CA_CERT),

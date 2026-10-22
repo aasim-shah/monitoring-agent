@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   AGENT_ENROLL,
   AGENT_ROUTE,
+  INTERNAL_ROUTE,
   IS_PUBLIC,
   REQUIRED_PERMISSION,
   SESSION_ONLY,
@@ -22,6 +23,7 @@ interface Route {
   path: string;
   isPublic: boolean;
   agent: boolean;
+  internal: boolean;
   sessionOnly: boolean;
   permission?: string;
   scope?: unknown;
@@ -49,6 +51,7 @@ function routes(): Route[] {
         path:
           `/${[base, String(path)].filter(Boolean).join('/')}`.replace(/\/+/g, '/').replace(/\/$/, '') || '/',
         isPublic: Boolean(reflector.getAllAndOverride(IS_PUBLIC, targets)),
+        internal: Boolean(reflector.getAllAndOverride(INTERNAL_ROUTE, targets)),
         agent:
           Boolean(reflector.getAllAndOverride(AGENT_ROUTE, targets)) ||
           Boolean(reflector.getAllAndOverride(AGENT_ENROLL, targets)),
@@ -84,6 +87,13 @@ describe('route enumeration (Review Focus #5)', () => {
   it('agent protocol routes, and only they, live under /agent/ and use agent authentication', () => {
     const mismatched = routes()
       .filter((r) => r.agent !== r.path.startsWith('/agent/'))
+      .map((r) => `${r.method} ${r.path}`);
+    expect(mismatched).toEqual([]);
+  });
+
+  it('internal routes, and only they, live under /internal/ and require the internal token', () => {
+    const mismatched = routes()
+      .filter((r) => r.internal !== r.path.startsWith('/internal/'))
       .map((r) => `${r.method} ${r.path}`);
     expect(mismatched).toEqual([]);
   });

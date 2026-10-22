@@ -8,6 +8,7 @@ export const REQUIRED_PERMISSION = 'pcp:permission';
 export const TENANT_SCOPE = 'pcp:tenant-scope';
 export const AGENT_ROUTE = 'pcp:agent-route';
 export const AGENT_ENROLL = 'pcp:agent-enroll';
+export const INTERNAL_ROUTE = 'pcp:internal';
 
 export type TenantResource = 'organization' | 'product' | 'environment' | 'connection' | 'agent';
 
@@ -39,3 +40,6 @@ export const AgentEnroll = () => applyDecorators(Public(), SetMetadata(AGENT_ENR
  * (AgentAuthGuard), never by a session. Marked public so the user guards skip it.
  */
 export const AgentRoute = () => applyDecorators(Public(), SetMetadata(AGENT_ROUTE, true));
+
+/** Private-network service call (ingest gateway, OpAMP server): `X-Internal-Token`, never a session. */
+export const Internal = () => applyDecorators(Public(), SetMetadata(INTERNAL_ROUTE, true));
