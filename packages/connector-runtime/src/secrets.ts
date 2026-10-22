@@ -19,8 +19,10 @@ export async function storeCredentials(
     credentialsAad(ctx.organizationId, connectionId),
     keys.active,
   );
-  // One statement: Prisma's upsert reads then writes, so two concurrent submissions could
-  // both try to insert and fail on the primary key.
+  // Serialize submissions for this connection: Prisma's upsert reads then writes, and
+  // ON CONFLICT alone does not cover the second unique index, so concurrent inserts could
+  // still fail. The row lock lasts until the caller's transaction ends.
+  await tx.$executeRaw`SELECT 1 FROM connections WHERE id = ${connectionId}::uuid FOR UPDATE`;
   await tx.$executeRaw`
     INSERT INTO connection_secrets (connection_id, organization_id, ciphertext, key_version)
     VALUES (${connectionId}::uuid, ${ctx.organizationId}::uuid, ${serializeSecret(sealed)}, ${sealed.keyVersion})
