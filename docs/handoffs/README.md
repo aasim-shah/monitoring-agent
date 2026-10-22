@@ -47,7 +47,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M4.1 | Envelope encryption | Done | [envelope](M2.3-identity-primitives.md), [storage](M4.2-connector-runtime.md) |
 | M4.2 | Connector SDK runtime | Done | [SDK](M4.2-connector-sdk.md), [runtime](M4.2-connector-runtime.md) |
 | M4.3 | Connection lifecycle and registry | Not started | — |
-| M4.4 | Job framework | Not started | — |
+| M4.4 | Job framework | Done | [M4.4](M4.4-jobs.md) |
 | M5.1 | Agent CA and certificate issuance | Not started | — |
 | M5.2 | Enrollment | Not started | — |
 | M5.3 | mTLS edge and agent authentication | Not started | — |

@@ -12,7 +12,11 @@
   },
   "dependencies": {
     "@pcp/health": "workspace:*",
-    "zod": "3.25.76"
+    "zod": "3.25.76",
+    "@pcp/connector-runtime": "workspace:*",
+    "@pcp/database": "workspace:*",
+    "@pcp/jobs": "workspace:*",
+    "@pcp/secrets": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
