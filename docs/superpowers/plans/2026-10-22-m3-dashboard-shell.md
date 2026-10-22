@@ -38,11 +38,11 @@
 **Interfaces:**
 - Produces: `type paths`, `type components` (generated); `createApiClient(opts?: { baseUrl?: string; fetch?: typeof fetch })` → `openapi-fetch` client with `credentials: 'include'`; `ApiError` class `{ status: number; code: string; message: string; requestId?: string }`; `unwrap<T>(result): T` throws `ApiError` on error responses; `type Schemas = components['schemas']`.
 
-- [ ] **Step 1: Failing tests** — `generate.test.ts`: `node scripts/generate.mjs --check` exits 0. `errors.test.ts`: `unwrap` returns data on success; throws `ApiError` with `status`, `code`, `message`, `requestId` from an error body; falls back to `code: 'error'` for non-JSON bodies.
-- [ ] **Step 2: Run** → FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** → PASS; `pnpm turbo run build typecheck --filter @pcp/api-client` → exit 0.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M3.3-api-client.md`; `git commit -m "feat(api-client): add typed OpenAPI client (M3.3)"`.
+- [x] **Step 1: Failing tests** — `generate.test.ts`: `node scripts/generate.mjs --check` exits 0. `errors.test.ts`: `unwrap` returns data on success; throws `ApiError` with `status`, `code`, `message`, `requestId` from an error body; falls back to `code: 'error'` for non-JSON bodies.
+- [x] **Step 2: Run** → FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run** → PASS; `pnpm turbo run build typecheck --filter @pcp/api-client` → exit 0.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M3.3-api-client.md`; `git commit -m "feat(api-client): add typed OpenAPI client (M3.3)"`.
 
 ### Task 2: Web foundation — styles, primitives, state components, providers, role matrix move (master M3.1 part 1)
 
@@ -56,11 +56,11 @@
 - Produces (web): `cn(...classes)`; `api` = `createApiClient()`; `queryClient` defaults (retry false for 4xx; 30 s stale); `<Loading label>`, `<Empty title action?>`, `<ErrorState error onRetry>`, `<Disconnected>`, `<NotFoundState>`; `handleApiError(error, router, pathname)` → 401 → `/login?next=…`, 403 `mfa_required` → `/mfa`, else returns the error.
 - Shared contracts: `ROLE_PERMISSIONS`, `can` now exported from `@pcp/shared-contracts`; `@pcp/tenant-security` re-exports them unchanged.
 
-- [ ] **Step 1: Failing tests** — states render accessible text (`role="status"` for loading, `role="alert"` for errors, retry button calls `onRetry`); `handleApiError` maps 401 to `/login?next=%2Forgs%2Fx`, `mfa_required` to `/mfa`, and returns other errors; shared-contracts `can` test (owner can `org.members.manage`, viewer cannot); tenant-security tests unchanged and green.
-- [ ] **Step 2: Run** → FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** → PASS; `next build` succeeds.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M3.1-web-foundation.md`; `git commit -m "feat(web): add styles, primitives, states, providers (M3.1)"`.
+- [x] **Step 1: Failing tests** — states render accessible text (`role="status"` for loading, `role="alert"` for errors, retry button calls `onRetry`); `handleApiError` maps 401 to `/login?next=%2Forgs%2Fx`, `mfa_required` to `/mfa`, and returns other errors; shared-contracts `can` test (owner can `org.members.manage`, viewer cannot); tenant-security tests unchanged and green.
+- [x] **Step 2: Run** → FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run** → PASS; `next build` succeeds.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M3.1-web-foundation.md`; `git commit -m "feat(web): add styles, primitives, states, providers (M3.1)"`.
 
 ### Task 3: Authentication pages (master M3.1 part 2)
 
@@ -73,11 +73,11 @@
 - `safeNext(next: string | null): string` → relative same-origin path or `/orgs`.
 - Middleware: paths outside `(auth)`, `/healthz`, `/_next`, static files → redirect to `/login?next=` when no `pcp_session` cookie.
 
-- [ ] **Step 1: Failing tests** — `safeNext`: `/orgs/a` kept; `//evil.com`, `https://evil.com`, `/\\evil`, `javascript:` → `/orgs` (Review Focus #5). Login form: client validation errors; submit disabled while pending (Review Focus #4); API `invalid_credentials` shown as a message; `mfaRequired: true` navigates to `/mfa`. Middleware: no cookie on `/orgs` → 307 to `/login?next=%2Forgs`; `/login` passes; with cookie passes.
-- [ ] **Step 2: Run** → FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M3.1-auth-pages.md`; `git commit -m "feat(web): add authentication pages (M3.1)"`.
+- [x] **Step 1: Failing tests** — `safeNext`: `/orgs/a` kept; `//evil.com`, `https://evil.com`, `/\\evil`, `javascript:` → `/orgs` (Review Focus #5). Login form: client validation errors; submit disabled while pending (Review Focus #4); API `invalid_credentials` shown as a message; `mfaRequired: true` navigates to `/mfa`. Middleware: no cookie on `/orgs` → 307 to `/login?next=%2Forgs`; `/login` passes; with cookie passes.
+- [x] **Step 2: Run** → FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run** → PASS.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M3.1-auth-pages.md`; `git commit -m "feat(web): add authentication pages (M3.1)"`.
 
 ### Task 4: App shell — organizations, context switcher, navigation (master M3.1 part 3)
 
@@ -90,11 +90,11 @@
 - `useApiQuery(key, fn)` wraps TanStack Query and applies `handleApiError`.
 - `/orgs`: memberships from `/me`, create-organization form (name, timezone default from browser).
 
-- [ ] **Step 1: Failing tests** — viewer org nav lacks Settings and Audit Log; owner has both; product nav lists all 14 §21 sections in order with unbuilt ones disabled and labelled; `useApiQuery` redirects on 401 to `/login?next=<path>` (Review Focus #1).
-- [ ] **Step 2: Run** → FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** → PASS.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M3.1-app-shell.md`; `git commit -m "feat(web): add app shell, context switcher, navigation (M3.1)"`.
+- [x] **Step 1: Failing tests** — viewer org nav lacks Settings and Audit Log; owner has both; product nav lists all 14 §21 sections in order with unbuilt ones disabled and labelled; `useApiQuery` redirects on 401 to `/login?next=<path>` (Review Focus #1).
+- [x] **Step 2: Run** → FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run** → PASS.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M3.1-app-shell.md`; `git commit -m "feat(web): add app shell, context switcher, navigation (M3.1)"`.
 
 ### Task 5: Organization, product, environment, members, audit, settings screens (master M3.2)
 
@@ -108,11 +108,11 @@
 - Audit: table newest first, "Load more" using `nextBefore`.
 - Settings: name, timezone, data retention days.
 
-- [ ] **Step 1: Failing tests** — role select offers only roles at or below the actor; audit table renders entries and calls `onLoadMore` when `nextBefore` exists, hides the button when null; empty state when no entries.
-- [ ] **Step 2: Run** → FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run** → PASS; `next build` succeeds.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M3.2-screens.md`; `git commit -m "feat(web): add organization, product, members, audit, settings screens (M3.2)"`.
+- [x] **Step 1: Failing tests** — role select offers only roles at or below the actor; audit table renders entries and calls `onLoadMore` when `nextBefore` exists, hides the button when null; empty state when no entries.
+- [x] **Step 2: Run** → FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run** → PASS; `next build` succeeds.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M3.2-screens.md`; `git commit -m "feat(web): add organization, product, members, audit, settings screens (M3.2)"`.
 
 ### Task 6: End-to-end tests against the Compose stack, CI, docs
 
@@ -123,8 +123,8 @@
 **Interfaces:**
 - `pnpm test:e2e` brings up the stack with the e2e override, installs Chromium, runs Playwright, and tears down.
 
-- [ ] **Step 1: Failing tests** — `onboarding.spec.ts`: sign up → open verification link from Mailpit → sign in → create "Example Company" → redirected to `/mfa` (Review Focus #2) → enroll with TOTP → recovery codes shown → create FireMaps with domains → add Production and Staging → invite a member (email arrives in Mailpit) → audit log lists `organization.created`, `product.created`, `environment.created`, `invitation.created`. `navigation.spec.ts`: viewer (invited, accepted) sees no Settings or Audit Log in nav; typing `/orgs/<id>/settings` shows the not-found state (Review Focus #3).
-- [ ] **Step 2: Run** → FAIL.
-- [ ] **Step 3: Implement** remaining glue (fix any defects the e2e tests reveal, test-first).
-- [ ] **Step 4: Run** → PASS; full `pnpm turbo run build lint typecheck test` green.
-- [ ] **Step 5: Handoff + commit** — `docs/handoffs/M3-e2e.md`; board and workbook updates; `git commit -m "test(e2e): add onboarding and navigation journeys (M3)"`.
+- [x] **Step 1: Failing tests** — `onboarding.spec.ts`: sign up → open verification link from Mailpit → sign in → create "Example Company" → redirected to `/mfa` (Review Focus #2) → enroll with TOTP → recovery codes shown → create FireMaps with domains → add Production and Staging → invite a member (email arrives in Mailpit) → audit log lists `organization.created`, `product.created`, `environment.created`, `invitation.created`. `navigation.spec.ts`: viewer (invited, accepted) sees no Settings or Audit Log in nav; typing `/orgs/<id>/settings` shows the not-found state (Review Focus #3).
+- [x] **Step 2: Run** → FAIL.
+- [x] **Step 3: Implement** remaining glue (fix any defects the e2e tests reveal, test-first).
+- [x] **Step 4: Run** → PASS; full `pnpm turbo run build lint typecheck test` green.
+- [x] **Step 5: Handoff + commit** — `docs/handoffs/M3-e2e.md`; board and workbook updates; `git commit -m "test(e2e): add onboarding and navigation journeys (M3)"`.

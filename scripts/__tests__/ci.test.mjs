@@ -6,7 +6,7 @@ import { parse } from 'yaml';
 const path = (p) => new URL(`../../${p}`, import.meta.url);
 const load = (p) => parse(readFileSync(path(p), 'utf8'));
 
-const JOBS = ['node', 'go', 'openapi', 'smoke', 'sbom', 'osv-scan', 'secret-scan'];
+const JOBS = ['node', 'go', 'openapi', 'smoke', 'e2e', 'sbom', 'osv-scan', 'secret-scan'];
 
 test('ci workflow exists', () => {
   assert.ok(existsSync(path('.github/workflows/ci.yml')));

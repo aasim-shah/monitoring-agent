@@ -1,0 +1,18 @@
+# E2E override: catches mail in Mailpit so tests can read verification and invitation links.
+services:
+  mailpit:
+    image: axllent/mailpit:v1.27.10
+    networks: [edge]
+    ports:
+      - '127.0.0.1:${MAILPIT_PORT:-18225}:8025'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8025/livez']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    environment:
+      SMTP_URL: smtp://mailpit:1025
+    depends_on:
+      mailpit: { condition: service_healthy }

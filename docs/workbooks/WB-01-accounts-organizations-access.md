@@ -233,9 +233,9 @@ Login, Sign up, Verify email, Reset password, MFA enrollment, Organization creat
 - [x] M2.4 Organizations, products, environments, RBAC guard, tenant matrix test
 - [x] M2.5 Audit log
 - [x] M2.6 Members and invitations
-- [ ] M3.1 Web foundation (auth pages, layout, navigation, state components)
-- [ ] M3.2 Organization, product, environment, member, audit screens
-- [ ] M3.3 Typed API client
+- [x] M3.1 Web foundation (auth pages, layout, navigation, state components)
+- [x] M3.2 Organization, product, environment, member, audit screens
+- [x] M3.3 Typed API client
 
 ## 13. Acceptance criteria
 
