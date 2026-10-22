@@ -141,4 +141,16 @@ describe('agent data model', () => {
   it('hides enrollments from the app role without tenant context', async () => {
     expect(await query(db.appUrl, `SELECT * FROM agent_enrollments`)).toEqual([]);
   });
+
+  it('allows one assignment per pack per agent', async () => {
+    const insert = () =>
+      query(
+        db.superuserUrl,
+        `INSERT INTO agent_pack_assignments (id, organization_id, agent_id, pack_id, settings, policy_version, updated_at)
+         VALUES ($1, $2, $3, 'postgresql', '{}', 2, now())`,
+        [randomUUID(), org, agent],
+      );
+    await insert();
+    await expect(insert()).rejects.toThrow(/duplicate key/);
+  });
 });

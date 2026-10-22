@@ -129,6 +129,16 @@ beforeAll(async () => {
         [task, org, agent],
       );
       await c.query(
+        `INSERT INTO agent_inventories (agent_id, organization_id, collected_at, services, listeners, warnings)
+         VALUES ($1, $2, now(), '[]', '[]', '[]')`,
+        [agent, org],
+      );
+      await c.query(
+        `INSERT INTO agent_pack_assignments (id, organization_id, agent_id, pack_id, settings, policy_version, updated_at)
+         VALUES ($1, $2, $3, 'redis', '{}', 2, now())`,
+        [randomUUID(), org, agent],
+      );
+      await c.query(
         `INSERT INTO agent_stream_sessions (id, organization_id, agent_id, task_id, expires_at) VALUES ($1, $2, $3, $4, now() + interval '10 minutes')`,
         [randomUUID(), org, agent, task],
       );

@@ -483,13 +483,15 @@ model Agent {
   revokedAt        DateTime?   @map("revoked_at") @db.Timestamptz(6)
   createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  enrollment     AgentEnrollment      @relation(fields: [organizationId, enrollmentId], references: [organizationId, id], onDelete: Cascade)
-  environment    Environment          @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Cascade)
+  enrollment     AgentEnrollment       @relation(fields: [organizationId, enrollmentId], references: [organizationId, id], onDelete: Cascade)
+  environment    Environment           @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Cascade)
   credentials    AgentCredential[]
   publicKeys     AgentPublicKey[]
   heartbeats     AgentHeartbeat[]
   tasks          AgentTask[]
   streamSessions AgentStreamSession[]
+  inventory      AgentInventory?
+  packs          AgentPackAssignment[]
 
   @@unique([organizationId, id])
   @@index([organizationId, productId])
@@ -604,4 +606,51 @@ model AgentStreamSession {
   task  AgentTask @relation(fields: [organizationId, taskId], references: [organizationId, id], onDelete: Cascade)
 
   @@map("agent_stream_sessions")
+}
+
+enum PackStatus {
+  pending
+  applied
+  failed
+  removing
+
+  @@map("pack_status")
+}
+
+/// Latest discovery snapshot reported by an agent (services, listeners, warnings).
+model AgentInventory {
+  agentId        String   @id @map("agent_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  collectedAt    DateTime @map("collected_at") @db.Timestamptz(6)
+  services       Json     @default("[]")
+  listeners      Json     @default("[]")
+  warnings       Json     @default("[]")
+
+  agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, agentId])
+  @@map("agent_inventories")
+}
+
+/// A monitoring pack enabled on an agent. `sealed_credentials` holds ciphertext only the
+/// agent can open and is cleared once the agent acknowledges (BR-11-03).
+model AgentPackAssignment {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String     @map("organization_id") @db.Uuid
+  agentId           String     @map("agent_id") @db.Uuid
+  packId            String     @map("pack_id")
+  settings          Json       @default("{}")
+  sealedCredentials String?    @map("sealed_credentials")
+  status            PackStatus @default(pending)
+  statusMessage     String?    @map("status_message")
+  policyVersion     Int        @map("policy_version")
+  appliedAt         DateTime?  @map("applied_at") @db.Timestamptz(6)
+  createdByUserId   String?    @map("created_by_user_id") @db.Uuid
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  agent Agent @relation(fields: [organizationId, agentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([agentId, packId])
+  @@map("agent_pack_assignments")
 }

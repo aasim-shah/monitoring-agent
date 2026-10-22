@@ -22,6 +22,8 @@ export const TENANT_TABLES = [
   'agent_tasks',
   'agent_task_results',
   'agent_stream_sessions',
+  'agent_inventories',
+  'agent_pack_assignments',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];
