@@ -6,6 +6,8 @@ export const SESSION_ONLY = 'pcp:session-only';
 export const ALLOW_MFA_PENDING = 'pcp:allow-mfa-pending';
 export const REQUIRED_PERMISSION = 'pcp:permission';
 export const TENANT_SCOPE = 'pcp:tenant-scope';
+export const AGENT_ROUTE = 'pcp:agent-route';
+export const AGENT_ENROLL = 'pcp:agent-enroll';
 
 export type TenantResource = 'organization' | 'product' | 'environment' | 'connection';
 
@@ -28,3 +30,6 @@ export const RequirePermission = (permission: Permission) => SetMetadata(REQUIRE
 
 /** Which route parameter identifies the tenant resource. */
 export const TenantScope = (scope: TenantScopeOptions) => SetMetadata(TENANT_SCOPE, scope);
+
+/** Agent bootstrap (`POST /agent/v1/enroll`): no session and no certificate yet; the token is the credential. */
+export const AgentEnroll = () => applyDecorators(Public(), SetMetadata(AGENT_ENROLL, true));

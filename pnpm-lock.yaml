@@ -62,6 +62,9 @@ importers:
       '@node-rs/argon2':
         specifier: 2.2.2
         version: 2.2.2
+      '@pcp/agent-protocol':
+        specifier: workspace:*
+        version: link:../../packages/agent-protocol
       '@pcp/connector-runtime':
         specifier: workspace:*
         version: link:../../packages/connector-runtime

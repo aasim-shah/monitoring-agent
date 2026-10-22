@@ -32,7 +32,8 @@
     "nodemailer": "10.2.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
-    "zod": "3.25.76"
+    "zod": "3.25.76",
+    "@pcp/agent-protocol": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/testing": "11.2.7",

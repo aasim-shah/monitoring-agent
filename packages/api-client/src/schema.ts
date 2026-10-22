@@ -859,18 +859,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/agent-enrollments": {
+    "/api/v1/environments/{environmentId}/agent-enrollments": {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Environment ID */
+                environmentId: components["parameters"]["environmentId"];
+            };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Enrollments for an environment (never the token)
+         * @description Enrollments for an environment (never the token). Requires `agent.view`.
+         */
+        get: operations["listAgentEnrollments"];
         put?: never;
         /**
-         * Create enrollment token (shown once)
-         * @description Create enrollment token (shown once).
+         * Create an enrollment token (shown once) and install command
+         * @description Create an enrollment token (shown once) and install command. Requires `agent.enroll`.
          */
         post: operations["createAgentEnrollment"];
         delete?: never;
@@ -1259,7 +1266,7 @@ export interface paths {
         put?: never;
         /**
          * Exchange enrollment token + CSR for certificate
-         * @description Exchange enrollment token + CSR for certificate.
+         * @description Exchange a one-time enrollment token and a P-256 CSR for an agent identity and client certificate. Body and response follow packages/agent-protocol (EnrollRequest, EnrollResponse). Every token failure returns the same 401 invalid_enrollment_token. Rate limited to 10 attempts/min/IP.
          */
         post: operations["agentEnroll"];
         delete?: never;
@@ -2783,6 +2790,46 @@ export interface components {
                 createdAt: string;
             }[];
         };
+        CreateAgentEnrollmentRequest: {
+            /**
+             * @default host
+             * @enum {string}
+             */
+            agentType: "host" | "private_worker";
+            /**
+             * @description Number of hosts that may use this token
+             * @default 1
+             */
+            maxUses: number;
+            /** @default 60 */
+            expiresInMinutes: number;
+        };
+        AgentEnrollmentCreated: {
+            /** Format: uuid */
+            id: string;
+            /** @description Shown once; only a peppered hash is stored */
+            token: string;
+            /** Format: date-time */
+            expiresAt: string;
+            maxUses: number;
+            installCommand: string;
+        };
+        AgentEnrollmentList: {
+            enrollments: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                agentType: "host" | "private_worker";
+                /** Format: date-time */
+                expiresAt: string;
+                maxUses: number;
+                uses: number;
+                /** Format: date-time */
+                revokedAt: string | null;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+        };
     };
     responses: {
         /** @description Success */
@@ -2896,6 +2943,8 @@ export interface components {
         productId: string;
         /** @description Resource ID */
         id: string;
+        /** @description Environment ID */
+        environmentId: string;
         /** @description Membership ID */
         memberId: string;
         /** @description Monitoring pack ID */
@@ -4000,18 +4049,68 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    createAgentEnrollment: {
+    listAgentEnrollments: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Environment ID */
+                environmentId: components["parameters"]["environmentId"];
+            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: components["responses"]["Created"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentEnrollmentList"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    createAgentEnrollment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Environment ID */
+                environmentId: components["parameters"]["environmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAgentEnrollmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentEnrollmentCreated"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Agent enrollment is not configured on this deployment */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listAgents: {
@@ -4307,10 +4406,46 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Enrolled (EnrollResponse) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            /** @description Unsupported protocol version (upgrade_required) */
+            426: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+            /** @description Agent enrollment is not configured on this deployment */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     agentHeartbeat: {

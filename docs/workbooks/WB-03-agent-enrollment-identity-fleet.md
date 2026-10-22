@@ -157,7 +157,8 @@ Streaming tasks (log tail, inspection) send `POST /agent/v1/streams/:sessionId/c
 ## 7. API
 
 ```http
-POST   /api/v1/agent-enrollments
+POST   /api/v1/environments/:environmentId/agent-enrollments
+GET    /api/v1/environments/:environmentId/agent-enrollments
 GET    /api/v1/agents
 GET    /api/v1/agents/:id
 POST   /api/v1/agents/:id/revoke

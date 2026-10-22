@@ -894,17 +894,50 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M4
-  /api/v1/agent-enrollments:
+  /api/v1/environments/{environmentId}/agent-enrollments:
+    parameters: [{ $ref: '#/components/parameters/environmentId' }]
     post:
       operationId: createAgentEnrollment
       tags: [agents]
-      summary: Create enrollment token (shown once)
-      description: Create enrollment token (shown once).
+      summary: Create an enrollment token (shown once) and install command
+      description: Create an enrollment token (shown once) and install command. Requires `agent.enroll`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentEnrollmentRequest'
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentEnrollmentCreated'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: Agent enrollment is not configured on this deployment
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M5
+    get:
+      operationId: listAgentEnrollments
+      tags: [agents]
+      summary: Enrollments for an environment (never the token)
+      description: Enrollments for an environment (never the token). Requires `agent.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentEnrollmentList'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M5
   /api/v1/agents:
     get:
       operationId: listAgents
@@ -1110,11 +1143,28 @@ paths:
       operationId: agentEnroll
       tags: [agent-protocol]
       summary: Exchange enrollment token + CSR for certificate
-      description: Exchange enrollment token + CSR for certificate.
+      description: >-
+        Exchange a one-time enrollment token and a P-256 CSR for an agent identity and client certificate.
+        Body and response follow packages/agent-protocol (EnrollRequest, EnrollResponse). Every token failure
+        returns the same 401 invalid_enrollment_token. Rate limited to 10 attempts/min/IP.
       security: []
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '201':
+          description: Enrolled (EnrollResponse)
+          content: { application/json: { schema: { type: object, additionalProperties: true } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '426':
+          description: Unsupported protocol version (upgrade_required)
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: Agent enrollment is not configured on this deployment
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M5
   /agent/v1/heartbeat:
     servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
@@ -1803,6 +1853,8 @@ components:
     productId:
       { name: productId, in: path, required: true, description: Product ID, schema: { type: string } }
     id: { name: id, in: path, required: true, description: Resource ID, schema: { type: string } }
+    environmentId:
+      { name: environmentId, in: path, required: true, description: Environment ID, schema: { type: string } }
     memberId:
       { name: memberId, in: path, required: true, description: Membership ID, schema: { type: string } }
     packId:
@@ -2481,6 +2533,45 @@ components:
               errorCode: { type: [string, 'null'] }
               errorMessage: { type: [string, 'null'], description: Redacted before storage }
               items: { type: [integer, 'null'] }
+              createdAt: { type: string, format: date-time }
+    CreateAgentEnrollmentRequest:
+      type: object
+      properties:
+        agentType: { type: string, enum: [host, private_worker], default: host }
+        maxUses:
+          {
+            type: integer,
+            minimum: 1,
+            maximum: 1000,
+            default: 1,
+            description: Number of hosts that may use this token,
+          }
+        expiresInMinutes: { type: integer, minimum: 5, maximum: 1440, default: 60 }
+    AgentEnrollmentCreated:
+      type: object
+      required: [id, token, expiresAt, maxUses, installCommand]
+      properties:
+        id: { type: string, format: uuid }
+        token: { type: string, description: Shown once; only a peppered hash is stored }
+        expiresAt: { type: string, format: date-time }
+        maxUses: { type: integer }
+        installCommand: { type: string }
+    AgentEnrollmentList:
+      type: object
+      required: [enrollments]
+      properties:
+        enrollments:
+          type: array
+          items:
+            type: object
+            required: [id, agentType, expiresAt, maxUses, uses, revokedAt, createdAt]
+            properties:
+              id: { type: string, format: uuid }
+              agentType: { type: string, enum: [host, private_worker] }
+              expiresAt: { type: string, format: date-time }
+              maxUses: { type: integer }
+              uses: { type: integer }
+              revokedAt: { type: [string, 'null'], format: date-time }
               createdAt: { type: string, format: date-time }
   responses:
     Ok: { description: Success }

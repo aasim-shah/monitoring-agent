@@ -7,6 +7,7 @@ import { OriginGuard } from './common/origin.guard.js';
 import { TenantGuard } from './common/tenant.guard.js';
 import type { AppConfig } from './config.js';
 import { DatabaseModule } from './database/database.module.js';
+import { AgentsModule } from './modules/agents/agents.module.js';
 import { AuditingModule } from './modules/auditing/auditing.module.js';
 import { ConnectionsModule } from './modules/connections/connections.module.js';
 import { HealthController } from './health/health.controller.js';
@@ -53,6 +54,7 @@ export class AppModule {
         ProductsModule,
         MembersModule,
         ConnectionsModule.register(env),
+        AgentsModule,
       ],
       controllers: [HealthController],
       providers: [

@@ -1315,7 +1315,8 @@ DELETE /api/v1/connections/:id
 ### 15.3 Agents
 
 ```http
-POST   /api/v1/agent-enrollments
+POST   /api/v1/environments/:environmentId/agent-enrollments
+GET    /api/v1/environments/:environmentId/agent-enrollments
 GET    /api/v1/agents
 GET    /api/v1/agents/:id
 POST   /api/v1/agents/:id/revoke
