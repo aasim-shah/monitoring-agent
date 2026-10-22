@@ -29,6 +29,7 @@ describe('agent enrollment (WB-03)', () => {
     expect(e.maxUses).toBe(1);
     expect(new Date(e.expiresAt).getTime() - Date.now()).toBeGreaterThan(59 * 60_000);
     expect(e.installCommand).toContain(`--token ${e.token}`);
+    expect(e.installCommand).toContain('--download-url http://localhost:8080/downloads');
     const [row] = await sql<{ token_hash: string }>(
       `SELECT token_hash FROM agent_enrollments WHERE id = $1`,
       [e.id],

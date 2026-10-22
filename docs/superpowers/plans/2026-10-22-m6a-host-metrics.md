@@ -81,7 +81,7 @@
 ### Task 4: Collector distribution and agent supervision (master M6.1, M6.2)
 
 **Files:**
-- Create: `agents/host-agent-go/collector/builder-config.yaml`, `agents/host-agent-go/internal/collector/{config.go,supervise.go}` + tests, `agents/dist/Dockerfile` (builds `pcp-agentctl` and `pcp-otelcol` for linux/amd64 and linux/arm64, tarballs `pcp-agent-<version>-linux-<arch>.tar.gz`, `SHA256SUMS`)
+- Create: `agents/host-agent-go/collector/builder-config.yaml`, `agents/host-agent-go/internal/collector/{config.go,supervise.go}` + tests, `agents/release/Dockerfile` (builds `pcp-agentctl` and `pcp-otelcol` for linux/amd64 and linux/arm64, tarballs `pcp-agent-<version>-linux-<arch>.tar.gz`, `SHA256SUMS`)
 - Modify: `agents/host-agent-go/cmd/pcp-agentctl/main.go` (`run` starts and supervises the collector)
 
 **Interfaces:**
@@ -90,7 +90,7 @@
 - `collector.Supervise(ctx, binary, configPath, logf)`: restarts with exponential backoff (1 s → 60 s), stops on context cancel.
 - `pcp-agentctl run`: writes `collector.yaml` (0600) on start and after rotation, then supervises `pcp-otelcol`.
 
-- [ ] Step 1 failing tests: generated config parses as YAML and contains the mTLS paths, `memory_limiter`, no `0.0.0.0` listener; supervisor restarts a crashing fake binary with backoff and stops on cancel; `docker build -f agents/dist/Dockerfile` produces both tarballs and a valid `SHA256SUMS`; `pcp-otelcol validate --config` accepts the generated config.
+- [ ] Step 1 failing tests: generated config parses as YAML and contains the mTLS paths, `memory_limiter`, no `0.0.0.0` listener; supervisor restarts a crashing fake binary with backoff and stops on cancel; `docker build -f agents/release/Dockerfile` produces both tarballs and a valid `SHA256SUMS`; `pcp-otelcol validate --config` accepts the generated config.
 - [ ] Step 2–4 → FAIL → implement → PASS. Step 5 handoff `M6.1-collector-dist.md` + commit.
 
 ### Task 5: Installer and downloads (master M6.7)

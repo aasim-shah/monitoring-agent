@@ -1,0 +1,23 @@
+[Unit]
+Description=Product Control Plane agent (control channel and host metrics collector)
+Documentation=https://github.com/aasim-shah/monitoring-agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pcp-agent
+Group=pcp-agent
+ExecStart=/usr/local/bin/pcp-agentctl run --state-dir /var/lib/pcp-agent --collector /usr/local/bin/pcp-otelcol
+Restart=always
+RestartSec=5
+# Outbound-only, unprivileged agent (BR-04-08): no new privileges, read-only system,
+# writable only its own state directory.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/pcp-agent
+
+[Install]
+WantedBy=multi-user.target

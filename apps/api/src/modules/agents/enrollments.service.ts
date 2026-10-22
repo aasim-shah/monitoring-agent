@@ -60,7 +60,7 @@ export class EnrollmentsService {
       token,
       expiresAt: enrollment.expiresAt,
       maxUses: enrollment.maxUses,
-      installCommand: `curl -fsSL ${this.config.appOrigin}/install.sh | sudo bash -s -- --token ${token} --control-url ${settings.config.controlUrl}`,
+      installCommand: `curl -fsSL ${this.config.appOrigin}/install.sh | sudo bash -s -- --token ${token} --control-url ${settings.config.controlUrl} --download-url ${this.config.appOrigin}/downloads`,
     };
   }
 

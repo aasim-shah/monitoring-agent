@@ -14,6 +14,12 @@
 		reverse_proxy api:3000
 	}
 
+	# Agent installer and release artifacts (M6.7).
+	@downloads path /install.sh /downloads/*
+	handle @downloads {
+		reverse_proxy downloads:8080
+	}
+
 	handle /healthz {
 		reverse_proxy api:3000
 	}

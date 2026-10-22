@@ -1,0 +1,15 @@
+# Serves the agent installer and release artifacts on the private network; the edge Caddy
+# routes /install.sh and /downloads/* here.
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	handle /healthz {
+		respond "ok" 200
+	}
+	header /install.sh Content-Type "text/x-shellscript; charset=utf-8"
+	root * /srv
+	file_server
+}

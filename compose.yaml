@@ -40,6 +40,7 @@ services:
         ipv4_address: ${CADDY_ADDRESS:-172.30.0.10}
     depends_on:
       api: { condition: service_healthy }
+      downloads: { condition: service_healthy }
       web: { condition: service_healthy }
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2019/config/']
@@ -174,6 +175,8 @@ services:
       - -storageDataPath=/storage
       - -retentionPeriod=15d
       - -dedup.minScrapeInterval=1s
+      # Show samples 5 s after arrival (default 30 s), so a new host's metrics appear within a minute.
+      - -search.latencyOffset=5s
       - -httpListenAddr=:8428
     volumes: [vm-data:/storage]
     networks: [internal]
@@ -214,6 +217,18 @@ services:
       interval: 10s
       timeout: 3s
       retries: 6
+    restart: unless-stopped
+
+  # install.sh and agent release artifacts (M6.7); built from agents/release/Dockerfile.
+  downloads:
+    build: { context: ., dockerfile: agents/release/Dockerfile, target: downloads }
+    networks: [edge]
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/healthz']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy: { resources: { limits: { memory: 64m } } }
     restart: unless-stopped
 
   ingest-gateway:
