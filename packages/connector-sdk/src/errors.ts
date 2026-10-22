@@ -6,7 +6,13 @@ export type ConnectorErrorReason =
   /** SSRF guard refused the target (BR-07-06). */
   | 'destination_blocked'
   /** The provider answered with something that is not the expected shape (e.g. HTML). */
-  | 'invalid_response';
+  | 'invalid_response'
+  /** Database/service rejected the credentials. */
+  | 'authentication_failed'
+  /** Host unreachable, connection refused, or timed out. */
+  | 'network_unreachable'
+  /** TLS is required by config but the server does not offer it. */
+  | 'tls_unavailable';
 
 /** A provider failure with a diagnosable reason (spec §9.1), not a generic error. */
 export class ConnectorError extends Error {

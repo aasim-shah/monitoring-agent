@@ -4,5 +4,6 @@ export * from './registry.js';
 export * from './state-machine.js';
 export * from './http-client.js';
 export * from './ssrf-guard.js';
+export * from './templates.js';
 export * from './circuit-breaker.js';
 export * from './redaction.js';

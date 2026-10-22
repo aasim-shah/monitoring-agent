@@ -5,6 +5,7 @@ import type {
   MetricResult,
   Observation,
 } from '@pcp/shared-contracts';
+import type { ReadOnlyTemplate } from './templates.js';
 
 export type ExecutionLocation = 'cloud' | 'private';
 
@@ -38,6 +39,14 @@ export interface ConnectionValidation {
 export interface HealthResult {
   ok: boolean;
   detail?: string;
+  /** Structured health fields (e.g. database connections, sizes, replication lag). */
+  data?: Record<string, unknown>;
+}
+
+export interface TemplateResult {
+  rows: Record<string, unknown>[];
+  /** More than the 1,000-row limit matched (BR-07-04). */
+  truncated: boolean;
 }
 
 export interface CredentialField {
@@ -79,6 +88,13 @@ export interface Connector {
   registerWebhook?(ctx: ExecutionContext): Promise<{ url: string }>;
   refreshCredential?(ctx: ExecutionContext): Promise<{ credentials: Record<string, string> }>;
   executeAction?(ctx: ExecutionContext, action: Record<string, unknown>): Promise<Record<string, unknown>>;
+  /** Named read-only templates this connector can run (BR-07-02). */
+  readonly templates?: ReadOnlyTemplate[];
+  runTemplate?(
+    ctx: ExecutionContext,
+    name: string,
+    params: { from: string; to: string },
+  ): Promise<TemplateResult>;
 }
 
 export interface CatalogEntry {

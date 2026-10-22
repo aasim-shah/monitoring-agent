@@ -1,0 +1,36 @@
+{
+  "name": "@pcp/connectors-databases",
+  "version": "0.0.0",
+  "private": true,
+  "description": "PostgreSQL, MySQL, and MongoDB connectors for the private worker (M8.2): read-only health and named templates.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pcp/connector-sdk": "workspace:*",
+    "mongodb": "7.7.0",
+    "mysql2": "3.24.5",
+    "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/pg": "8.15.6",
+    "eslint": "9.39.5",
+    "testcontainers": "11.14.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}
