@@ -44,8 +44,8 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M3.1 | Web foundation | Done | [part 1](M3.1-web-foundation.md), [part 2](M3.1-auth-pages.md), [part 3](M3.1-app-shell.md) |
 | M3.2 | Organization, product, environment, member, audit screens | Done | [M3.2](M3.2-screens.md) |
 | M3.3 | Typed API client | Done | [M3.3](M3.3-api-client.md) |
-| M4.1 | Envelope encryption | In progress | [M4.1 (with M2.3)](M2.3-identity-primitives.md) |
-| M4.2 | Connector SDK runtime | Not started | — |
+| M4.1 | Envelope encryption | Done | [envelope](M2.3-identity-primitives.md), [storage](M4.2-connector-runtime.md) |
+| M4.2 | Connector SDK runtime | Done | [SDK](M4.2-connector-sdk.md), [runtime](M4.2-connector-runtime.md) |
 | M4.3 | Connection lifecycle and registry | Not started | — |
 | M4.4 | Job framework | Not started | — |
 | M5.1 | Agent CA and certificate issuance | Not started | — |
