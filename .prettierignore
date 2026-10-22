@@ -5,3 +5,6 @@ pnpm-lock.yaml
 *.md
 **/generated
 packages/api-client/src/schema.ts
+
+# Generated test vector; keep byte-identical to what the generator wrote.
+packages/agent-protocol/testdata/
