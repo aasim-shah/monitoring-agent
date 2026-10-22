@@ -88,7 +88,7 @@ services:
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Product Control Plane <no-reply@localhost>}
       AGENT_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
-      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN must be set (see .env.example)}
       AGENT_CA_CERT: ${AGENT_CA_CERT:-}
       AGENT_CA_KEY: ${AGENT_CA_KEY:-}
       AGENT_CA_CHAIN: ${AGENT_CA_CHAIN:-}
@@ -219,9 +219,14 @@ services:
     build: { context: ., dockerfile: apps/ingest-gateway/Dockerfile }
     environment:
       INGEST_PORT: '4318'
+      VM_WRITE_URL: http://victoriametrics:8428/api/v1/write
+      API_INTERNAL_URL: http://api:3000
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN must be set (see .env.example)}
+      TRUSTED_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
     networks: [edge, internal]
     depends_on:
       victoriametrics: { condition: service_healthy }
+      api: { condition: service_healthy }
     healthcheck:
       test: ['CMD', '/app/service', 'healthcheck']
       interval: 10s

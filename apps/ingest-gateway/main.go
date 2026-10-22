@@ -1,5 +1,6 @@
-// Command ingest-gateway is the platform's ingest-gateway service. This milestone (M1.2)
-// provides only liveness; protocol handling arrives in M6.
+// Command ingest-gateway accepts agent telemetry (D15): it authenticates the agent by
+// client-certificate fingerprint, overwrites tenant labels, enforces limits, and forwards
+// to VictoriaMetrics.
 package main
 
 import (
@@ -7,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"pcp.local/platform/health"
@@ -28,8 +30,33 @@ func main() {
 		return
 	}
 
+	required := func(name string) string {
+		v := os.Getenv(name)
+		if v == "" {
+			slog.Error("missing required setting", "name", name)
+			os.Exit(1)
+		}
+		return v
+	}
+	gateway := NewGateway(Config{
+		VMWriteURL:     required("VM_WRITE_URL"),
+		TrustedProxies: strings.Split(required("TRUSTED_PROXY_ADDRESSES"), ","),
+		Resolver: &APIResolver{
+			BaseURL: strings.TrimRight(required("API_INTERNAL_URL"), "/"),
+			Token:   required("INTERNAL_TOKEN"),
+			Client:  &http.Client{Timeout: 5 * time.Second},
+			Now:     time.Now,
+		},
+		AgentSeriesMax:  20_000,
+		TenantSeriesMax: 200_000,
+		AgentSamplesPS:  10_000,
+		MaxBodyBytes:    10 << 20,
+		Now:             time.Now,
+	})
+
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", health.Handler(service))
+	mux.Handle("/", gateway)
 
 	srv := &http.Server{Addr: ":" + port, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	slog.Info("listening", "service", service, "port", port)

@@ -77,6 +77,7 @@ export default async function globalSetup() {
       PCP_SCHEDULER_PASSWORD: 'e2e0scheduler',
       REDIS_PASSWORD: 'e2e0redis',
       MASTER_KEY: Buffer.alloc(32, 9).toString('base64'),
+      INTERNAL_TOKEN: 'e2e0internal0token0value0hex',
       HTTP_PORT: String(E2E_HTTP_PORT),
       HTTPS_PORT: String(E2E_HTTP_PORT + 400),
       EDGE_SUBNET: '172.31.9.0/24',

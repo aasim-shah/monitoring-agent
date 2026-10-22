@@ -14,7 +14,7 @@ const STORAGE_AND_APP = [
 ];
 
 describe('compose configuration', () => {
-  it.each(['POSTGRES_SUPERUSER_PASSWORD', 'PCP_APP_PASSWORD', 'MASTER_KEY'])(
+  it.each(['POSTGRES_SUPERUSER_PASSWORD', 'PCP_APP_PASSWORD', 'MASTER_KEY', 'INTERNAL_TOKEN'])(
     'compose refuses to start without %s',
     async (name) => {
       const { [name as keyof typeof SECRETS]: _omit, ...rest } = SECRETS;

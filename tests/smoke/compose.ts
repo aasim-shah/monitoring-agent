@@ -52,4 +52,5 @@ export const SECRETS = {
   PCP_SCHEDULER_PASSWORD: 'smoke0scheduler0password0hex',
   REDIS_PASSWORD: 'smoke0redis0password0hex',
   MASTER_KEY: Buffer.alloc(32, 7).toString('base64'),
+  INTERNAL_TOKEN: 'smoke0internal0token0hex0value',
 };
