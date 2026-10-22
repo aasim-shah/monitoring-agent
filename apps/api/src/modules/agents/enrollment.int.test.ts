@@ -29,6 +29,8 @@ describe('agent enrollment (WB-03)', () => {
       'curl -fsSL http://localhost:8080/downloads/worker/pcp-private-worker.tar.gz | docker load',
     );
     expect(e.installCommand).toContain('-v /etc/pcp-worker/secrets:/etc/pcp-worker/secrets:ro');
+    // The worker reports the server's name, not the container ID.
+    expect(e.installCommand).toContain('--hostname "$(hostname)"');
     expect(e.installCommand).toContain(`enroll-and-run --token ${e.token} --control-url`);
     expect(e.installCommand).not.toContain('install.sh');
   });
