@@ -4,7 +4,7 @@ Status of every master-plan task. Each started task has a handoff document in th
 
 Status values: **Done** (complete, tests green), **In progress** (work started, handoff describes current state), **Awaiting approval** (delivered, needs a human decision), **Not started**.
 
-Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, stacked). Execution plans: `docs/superpowers/plans/2026-10-22-m0-m1-foundation.md`, `2026-10-22-m2-identity-tenancy.md`. Logs: [M0-M1](M0-M1-execution-log.md), [M2](M2-execution-log.md). Platform runbook for M2 deployment: [M2-compose-migrate](M2-compose-migrate.md).
+Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, stacked). Execution plans: `docs/superpowers/plans/2026-10-22-m0-m1-foundation.md`, `2026-10-22-m2-identity-tenancy.md`. Logs: [M0-M1](M0-M1-execution-log.md), [M2](M2-execution-log.md), [M3](M3-execution-log.md). Platform runbook for M2 deployment: [M2-compose-migrate](M2-compose-migrate.md).
 
 ## Milestone summary
 
