@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import fastifyCookie from '@fastify/cookie';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
@@ -9,7 +9,7 @@ import { AppModule } from '../src/app.module.js';
 import { loadConfig, type AppConfig } from '../src/config.js';
 import { MAILER } from '../src/modules/mail/mailer.js';
 import { GOOGLE_HTTP, type GoogleHttp } from '../src/modules/identity/google-login.service.js';
-import { PRISMA } from '../src/tokens.js';
+import { CLOCK, PRISMA } from '../src/tokens.js';
 import { MemoryMailer } from './memory-mailer.js';
 
 export const MASTER_KEY = randomBytes(32).toString('base64');
@@ -24,7 +24,7 @@ export interface TestApp {
 }
 
 export async function createTestApp(
-  opts: { env?: Record<string, string>; google?: GoogleHttp } = {},
+  opts: { env?: Record<string, string>; google?: GoogleHttp; clock?: () => Date } = {},
 ): Promise<TestApp> {
   const env = {
     DATABASE_URL: inject('appDbUrl'),
@@ -40,6 +40,7 @@ export async function createTestApp(
     .overrideProvider(MAILER)
     .useValue(mailer);
   if (opts.google) builder = builder.overrideProvider(GOOGLE_HTTP).useValue(opts.google);
+  if (opts.clock) builder = builder.overrideProvider(CLOCK).useValue(opts.clock);
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<NestFastifyApplication>(
     new FastifyAdapter({ trustProxy: true }),
@@ -55,10 +56,10 @@ export function uniqueEmail(): string {
   return `user-${randomUUID()}@example.com`;
 }
 
-let ipCounter = 0;
+/** Random 10.x.y.z: test files run in parallel against one Redis, so per-file counters would collide. */
 export function uniqueIp(): string {
-  ipCounter += 1;
-  return `10.${(ipCounter >> 16) & 255}.${(ipCounter >> 8) & 255}.${ipCounter & 255}`;
+  const n = randomInt(1, 2 ** 24);
+  return `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 }
 
 export function sessionCookie(res: { headers: Record<string, unknown> }): string {

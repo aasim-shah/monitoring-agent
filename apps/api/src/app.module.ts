@@ -12,6 +12,7 @@ import { HealthController } from './health/health.controller.js';
 import { CurrentUserGuard } from './modules/identity/current-user.guard.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
+import { MembersModule } from './modules/members/members.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
 import { TenantsModule } from './modules/tenants/tenants.module.js';
 import { RedisModule } from './redis/redis.module.js';
@@ -49,6 +50,7 @@ export class AppModule {
         IdentityModule,
         TenantsModule,
         ProductsModule,
+        MembersModule,
       ],
       controllers: [HealthController],
       providers: [

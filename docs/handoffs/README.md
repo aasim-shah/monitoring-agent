@@ -31,7 +31,7 @@ Current branch: `feat/m0-m1-foundation` · Execution plan: `docs/superpowers/pla
 | M2.3 | Authentication | Done | [part 1](M2.3-identity-primitives.md), [part 2](M2.3-authentication-api.md) |
 | M2.4 | Organizations, products, environments, RBAC guard | Done | [M2.4](M2.4-organizations-rbac.md) |
 | M2.5 | Audit log | Done | [M2.5](M2.5-audit-log.md) |
-| M2.6 | Members and invitations | Not started | — |
+| M2.6 | Members and invitations | Done | [M2.6](M2.6-members-invitations.md) |
 | M3.1 | Web foundation | Not started | — |
 | M3.2 | Organization, product, environment, member, audit screens | Not started | — |
 | M3.3 | Typed API client | Not started | — |
