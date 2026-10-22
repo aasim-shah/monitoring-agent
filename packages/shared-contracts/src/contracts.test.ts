@@ -9,6 +9,8 @@ import {
   observationSchema,
   packManifestSchema,
   relationTypeSchema,
+  ROLE_PERMISSIONS,
+  can,
 } from './index.js';
 
 const observation = {
@@ -89,5 +91,21 @@ describe('pack manifest', () => {
   });
   it('rejects change level 3', () => {
     expect(packManifestSchema.safeParse({ ...redisPack, changeLevel: 3 }).success).toBe(false);
+  });
+});
+
+describe('role matrix in shared contracts', () => {
+  const ctx = (role: (typeof ROLES)[number]) => ({
+    organizationId: 'o',
+    actor: { kind: 'user' as const, userId: 'u' },
+    roles: [role],
+    productIds: 'all' as const,
+    environmentIds: 'all' as const,
+    requestId: 'r',
+  });
+  it('is importable in the browser and matches tenant-security', () => {
+    expect(can(ctx('owner'), 'org.members.manage')).toBe(true);
+    expect(can(ctx('viewer'), 'org.members.manage')).toBe(false);
+    expect(ROLE_PERMISSIONS.viewer).toContain('org.view');
   });
 });

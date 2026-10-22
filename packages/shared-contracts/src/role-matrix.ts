@@ -1,4 +1,4 @@
-import { PERMISSIONS, type Permission, type Role } from '@pcp/shared-contracts';
+import { PERMISSIONS, type Permission, type Role, type TenantContext } from './tenancy.js';
 
 const VIEW: readonly Permission[] = [
   'org.view',
@@ -32,3 +32,11 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   analyst: [...VIEW, 'ai.use'],
   viewer: VIEW,
 };
+
+/** True when one of the caller's roles grants `permission` within the optional product scope. */
+export function can(ctx: TenantContext, permission: Permission, scope: { productId?: string } = {}): boolean {
+  const granted = ctx.roles.some((role) => ROLE_PERMISSIONS[role]?.includes(permission));
+  if (!granted) return false;
+  if (scope.productId && ctx.productIds !== 'all') return ctx.productIds.includes(scope.productId);
+  return true;
+}

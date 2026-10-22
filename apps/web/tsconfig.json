@@ -8,8 +8,28 @@
     "allowJs": false,
     "noEmit": true,
     "incremental": true,
-    "plugins": [{ "name": "next" }]
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
-  "include": ["next-env.d.ts", "app/**/*.ts", "app/**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "middleware.ts",
+    "middleware.test.ts",
+    "vitest.config.ts",
+    "vitest.setup.ts",
+    ".next/types/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }
