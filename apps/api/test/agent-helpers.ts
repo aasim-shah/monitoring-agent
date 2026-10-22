@@ -93,6 +93,7 @@ export interface EnrolledAgent {
   agentId: string;
   fingerprint: string;
   certificatePem: string;
+  taskSigningPublicKey: string;
 }
 
 /** Enrolls a fresh agent through the API; the fingerprint is what Caddy would forward. */
@@ -111,7 +112,7 @@ export async function enrolledAgent(
     payload: await enrollRequest(e.token, host),
   });
   if (res.statusCode !== 201) throw new Error(`enroll failed ${res.statusCode} ${res.body}`);
-  const body = res.json() as { agentId: string; certificatePem: string };
+  const body = res.json() as { agentId: string; certificatePem: string; taskSigningPublicKey: string };
   const der = Buffer.from(body.certificatePem.replace(/-----[^-]+-----|\s/g, ''), 'base64');
   return { ...body, fingerprint: createHash('sha256').update(der).digest('hex') };
 }

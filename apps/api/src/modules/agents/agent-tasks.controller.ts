@@ -1,0 +1,44 @@
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import { z } from 'zod';
+import { AgentRoute } from '../../common/decorators.js';
+import { notFound, parseBody } from '../../common/errors.js';
+import { requireAgent, type ApiRequest } from '../../common/request.js';
+import { requireTenant } from '../../common/tenant.js';
+import { TasksService } from './tasks.service.js';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const resultBody = z.object({
+  status: z.enum(['succeeded', 'failed']),
+  result: z.record(z.unknown()).optional(),
+  error: z.string().max(4096).optional(),
+});
+
+@Controller('agent/v1')
+export class AgentTasksController {
+  constructor(private readonly tasks: TasksService) {}
+
+  @AgentRoute()
+  @Get('tasks')
+  async poll(@Req() req: ApiRequest, @Query('wait') wait?: string) {
+    const seconds = Math.max(0, Math.min(25, Number.parseInt(wait ?? '0', 10) || 0));
+    return { tasks: await this.tasks.poll(requireTenant(req), requireAgent(req), seconds) };
+  }
+
+  @AgentRoute()
+  @Post('tasks/:id/result')
+  @HttpCode(204)
+  async result(@Req() req: ApiRequest, @Param('id') id: string, @Body() body: unknown) {
+    if (!UUID.test(id)) throw notFound();
+    await this.tasks.result(requireTenant(req), requireAgent(req), id, parseBody(resultBody, body));
+  }
+
+  @AgentRoute()
+  @Post('streams/:sessionId/chunks')
+  @HttpCode(202)
+  async chunk(@Req() req: ApiRequest, @Param('sessionId') sessionId: string, @Body() body: unknown) {
+    if (!UUID.test(sessionId)) throw notFound();
+    await this.tasks.chunk(requireTenant(req), requireAgent(req), sessionId, body);
+    return { accepted: true };
+  }
+}

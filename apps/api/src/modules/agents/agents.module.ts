@@ -5,6 +5,7 @@ import type { KeyRing } from '@pcp/secrets';
 import { CLOCK, KEY_RING, PRISMA, REDIS } from '../../tokens.js';
 import { RateLimiter } from '../identity/rate-limiter.js';
 import { AgentAuthGuard } from './agent-auth.guard.js';
+import { AgentTasksController } from './agent-tasks.controller.js';
 import { AgentIdentityCache } from './agent-identity.cache.js';
 import { AgentsController } from './agents.controller.js';
 import { AgentsService } from './agents.service.js';
@@ -14,6 +15,9 @@ import { EnrollmentsController } from './enrollments.controller.js';
 import { EnrollmentsService } from './enrollments.service.js';
 import { HeartbeatController } from './heartbeat.controller.js';
 import { agentSettingsProvider } from './settings.provider.js';
+import { TaskNotifier } from './task-notifier.js';
+import { TasksController } from './tasks.controller.js';
+import { TasksService } from './tasks.service.js';
 import { EnrollmentTokens } from './tokens.js';
 import { WhoamiController } from './whoami.controller.js';
 
@@ -24,6 +28,8 @@ import { WhoamiController } from './whoami.controller.js';
     WhoamiController,
     HeartbeatController,
     AgentsController,
+    TasksController,
+    AgentTasksController,
   ],
   providers: [
     agentSettingsProvider,
@@ -42,6 +48,12 @@ import { WhoamiController } from './whoami.controller.js';
     EnrollmentsService,
     EnrollService,
     AgentsService,
+    {
+      provide: TaskNotifier,
+      inject: [REDIS],
+      useFactory: (redis: Redis) => new TaskNotifier(redis, redis.duplicate()),
+    },
+    TasksService,
   ],
   exports: [AgentAuthGuard],
 })

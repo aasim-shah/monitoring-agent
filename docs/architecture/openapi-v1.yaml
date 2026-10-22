@@ -977,6 +977,73 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M5
+  /api/v1/agents/{id}/diagnostics:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: runAgentDiagnostics
+      tags: [agents]
+      summary: Ask the agent to report its facts
+      description: Queues a signed inspect task (target agent_info). Requires `agent.enroll`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                { type: object, required: [taskId], properties: { taskId: { type: string, format: uuid } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M5
+  /api/v1/agents/{id}/tasks:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listAgentTasks
+      tags: [agents]
+      summary: Latest 20 tasks with results
+      description: Latest 20 tasks with results. Requires `agent.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tasks]
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        [
+                          id,
+                          type,
+                          status,
+                          payload,
+                          expiresAt,
+                          deliveredAt,
+                          createdAt,
+                          result,
+                          error,
+                          completedAt,
+                        ]
+                      properties:
+                        id: { type: string, format: uuid }
+                        type: { type: string }
+                        status: { type: string, enum: [queued, delivered, succeeded, failed, expired] }
+                        payload: { type: object, additionalProperties: true }
+                        expiresAt: { type: string, format: date-time }
+                        deliveredAt: { type: [string, 'null'], format: date-time }
+                        createdAt: { type: string, format: date-time }
+                        result: { type: [object, 'null'], additionalProperties: true }
+                        error: { type: [string, 'null'] }
+                        completedAt: { type: [string, 'null'], format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M5
   /api/v1/agents/{id}/revoke:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
@@ -1241,36 +1308,73 @@ paths:
     get:
       operationId: agentPollTasks
       tags: [agent-protocol]
-      summary: Long-poll signed tasks (wait=25)
-      description: Long-poll signed tasks (wait=25).
+      summary: Long-poll signed tasks
+      description: >-
+        Returns this agent's queued, unexpired tasks (marking them delivered), waiting up to `wait` seconds (max 25)
+        for new ones. Each task is Ed25519-signed over canonicalJson(task without signature). Expired tasks are never
+        delivered.
       security: [{ agentMtls: [] }]
+      parameters:
+        - { name: wait, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 25 } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Tasks (packages/agent-protocol AgentTask)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tasks]
+                properties:
+                  tasks: { type: array, items: { type: object, additionalProperties: true } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M5
   /agent/v1/tasks/{id}/result:
-    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     parameters: [{ $ref: '#/components/parameters/id' }]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
       operationId: agentTaskResult
       tags: [agent-protocol]
-      summary: Submit task result
-      description: Submit task result.
+      summary: Report a task result
+      description: Report a delivered task's result. Another agent's task, unknown, or finished → 404; over maxResponseBytes → 413.
       security: [{ agentMtls: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [succeeded, failed] }
+                result: { type: object, additionalProperties: true }
+                error: { type: string, maxLength: 4096 }
       responses:
         '204': { $ref: '#/components/responses/NoContent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413':
+          description: Result larger than the task's maxResponseBytes
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M5
   /agent/v1/streams/{sessionId}/chunks:
-    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     parameters: [{ $ref: '#/components/parameters/sessionId' }]
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
       operationId: agentStreamChunk
       tags: [agent-protocol]
-      summary: Submit stream chunk
-      description: Submit stream chunk.
+      summary: Send a stream chunk
+      description: Stream chunk (packages/agent-protocol StreamChunk) for an open session of this agent; otherwise 404.
       security: [{ agentMtls: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M5
   /agent/v1/stream:
     servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     get:

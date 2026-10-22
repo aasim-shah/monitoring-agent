@@ -932,6 +932,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{id}/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the agent to report its facts
+         * @description Queues a signed inspect task (target agent_info). Requires `agent.enroll`.
+         */
+        post: operations["runAgentDiagnostics"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Latest 20 tasks with results
+         * @description Latest 20 tasks with results. Requires `agent.view`.
+         */
+        get: operations["listAgentTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{id}/revoke": {
         parameters: {
             query?: never;
@@ -1346,8 +1392,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Long-poll signed tasks (wait=25)
-         * @description Long-poll signed tasks (wait=25).
+         * Long-poll signed tasks
+         * @description Returns this agent's queued, unexpired tasks (marking them delivered), waiting up to `wait` seconds (max 25) for new ones. Each task is Ed25519-signed over canonicalJson(task without signature). Expired tasks are never delivered.
          */
         get: operations["agentPollTasks"];
         put?: never;
@@ -1371,8 +1417,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Submit task result
-         * @description Submit task result.
+         * Report a task result
+         * @description Report a delivered task's result. Another agent's task, unknown, or finished → 404; over maxResponseBytes → 413.
          */
         post: operations["agentTaskResult"];
         delete?: never;
@@ -1394,8 +1440,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Submit stream chunk
-         * @description Submit stream chunk.
+         * Send a stream chunk
+         * @description Stream chunk (packages/agent-protocol StreamChunk) for an open session of this agent; otherwise 404.
          */
         post: operations["agentStreamChunk"];
         delete?: never;
@@ -4223,6 +4269,83 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    runAgentDiagnostics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        taskId: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listAgentTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        tasks: {
+                            /** Format: uuid */
+                            id: string;
+                            type: string;
+                            /** @enum {string} */
+                            status: "queued" | "delivered" | "succeeded" | "failed" | "expired";
+                            payload: {
+                                [key: string]: unknown;
+                            };
+                            /** Format: date-time */
+                            expiresAt: string;
+                            /** Format: date-time */
+                            deliveredAt: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                            result: {
+                                [key: string]: unknown;
+                            } | null;
+                            error: string | null;
+                            /** Format: date-time */
+                            completedAt: string | null;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     revokeAgent: {
         parameters: {
             query?: never;
@@ -4597,14 +4720,28 @@ export interface operations {
     };
     agentPollTasks: {
         parameters: {
-            query?: never;
+            query?: {
+                wait?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Tasks (packages/agent-protocol AgentTask) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        tasks: {
+                            [key: string]: unknown;
+                        }[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
         };
     };
@@ -4618,10 +4755,32 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "succeeded" | "failed";
+                    result?: {
+                        [key: string]: unknown;
+                    };
+                    error?: string;
+                };
+            };
+        };
         responses: {
             204: components["responses"]["NoContent"];
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Result larger than the task's maxResponseBytes */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     agentStreamChunk: {
@@ -4634,10 +4793,18 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
         responses: {
-            204: components["responses"]["NoContent"];
+            202: components["responses"]["Accepted"];
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     agentStream: {

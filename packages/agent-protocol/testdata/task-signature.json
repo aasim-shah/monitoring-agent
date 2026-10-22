@@ -1,0 +1,30 @@
+{
+  "comment": "Shared Ed25519 task-signature vector for the TypeScript signer and the Go verifier (BR-03-07). Test key only.",
+  "publicKey": "ebVWLo/mVPlAeLES6KmLp5AfhTrmlb7X4OORC60ElmQ=",
+  "task": {
+    "id": "6f1c2f0e-6b9a-4c1e-9d2a-1f3e5b7c9d01",
+    "type": "inspect",
+    "expiresAt": "2026-10-22T12:10:00Z",
+    "resourceScope": {
+      "packId": "redis"
+    },
+    "maxRuntimeSeconds": 60,
+    "maxResponseBytes": 65536,
+    "payload": {
+      "target": "agent_info",
+      "note": "café <ok> & \"quoted\"\n",
+      "nested": {
+        "b": [
+          1,
+          -2,
+          true,
+          null
+        ],
+        "a": "😀 "
+      }
+    },
+    "signature": "BRQqcRcaPSOr1MoGNctHmM2vqhSm7ZKEsprT3BBpI9IqChK9BKFqdki49tDYZeW0eHEWhk6hUTq4BHxVMGeaAw=="
+  },
+  "canonical": "{\"expiresAt\":\"2026-10-22T12:10:00Z\",\"id\":\"6f1c2f0e-6b9a-4c1e-9d2a-1f3e5b7c9d01\",\"maxResponseBytes\":65536,\"maxRuntimeSeconds\":60,\"payload\":{\"nested\":{\"a\":\"\\ud83d\\ude00\\u2028\",\"b\":[1,-2,true,null]},\"note\":\"caf\\u00e9 <ok> & \\\"quoted\\\"\\n\",\"target\":\"agent_info\"},\"resourceScope\":{\"packId\":\"redis\"},\"type\":\"inspect\"}",
+  "signature": "BRQqcRcaPSOr1MoGNctHmM2vqhSm7ZKEsprT3BBpI9IqChK9BKFqdki49tDYZeW0eHEWhk6hUTq4BHxVMGeaAw=="
+}

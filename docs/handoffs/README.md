@@ -53,7 +53,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M5.2 | Enrollment | Done | [M5.2](M5.2-enrollment.md) |
 | M5.3 | mTLS edge and agent authentication | Done | [M5.3](M5.3-agent-auth.md) |
 | M5.4 | Heartbeats and fleet status | Done | [M5.4](M5.4-heartbeats.md) |
-| M5.5 | Tasks and streams | Not started | — |
+| M5.5 | Tasks and streams | Done | [M5.5](M5.5-tasks.md) |
 | M5.6 | Rotation and revocation | Not started | — |
 | M5.7 | Fleet UI | Not started | — |
 | M6.1 | Agent distribution build | Not started | — |
