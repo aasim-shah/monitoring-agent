@@ -131,9 +131,9 @@ Integrations → Databases (PostgreSQL/MongoDB/MySQL wizard with "create read-on
 
 ## 10. Task checklist
 
-- [ ] M8.1 Private connector worker
-- [ ] M8.2 Database connectors
-- [ ] M8.3 Custom REST connector and SSRF guard
+- [x] M8.1 Private connector worker ([M8-private-worker](../handoffs/M8-private-worker.md), [M8-private-connections](../handoffs/M8-private-connections.md))
+- [x] M8.2 Database connectors ([M8-database-connectors](../handoffs/M8-database-connectors.md), UI [M8-databases-ui](../handoffs/M8-databases-ui.md))
+- [x] M8.3 Custom REST connector and SSRF guard ([M8-ssrf](../handoffs/M8-ssrf.md), [M8-custom-rest](../handoffs/M8-custom-rest.md)); dashboard UI with M7 Integrations
 
 ## 11. Acceptance criteria
 

@@ -18,7 +18,8 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M5 Agent enrollment and identity | Done | Branch `feat/m5-onboarding-agents`; exit gate passes through Caddy mTLS and from the dashboard; [execution log](M5-execution-log.md) |
 | M6a Host metrics path | Done | Branch `feat/m6-host-agent`; install.sh → metrics in Infrastructure; [execution log](M6a-execution-log.md) |
 | M6b Service discovery and monitoring packs | Done | Branch `feat/m6b-services`; discovery, packs API, agent applies packs, services UI; [execution log](M6b-execution-log.md). OpAMP, OTLP logs, OS matrix moved to M10/M11 |
-| M7–M19 | Not started | |
+| M8 Private worker, databases, custom REST | Done | Branch `feat/m8-private-worker`; deployed; [execution log](M8-execution-log.md) |
+| M7, M9–M19 | Not started | |
 
 ## Maintenance
 
