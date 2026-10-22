@@ -9,7 +9,7 @@ import { AppModule } from '../src/app.module.js';
 import { loadConfig, type AppConfig } from '../src/config.js';
 import { MAILER } from '../src/modules/mail/mailer.js';
 import { GOOGLE_HTTP, type GoogleHttp } from '../src/modules/identity/google-login.service.js';
-import { CLOCK, PRISMA } from '../src/tokens.js';
+import { CLOCK, PRISMA, DNS_RESOLVER } from '../src/tokens.js';
 import { MemoryMailer } from './memory-mailer.js';
 
 export const MASTER_KEY = randomBytes(32).toString('base64');
@@ -26,7 +26,13 @@ export interface TestApp {
 }
 
 export async function createTestApp(
-  opts: { env?: Record<string, string>; google?: GoogleHttp; clock?: () => Date } = {},
+  opts: {
+    env?: Record<string, string>;
+    google?: GoogleHttp;
+    clock?: () => Date;
+    /** Hostname → addresses, for discovery's dns-to-host rule. */
+    dns?: (hostname: string) => Promise<string[]>;
+  } = {},
 ): Promise<TestApp> {
   const env = {
     DATABASE_URL: inject('appDbUrl'),
@@ -45,6 +51,7 @@ export async function createTestApp(
     .useValue(mailer);
   if (opts.google) builder = builder.overrideProvider(GOOGLE_HTTP).useValue(opts.google);
   if (opts.clock) builder = builder.overrideProvider(CLOCK).useValue(opts.clock);
+  if (opts.dns) builder = builder.overrideProvider(DNS_RESOLVER).useValue(opts.dns);
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<NestFastifyApplication>(
     new FastifyAdapter({ trustProxy: true }),

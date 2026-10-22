@@ -9,6 +9,20 @@ import { AGENT_SETTINGS, type AgentSettings } from './settings.provider.js';
 
 const FINGERPRINT = /^[0-9a-f]{64}$/;
 
+/**
+ * The peer is the trusted proxy (checked above), which replaces client-sent forwarding
+ * headers and appends the real client address: the last entry is the agent's egress IP.
+ */
+function clientIp(header: string | string[] | undefined): string | undefined {
+  const value = Array.isArray(header) ? header.join(',') : (header ?? '');
+  const last = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .pop();
+  return last && /^[0-9a-fA-F.:]{3,45}$/.test(last) ? normalize(last) : undefined;
+}
+
 const unauthorized = () => new ApiException(401, 'agent_unauthorized', 'Agent authentication failed');
 
 /** IPv4-mapped IPv6 (`::ffff:a.b.c.d`) compares equal to its IPv4 form. */
@@ -46,6 +60,7 @@ export class AgentAuthGuard implements CanActivate {
       productId: state.product_id,
       environmentId: state.environment_id,
       fingerprint,
+      clientIp: clientIp(req.headers['x-forwarded-for']),
     };
     req.tenant = {
       organizationId: state.organization_id,

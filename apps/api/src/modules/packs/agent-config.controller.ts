@@ -4,12 +4,16 @@ import { AgentRoute } from '../../common/decorators.js';
 import { ApiException, parseBody } from '../../common/errors.js';
 import { requireAgent, type ApiRequest } from '../../common/request.js';
 import { requireTenant } from '../../common/tenant.js';
+import { DiscoveryService } from '../discovery/discovery.service.js';
 import { PacksService } from './packs.service.js';
 import { configAckBody } from './schemas.js';
 
 @Controller('agent/v1')
 export class AgentConfigController {
-  constructor(private readonly packs: PacksService) {}
+  constructor(
+    private readonly packs: PacksService,
+    private readonly discovery: DiscoveryService,
+  ) {}
 
   /** Discovery snapshot: replaces the previous one (start-up and every 5 minutes). */
   @AgentRoute()
@@ -19,7 +23,10 @@ export class AgentConfigController {
     const check = validateMessage('inventory', body);
     if (!check.ok)
       throw new ApiException(400, 'invalid_request', `Invalid inventory: ${check.errors.join('; ')}`);
-    await this.packs.saveInventory(requireTenant(req), requireAgent(req), body as never);
+    const agent = requireAgent(req);
+    await this.packs.saveInventory(requireTenant(req), agent, body as never);
+    // New services on a host refresh the product's graph (debounced).
+    this.discovery.trigger(requireTenant(req), agent.productId);
     return { accepted: true };
   }
 

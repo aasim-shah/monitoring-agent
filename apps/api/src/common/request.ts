@@ -14,6 +14,8 @@ export interface AgentIdentity {
   productId: string;
   environmentId: string;
   fingerprint: string;
+  /** The agent's egress IP as Caddy saw it (last X-Forwarded-For entry, set by the trusted proxy). */
+  clientIp?: string;
 }
 
 export type ApiRequest = FastifyRequest & { auth?: AuthInfo; tenant?: TenantContext; agent?: AgentIdentity };

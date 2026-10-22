@@ -55,6 +55,7 @@ export class HeartbeatController {
           agentVersion: hb.agentVersion,
           capabilities: hb.capabilities,
           clockSkewSeconds,
+          ...(agent.clientIp ? { lastSeenIp: agent.clientIp } : {}),
         },
       });
       const { policyVersion } = await tx.agent.findUniqueOrThrow({

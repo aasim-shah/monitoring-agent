@@ -114,6 +114,9 @@ importers:
       '@pcp/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@pcp/discovery-engine':
+        specifier: workspace:*
+        version: link:../../packages/discovery-engine
       '@pcp/health':
         specifier: workspace:*
         version: link:../../packages/health
