@@ -8,7 +8,8 @@ import {
   uniqueEmail,
   type TestApp,
 } from '../../../test/app-factory.js';
-import { headers } from '../../../test/auth-helpers.js';
+import { PASSWORD, headers } from '../../../test/auth-helpers.js';
+import { uniqueIp } from '../../../test/app-factory.js';
 
 const CLIENT_ID = 'test-client.apps.googleusercontent.com';
 const googleEnv = {
@@ -120,6 +121,39 @@ describe('Google login', () => {
     expect(me.json().user.email).toBe(email);
     const user = await t.prisma.user.findUniqueOrThrow({ where: { email } });
     expect(user.emailVerifiedAt).not.toBeNull();
+  });
+
+  it('discards a password set on an unverified account before linking it (pre-hijack defense)', async () => {
+    const email = uniqueEmail();
+    // Attacker registers the victim's email but cannot verify it.
+    await t.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/signup',
+      headers: headers(),
+      remoteAddress: uniqueIp(),
+      payload: { email, password: PASSWORD },
+    });
+    const { location, stateCookie } = await start();
+    nextClaims = {
+      sub: randomUUID(),
+      email,
+      email_verified: true,
+      nonce: location.searchParams.get('nonce'),
+    };
+    const res = await t.app.inject({
+      method: 'GET',
+      url: `/api/v1/auth/google/callback?code=abc&state=${location.searchParams.get('state')}`,
+      headers: { cookie: stateCookie },
+    });
+    expect(res.statusCode).toBe(302);
+    const attacker = await t.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      headers: headers(),
+      remoteAddress: uniqueIp(),
+      payload: { email, password: PASSWORD },
+    });
+    expect(attacker.statusCode).toBe(401);
   });
 
   it('reports not configured when Google credentials are absent', async () => {

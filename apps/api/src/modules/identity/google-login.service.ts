@@ -113,18 +113,30 @@ export class GoogleLoginService {
       throw new ApiException(403, 'google_email_unverified', 'Your Google email address is not verified');
     }
 
-    const email = claims.email.toLowerCase();
     const user =
       (await this.prisma.user.findUnique({ where: { googleSub: claims.sub } })) ??
-      (await this.prisma.user.upsert({
-        where: { email },
-        update: { googleSub: claims.sub },
-        create: { email, googleSub: claims.sub, emailVerifiedAt: this.now() },
-      }));
-    if (!user.emailVerifiedAt) {
-      await this.prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: this.now() } });
-    }
+      (await this.linkOrCreate(claims.email.toLowerCase(), claims.sub));
     const { token } = await this.sessions.create(user.id, { mfaVerified: !user.mfaEnabledAt });
     return { token };
+  }
+
+  /**
+   * Links Google to an account with the same email, or creates one. An unverified
+   * account's password may have been set by someone else (account pre-hijacking), so it
+   * is discarded and its sessions revoked before Google proves ownership of the email.
+   */
+  private async linkOrCreate(email: string, googleSub: string) {
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (!existing) {
+      return this.prisma.user.create({ data: { email, googleSub, emailVerifiedAt: this.now() } });
+    }
+    if (existing.emailVerifiedAt) {
+      return this.prisma.user.update({ where: { id: existing.id }, data: { googleSub } });
+    }
+    await this.sessions.revokeAllForUser(existing.id);
+    return this.prisma.user.update({
+      where: { id: existing.id },
+      data: { googleSub, emailVerifiedAt: this.now(), passwordHash: null },
+    });
   }
 }
