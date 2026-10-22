@@ -1,0 +1,35 @@
+{
+  "name": "@pcp/discovery-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Observation pipeline and evidence-backed edges for the asset graph (M9, spec §10).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pcp/database": "workspace:*"
+  },
+  "devDependencies": {
+    "@pcp/shared-contracts": "workspace:*",
+    "@pcp/tenant-security": "workspace:*",
+    "@types/node": "22.20.5",
+    "eslint": "9.39.5",
+    "pg": "8.16.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12",
+    "@types/pg": "8.15.6"
+  }
+}
