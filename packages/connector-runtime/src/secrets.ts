@@ -19,12 +19,13 @@ export async function storeCredentials(
     credentialsAad(ctx.organizationId, connectionId),
     keys.active,
   );
-  const data = { ciphertext: serializeSecret(sealed), keyVersion: sealed.keyVersion };
-  await tx.connectionSecret.upsert({
-    where: { connectionId },
-    create: { connectionId, organizationId: ctx.organizationId, ...data },
-    update: { ...data, rotatedAt: new Date() },
-  });
+  // One statement: Prisma's upsert reads then writes, so two concurrent submissions could
+  // both try to insert and fail on the primary key.
+  await tx.$executeRaw`
+    INSERT INTO connection_secrets (connection_id, organization_id, ciphertext, key_version)
+    VALUES (${connectionId}::uuid, ${ctx.organizationId}::uuid, ${serializeSecret(sealed)}, ${sealed.keyVersion})
+    ON CONFLICT (connection_id) DO UPDATE
+      SET ciphertext = EXCLUDED.ciphertext, key_version = EXCLUDED.key_version, rotated_at = now()`;
 }
 
 export function decryptCredentials(
