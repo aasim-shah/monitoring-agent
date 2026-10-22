@@ -1,0 +1,84 @@
+# Platform behind an existing reverse proxy (for example a shared VPS whose nginx owns
+# ports 80/443). The proxy terminates TLS for the dashboard and forwards plain HTTP here;
+# agents connect directly to this Caddy on https_port (8443) because their client
+# certificates must reach Caddy itself (D10). Certificates for the agent and ingest names
+# use the HTTP-01 challenge, which the front proxy forwards to port 80 here.
+{
+	email {$ACME_EMAIL}
+	https_port 8443
+	servers :80 {
+		# The front proxy's address: keep the real client IP from X-Forwarded-For.
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	request_header -X-Client-Cert-Fingerprint
+
+	@downloads path /install.sh /downloads/*
+	handle @downloads {
+		reverse_proxy downloads:8080
+	}
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	handle /webhooks/* {
+		reverse_proxy api:3000
+	}
+
+	handle /healthz {
+		reverse_proxy api:3000
+	}
+
+	handle {
+		reverse_proxy web:3001
+	}
+}
+
+{$AGENT_DOMAIN} {
+	tls {
+		issuer acme {
+			disable_tlsalpn_challenge
+		}
+		client_auth {
+			mode verify_if_given
+			trust_pool file /etc/caddy-agent-ca/chain.pem
+		}
+	}
+	request_header -X-Client-Cert-Fingerprint
+
+	handle /agent/v1/opamp* {
+		reverse_proxy opamp-server:4320 {
+			header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+		}
+	}
+
+	handle /agent/v1/* {
+		reverse_proxy api:3000 {
+			header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+		}
+	}
+
+	handle {
+		respond 404
+	}
+}
+
+{$INGEST_DOMAIN} {
+	tls {
+		issuer acme {
+			disable_tlsalpn_challenge
+		}
+		client_auth {
+			mode require_and_verify
+			trust_pool file /etc/caddy-agent-ca/chain.pem
+		}
+	}
+	request_header -X-Client-Cert-Fingerprint
+
+	reverse_proxy ingest-gateway:4318 {
+		header_up X-Client-Cert-Fingerprint {http.request.tls.client.fingerprint}
+	}
+}

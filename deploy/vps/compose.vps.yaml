@@ -1,0 +1,49 @@
+# Override for a shared VPS behind an existing nginx (see docs/runbooks/deploy-shared-vps.md).
+# - Dashboard HTTP only on the docker0 address (172.17.0.1:18090), for the front nginx.
+# - Agents on 8443 (TLS + client certificates terminate in Caddy).
+# - Hard memory caps so the platform cannot take memory from other apps on the host.
+# Start with: docker compose -p pcp -f compose.yaml -f deploy/vps/compose.vps.yaml --env-file .env \
+#   up -d --no-build caddy ingest-gateway mailpit
+services:
+  caddy:
+    ports: !override
+      - '172.17.0.1:18090:80'
+      - '8443:8443'
+    # Set CADDY_CONFIG=Caddyfile.behind-proxy in .env (Compose reads it for the command).
+    deploy: { resources: { limits: { memory: 96m } } }
+
+  api:
+    environment:
+      SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
+    deploy: { resources: { limits: { memory: 384m } } }
+
+  web:
+    deploy: { resources: { limits: { memory: 256m } } }
+
+  migrate:
+    deploy: { resources: { limits: { memory: 256m } } }
+
+  postgres:
+    deploy: { resources: { limits: { memory: 320m } } }
+
+  redis:
+    deploy: { resources: { limits: { memory: 64m } } }
+
+  victoriametrics:
+    deploy: { resources: { limits: { memory: 384m } } }
+
+  ingest-gateway:
+    deploy: { resources: { limits: { memory: 64m } } }
+
+  downloads:
+    deploy: { resources: { limits: { memory: 32m } } }
+
+  # Until real SMTP is configured, sign-up and invitation mail lands here. It listens on
+  # localhost only; read it through an SSH tunnel: ssh -L 18225:127.0.0.1:18225 root@<host>
+  mailpit:
+    image: axllent/mailpit:v1.27.10
+    networks: [edge]
+    ports:
+      - '127.0.0.1:18225:8025'
+    deploy: { resources: { limits: { memory: 48m } } }
+    restart: unless-stopped

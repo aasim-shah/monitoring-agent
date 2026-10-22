@@ -5,7 +5,7 @@
 ARG AGENT_VERSION=0.1.0
 
 # The collector needs Go 1.26 (OpenTelemetry v0.162.0); our own code builds with 1.23.
-FROM golang:1.26.9-alpine AS collector
+FROM --platform=$BUILDPLATFORM golang:1.26.9-alpine AS collector
 RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod \
     go install go.opentelemetry.io/collector/cmd/builder@v0.162.0
 WORKDIR /build
@@ -16,7 +16,7 @@ RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod --mount=type=cache,id=go-bui
       CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o /out/$arch/pcp-otelcol . || exit 1; \
     done
 
-FROM golang:1.23.12-alpine AS agentctl
+FROM --platform=$BUILDPLATFORM golang:1.23.12-alpine AS agentctl
 WORKDIR /src
 COPY packages/agent-protocol/go packages/agent-protocol/go
 COPY agents/host-agent-go agents/host-agent-go
@@ -27,7 +27,7 @@ RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod --mount=type=cache,id=go-bui
         -ldflags="-s -w -X main.version=${AGENT_VERSION}" -o /out/$arch/pcp-agentctl ./cmd/pcp-agentctl || exit 1; \
     done
 
-FROM alpine:3.22 AS package
+FROM --platform=$BUILDPLATFORM alpine:3.22 AS package
 ARG AGENT_VERSION
 COPY --from=collector /out /bin-out
 COPY --from=agentctl /out /bin-out
@@ -39,7 +39,7 @@ FROM scratch AS dist
 COPY --from=package /dist /
 
 # install.sh with the systemd unit embedded, so the installer is one self-contained file.
-FROM alpine:3.22 AS installer
+FROM --platform=$BUILDPLATFORM alpine:3.22 AS installer
 COPY agents/host-agent-go/packaging/systemd/pcp-agent.service agents/host-agent-go/installer/install.sh /in/
 RUN awk 'FNR==NR { unit = unit $0 "\n"; next } /^@@UNIT@@$/ { printf "%s", unit; next } { print }' \
       /in/pcp-agent.service /in/install.sh > /install.sh && chmod 0644 /install.sh && ! grep -q '@@UNIT@@' /install.sh

@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.23.12-alpine AS build
+# Cross-compile on the build machine's architecture for the target platform.
+FROM --platform=$BUILDPLATFORM golang:1.23.12-alpine AS build
+ARG TARGETOS=linux
+ARG TARGETARCH
 WORKDIR /src
 COPY go.work ./
 COPY packages/go-platform packages/go-platform
@@ -8,7 +11,7 @@ COPY packages/agent-protocol/go packages/agent-protocol/go
 COPY agents/host-agent-go agents/host-agent-go
 COPY apps/opamp-server apps/opamp-server
 COPY apps/ingest-gateway apps/ingest-gateway
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/service ./apps/ingest-gateway
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/service ./apps/ingest-gateway
 
 FROM alpine:3.22
 RUN adduser -D -H -u 10001 app
