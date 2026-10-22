@@ -110,8 +110,8 @@ export function AddServerDialog({
             {isLocalControlUrl(created.installCommand) ? (
               <Alert tone="info">
                 Remote servers cannot reach this control URL (it is local to this machine). To add a VPS, run
-                the platform on a public domain and set AGENT_CONTROL_URL to it. For local testing use
-                scripts/dev-agent.sh with this token.
+                the platform on a public domain and set AGENT_CONTROL_URL to it. For local testing run
+                scripts/dev-host.sh with this token (installs a test server with metrics).
               </Alert>
             ) : null}
             <InstallCommand command={created.installCommand} />
