@@ -88,6 +88,10 @@ services:
       MASTER_KEY: ${MASTER_KEY:?MASTER_KEY must be set (see .env.example)}
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Product Control Plane <no-reply@localhost>}
+      # Google sign-in and Google data connections (one OAuth client; all three or none).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       AGENT_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN must be set (see .env.example)}
       VM_QUERY_URL: http://victoriametrics:8428

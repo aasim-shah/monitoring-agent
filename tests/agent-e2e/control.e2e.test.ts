@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { sealCredentials } from '../../apps/web/lib/seal.js';
 import { SECRETS, compose as composeRun, envFile, repoRoot, run } from '../smoke/compose.js';
 
 // M5 exit gate: a Go client enrolls through Caddy's mTLS edge (Caddyfile.local), heartbeats,
@@ -51,7 +52,12 @@ let cookie = '';
 async function api(method: string, path: string, body?: unknown) {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'content-type': 'application/json', origin: ORIGIN, ...(cookie ? { cookie } : {}) },
+    // No content type without a body: Fastify rejects an empty JSON body (the web client sends none either).
+    headers: {
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      origin: ORIGIN,
+      ...(cookie ? { cookie } : {}),
+    },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const setCookie = res.headers.get('set-cookie');
@@ -86,7 +92,7 @@ beforeAll(async () => {
     EDGE_SUBNET: `${SUBNET}.0/24`,
     CADDY_ADDRESS: `${SUBNET}.10`,
   });
-  const up = await compose(['up', '-d', '--build', '--wait', '--wait-timeout', '900']);
+  const up = await compose(['up', '-d', '--build', '--wait', '--wait-timeout', '1700']);
   if (up.status !== 0) throw new Error(`compose up failed: ${up.stderr.slice(-4000)}`);
   const ca = await compose([
     'cp',
@@ -311,5 +317,124 @@ describe('install.sh on a systemd host (M6a exit gate)', () => {
         .split('\n')
         .filter(Boolean),
     ).toEqual(['1', '1', '1']);
+  });
+});
+
+describe('service discovery and monitoring packs (M6b exit gate)', () => {
+  it('discovers Redis and PostgreSQL, applies both packs with sealed credentials, and charts them', async () => {
+    // Reuses the systemd host from the install test (tests in this file run in order).
+    const installer = `curl -fsSL http://${CADDY}/install.sh | bash -s --`;
+    const devFlags = `--control-url https://agent.localhost --download-url http://${CADDY}/downloads --ca-file /root/caddy-root.crt`;
+    const pgPassword = 'monitor-e2e-secret';
+    const db = await inHost(
+      `systemctl is-active redis-server postgresql && runuser -u postgres -- psql -qc "CREATE USER pcp_monitor PASSWORD '${pgPassword}' IN ROLE pg_monitor"`,
+    );
+    expect(db.status, db.stdout + db.stderr).toBe(0);
+    const { token } = await enrollmentToken();
+    const install = await inHost(`${installer} --token ${token} ${devFlags}`);
+    expect(install.status, install.stdout + install.stderr).toBe(0);
+    const agentId = JSON.parse((await inHost('cat /var/lib/pcp-agent/state.json')).stdout).agentId as string;
+
+    // Discovery: both services on loopback, no exposure warning.
+    const inventory = await until('inventory with Redis and PostgreSQL', async () => {
+      const inv = (await api('GET', `/api/v1/agents/${agentId}/inventory`)).json;
+      const packs = ((inv.inventory?.services ?? []) as Json[]).map((s) => s.pack);
+      return packs.includes('redis') && packs.includes('postgresql') ? inv : undefined;
+    });
+    expect(inventory.inventory.warnings).toEqual([]);
+    expect(inventory.suggestedPacks).toEqual(expect.arrayContaining(['redis', 'postgresql']));
+
+    // Enable both; PostgreSQL credentials are sealed as the dashboard does.
+    const agent = (await api('GET', `/api/v1/agents/${agentId}`)).json;
+    const sealed = await sealCredentials(agent.x25519PublicKey, {
+      username: 'pcp_monitor',
+      password: pgPassword,
+    });
+    expect(
+      (
+        await api('POST', `/api/v1/agents/${agentId}/packs`, {
+          packId: 'redis',
+          settings: { endpoint: '127.0.0.1:6379' },
+        })
+      ).status,
+    ).toBe(201);
+    const pg = await api('POST', `/api/v1/agents/${agentId}/packs`, {
+      packId: 'postgresql',
+      settings: { endpoint: '127.0.0.1:5432' },
+      sealedCredentials: sealed,
+    });
+    expect(pg.status, JSON.stringify(pg.json)).toBe(201);
+
+    const t0 = Date.now();
+    const packs = await until(
+      'both packs applied',
+      async () => {
+        const list = (await api('GET', `/api/v1/agents/${agentId}/packs`)).json.packs as Json[];
+        const failed = list.find((p) => p.status === 'failed');
+        if (failed) throw new Error(`pack failed: ${failed.packId}: ${failed.statusMessage}`);
+        return list.length === 2 && list.every((p) => p.status === 'applied') ? list : undefined;
+      },
+      120_000,
+    );
+    expect(packs.map((p) => p.packId).sort()).toEqual(['postgresql', 'redis']);
+
+    // Review Focus #1: the ciphertext is gone once the agent acknowledged; the password is nowhere.
+    const rows = await compose([
+      'exec',
+      '-T',
+      'postgres',
+      'psql',
+      '-U',
+      'postgres',
+      '-d',
+      'pcp',
+      '-tAc',
+      `SELECT count(*) FROM agent_pack_assignments WHERE agent_id = '${agentId}' AND sealed_credentials IS NOT NULL`,
+    ]);
+    expect(rows.stdout.trim(), rows.stderr).toBe('0');
+    expect(
+      (await inHost('stat -c %a /var/lib/pcp-agent/packs.json /var/lib/pcp-agent/collector.yaml')).stdout
+        .trim()
+        .split('\n'),
+    ).toEqual(['600', '600']);
+
+    // Charts: the fixed PromQL templates find real series (metric names verified here).
+    const chartHasData = (body: Json, key: string) =>
+      ((body.charts as Json[]).find((c) => c.key === key)?.series as Json[] | undefined)?.some((s) =>
+        (s.points as Array<[number, number | null]>).some(([, v]) => v !== null),
+      );
+    const redis = await until(
+      'Redis charts',
+      async () => {
+        const body = (await api('GET', `/api/v1/agents/${agentId}/services/redis/metrics?range=15m`)).json;
+        return chartHasData(body, 'memory') && chartHasData(body, 'clients') ? body : undefined;
+      },
+      180_000,
+    );
+    const postgres = await until(
+      'PostgreSQL charts',
+      async () => {
+        const body = (await api('GET', `/api/v1/agents/${agentId}/services/postgresql/metrics?range=15m`))
+          .json;
+        return chartHasData(body, 'connections') && chartHasData(body, 'size') ? body : undefined;
+      },
+      180_000,
+    );
+    writeFileSync(
+      join(work, 'packs-timing.txt'),
+      `service metrics visible ${Math.round((Date.now() - t0) / 1000)}s after enabling\n`,
+    );
+    expect(redis.status).toBe('applied');
+    expect(postgres.status).toBe('applied');
+
+    // Disabling removes the receiver; the assignment disappears after the agent acknowledges.
+    expect((await api('DELETE', `/api/v1/agents/${agentId}/packs/redis`)).status).toBe(202);
+    await until('redis pack removed', async () => {
+      const list = (await api('GET', `/api/v1/agents/${agentId}/packs`)).json.packs as Json[];
+      return list.some((p) => p.packId === 'redis') ? undefined : true;
+    });
+    expect(
+      (await inHost('grep -c \'"redis"\' /var/lib/pcp-agent/collector.yaml || true')).stdout.trim(),
+    ).toBe('0');
   });
 });

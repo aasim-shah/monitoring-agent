@@ -157,14 +157,14 @@ Host detail → Detected services and proposals, Enable pack dialog (credentials
 
 ## 11. Task checklist
 
-- [ ] M10.1 Pack schema and loader
-- [ ] M10.2 Pack compiler
-- [ ] M10.3 Pack catalog
-- [ ] M10.4 Detection, proposals, credential delivery
+- [ ] M10.1 Pack schema and loader — M6b ships a code catalog (`apps/api/src/modules/packs/catalog.ts`); versioned pack files in M10
+- [x] M10.2 Pack compiler — M6b scope: `collector.Config` per pack + `filter/allowlist`, validated by `pcp-otelcol validate` ([M6b-agent-packs](../handoffs/M6b-agent-packs.md)); drop-label transform (BR-11-06) still open
+- [x] M10.3 Pack catalog — redis, postgresql, mysql, mongodb, kafka, nginx, nodejs ([M6b-packs-api](../handoffs/M6b-packs-api.md))
+- [x] M10.4 Detection, proposals, credential delivery — /proc discovery, suggested packs, browser-sealed credentials deleted after ack ([M6b-discovery](../handoffs/M6b-discovery.md))
 - [ ] M10.5 Level 2 guidance
 - [ ] M10.6 Usage and limits UI
 - [ ] M10.7 Live boost
-- [ ] M10.8 Service dashboards
+- [x] M10.8 Service dashboards — fixed-PromQL charts per pack on the host page ([M6b-services-ui](../handoffs/M6b-services-ui.md)); Redis and PostgreSQL verified end to end
 - [ ] M18.3 Level 1 managed exporters
 
 ## 12. Acceptance criteria

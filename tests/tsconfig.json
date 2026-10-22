@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": true,
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM"]
   },
   "include": ["smoke", "e2e", "agent-e2e"]
 }
