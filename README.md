@@ -42,6 +42,29 @@ curl http://localhost:8080/healthz
 
 Sign-up emails need `SMTP_URL` (for example a local Mailpit at `smtp://mailpit:1025`); without it no mail is sent.
 
+## Add servers locally (agents)
+
+Agent enrollment needs an agent PKI and HTTPS for `agent.localhost`:
+
+```bash
+pnpm --filter @pcp/api agent:pki --out ./.pki      # prints AGENT_CA_CERT, AGENT_CA_KEY, AGENT_CA_CHAIN, TASK_SIGNING_KEY
+# Add those four lines to .env, plus:
+#   CADDY_CONFIG=Caddyfile.local
+#   AGENT_CA_DIR=./.pki
+#   AGENT_CONTROL_URL=https://agent.localhost:8443
+#   AGENT_INGEST_URL=https://ingest.localhost:8443
+#   AGENT_OPAMP_URL=wss://agent.localhost:8443/agent/v1/opamp
+docker compose up -d --build --wait
+```
+
+In the dashboard open a product → **Add your servers** → **Add server**, copy the token from the install command, then attach a demo agent that connects through Caddy's mTLS edge:
+
+```bash
+scripts/dev-agent.sh <token> demo-vps-1        # docker logs -f pcp-dev-agent-demo-vps-1
+```
+
+`install.sh` for real VPS hosts arrives in M6; the control channel, certificates, heartbeats, signed tasks, rotation, and revocation work today. `pnpm test:agent-e2e` runs the whole agent flow against a fresh stack.
+
 ## Repository layout
 
 See master plan §5. `apps/` holds deployable services, `packages/` shared libraries and connectors, `agents/` customer-side agents, `infrastructure/` Compose, Caddy, and telemetry configuration, `tests/` cross-service suites.

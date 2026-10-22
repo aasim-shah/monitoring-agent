@@ -165,6 +165,10 @@ POST   /api/v1/agents/:id/revoke
 POST   /agent/v1/enroll
 POST   /agent/v1/heartbeat
 POST   /agent/v1/rotate
+GET    /agent/v1/whoami
+POST   /api/v1/agents/:id/diagnostics
+GET    /api/v1/agents/:id/tasks
+POST   /api/v1/environments/:environmentId/agent-enrollments/:enrollmentId/revoke
 GET    /agent/v1/tasks?wait=25
 POST   /agent/v1/tasks/:id/result
 POST   /agent/v1/streams/:sessionId/chunks
@@ -215,14 +219,14 @@ Agents → Fleet (status, version, last seen, environment, packs), Enrollment di
 
 ## 12. Task checklist
 
-- [ ] M5.1 Agent CA and certificate issuance
-- [ ] M5.2 Enrollment
-- [ ] M5.3 mTLS edge and agent authentication
-- [ ] M5.4 Heartbeats and fleet status
-- [ ] M5.5 Tasks and streams
-- [ ] M5.6 Rotation and revocation
-- [ ] M5.7 Fleet UI
-- [ ] M6.2 `pcp-agentctl`
+- [x] M5.1 Agent CA and certificate issuance ([M5.1](../handoffs/M5.1-agent-ca.md))
+- [x] M5.2 Enrollment ([M5.2](../handoffs/M5.2-enrollment.md))
+- [x] M5.3 mTLS edge and agent authentication ([M5.3](../handoffs/M5.3-agent-auth.md))
+- [x] M5.4 Heartbeats and fleet status ([M5.4](../handoffs/M5.4-heartbeats.md))
+- [x] M5.5 Tasks and streams ([M5.5](../handoffs/M5.5-tasks.md))
+- [x] M5.6 Rotation and revocation ([M5.6](../handoffs/M5.6-rotation-revocation.md))
+- [x] M5.7 Fleet UI ([M5.7](../handoffs/M5.7-fleet-ui.md))
+- [ ] M6.2 `pcp-agentctl` (enroll/run/status done in M5.7; packaging pending)
 - [ ] M6.4 OpAMP server and supervisor
 - [ ] M17.1 Fleet install UX
 
