@@ -62,12 +62,21 @@ importers:
       '@node-rs/argon2':
         specifier: 2.2.2
         version: 2.2.2
+      '@pcp/connector-runtime':
+        specifier: workspace:*
+        version: link:../../packages/connector-runtime
+      '@pcp/connector-sdk':
+        specifier: workspace:*
+        version: link:../../packages/connector-sdk
       '@pcp/database':
         specifier: workspace:*
         version: link:../../packages/database
       '@pcp/health':
         specifier: workspace:*
         version: link:../../packages/health
+      '@pcp/jobs':
+        specifier: workspace:*
+        version: link:../../packages/jobs
       '@pcp/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets

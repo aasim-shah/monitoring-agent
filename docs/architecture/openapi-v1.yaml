@@ -666,48 +666,119 @@ paths:
     get:
       operationId: getConnectorCatalog
       tags: [connections]
-      summary: Connector catalog with capabilities
-      description: Connector catalog with capabilities.
+      summary: Connector catalog with capabilities, credential fields, and config schema
+      description: Connector catalog with capabilities, credential fields, and config schema.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectorCatalog'
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/v1/connections:
+      x-implemented-in: M4
+  /api/v1/organizations/{orgId}/connections:
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
       operationId: createConnection
       tags: [connections]
       summary: Create connection (draft)
-      description: Create connection (draft).
+      description: Create connection (draft). Requires `connection.configure`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectionRequest'
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M4
+    get:
+      operationId: listConnections
+      tags: [connections]
+      summary: Connections visible to the caller (product-scoped members see scoped ones only)
+      description: Connections visible to the caller (product-scoped members see scoped ones only). Requires `connection.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionList'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M4
   /api/v1/connections/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getConnection
+      tags: [connections]
+      summary: Connection detail (never includes credentials)
+      description: Connection detail (never includes credentials). Requires `connection.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionDetail'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M4
     delete:
       operationId: deleteConnection
       tags: [connections]
-      summary: Delete connection (crypto-shred secrets)
-      description: Delete connection (crypto-shred secrets).
+      summary: Delete connection (crypto-shred secrets; status disconnected)
+      description: Delete connection (crypto-shred secrets; status disconnected). Requires `connection.configure`.
       security: [{ sessionCookie: [] }]
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionDeleted'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M4
   /api/v1/connections/{id}/authorize:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: authorizeConnection
       tags: [connections]
-      summary: Submit token or start OAuth
-      description: Submit token or start OAuth.
+      summary: Store encrypted credentials and queue validation
+      description: Store encrypted credentials and queue validation. Requires `connection.configure`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeConnectionRequest'
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M4
   /api/v1/oauth/{provider}/callback:
     parameters: [{ $ref: '#/components/parameters/provider' }]
     get:
@@ -725,61 +796,104 @@ paths:
     post:
       operationId: validateConnection
       tags: [connections]
-      summary: Queue validation
-      description: Queue validation.
+      summary: Queue a validation job
+      description: Queue a validation job. Requires `connection.configure`.
       security: [{ sessionCookie: [] }]
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M4
   /api/v1/connections/{id}/resources:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listConnectionResources
       tags: [connections]
-      summary: Accessible provider resources
-      description: Accessible provider resources.
+      summary: Run discovery now and list provider resources for scoping
+      description: Run discovery now and list provider resources for scoping. Requires `connection.configure`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionResourceList'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+      x-implemented-in: M4
   /api/v1/connections/{id}/resource-scopes:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: setConnectionResourceScopes
       tags: [connections]
-      summary: Assign resources to products/environments
-      description: Assign resources to products/environments.
+      summary: Replace the resource-to-product scopes
+      description: Replace the resource-to-product scopes. Requires `connection.configure`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceScopesRequest'
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceScopeList'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M4
   /api/v1/connections/{id}/discover:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: discoverConnection
       tags: [connections]
-      summary: Queue discovery
-      description: Queue discovery.
+      summary: Queue a discovery job
+      description: Queue a discovery job. Requires `connection.configure`.
       security: [{ sessionCookie: [] }]
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobAccepted'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M4
   /api/v1/connections/{id}/sync-runs:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listSyncRuns
       tags: [connections]
-      summary: Sync history
-      description: Sync history.
+      summary: Latest 50 validation, discovery, and sync runs
+      description: Latest 50 validation, discovery, and sync runs. Requires `connection.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncRunList'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M4
   /api/v1/agent-enrollments:
     post:
       operationId: createAgentEnrollment
@@ -2221,6 +2335,153 @@ components:
           properties:
             environments:
               type: integer
+    ConnectorCatalog:
+      type: object
+      required: [connectors]
+      properties:
+        connectors:
+          type: array
+          items:
+            type: object
+            required: [type, version, displayName, capabilities, executionLocations, configSchema]
+            properties:
+              type: { type: string }
+              version: { type: string }
+              displayName: { type: string }
+              capabilities: { type: array, items: { type: string } }
+              executionLocations: { type: array, items: { type: string, enum: [cloud, private] } }
+              credentialFields:
+                type: array
+                items:
+                  type: object
+                  required: [name, label, secret]
+                  properties:
+                    name: { type: string }
+                    label: { type: string }
+                    secret: { type: boolean }
+              configSchema: { type: object, additionalProperties: true }
+    CreateConnectionRequest:
+      type: object
+      required: [provider, displayName, executionLocation]
+      properties:
+        provider: { type: string, maxLength: 64 }
+        displayName: { type: string, minLength: 1, maxLength: 100 }
+        executionLocation: { type: string, enum: [cloud, private] }
+        config:
+          {
+            type: object,
+            additionalProperties: true,
+            description: Non-secret configuration validated by the connector,
+          }
+    AuthorizeConnectionRequest:
+      type: object
+      required: [credentials]
+      properties:
+        credentials:
+          type: object
+          description: Values for the connector's credentialFields; encrypted at rest and never returned
+          additionalProperties: { type: string }
+    ResourceScope:
+      type: object
+      required: [externalId, resourceType, name, productId]
+      properties:
+        externalId: { type: string }
+        resourceType: { type: string }
+        name: { type: string }
+        productId: { type: string, format: uuid }
+        environmentId: { type: [string, 'null'], format: uuid }
+    Connection:
+      type: object
+      required:
+        [
+          id,
+          provider,
+          displayName,
+          executionLocation,
+          status,
+          statusReason,
+          config,
+          lastValidatedAt,
+          createdAt,
+          scopes,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        provider: { type: string }
+        displayName: { type: string }
+        executionLocation: { type: string, enum: [cloud, private] }
+        status:
+          type: string
+          enum: [draft, pending_auth, pending_validation, connected, degraded, revoked, disconnected]
+        statusReason: { type: [string, 'null'] }
+        config: { type: object, additionalProperties: true }
+        lastValidatedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        scopes: { type: array, items: { $ref: '#/components/schemas/ResourceScope' } }
+    ConnectionDetail:
+      allOf:
+        - $ref: '#/components/schemas/Connection'
+        - type: object
+          required: [hasCredentials]
+          properties:
+            hasCredentials: { type: boolean }
+    ConnectionList:
+      type: object
+      required: [connections]
+      properties:
+        connections: { type: array, items: { $ref: '#/components/schemas/Connection' } }
+    ConnectionDeleted:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [disconnected, revoked] }
+    JobAccepted:
+      type: object
+      required: [jobId]
+      properties:
+        jobId: { type: string }
+    ConnectionResourceList:
+      type: object
+      required: [resources]
+      properties:
+        resources:
+          type: array
+          items:
+            type: object
+            required: [externalId, resourceType, name]
+            properties:
+              externalId: { type: string }
+              resourceType: { type: string }
+              name: { type: string }
+    ResourceScopesRequest:
+      type: object
+      required: [scopes]
+      properties:
+        scopes: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/ResourceScope' } }
+    ResourceScopeList:
+      type: object
+      required: [scopes]
+      properties:
+        scopes: { type: array, items: { $ref: '#/components/schemas/ResourceScope' } }
+    SyncRunList:
+      type: object
+      required: [runs]
+      properties:
+        runs:
+          type: array
+          items:
+            type: object
+            required: [id, kind, status, createdAt]
+            properties:
+              id: { type: string, format: uuid }
+              kind: { type: string, enum: [validate, discover, sync] }
+              status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
+              startedAt: { type: [string, 'null'], format: date-time }
+              finishedAt: { type: [string, 'null'], format: date-time }
+              errorCode: { type: [string, 'null'] }
+              errorMessage: { type: [string, 'null'], description: Redacted before storage }
+              items: { type: [integer, 'null'] }
+              createdAt: { type: string, format: date-time }
   responses:
     Ok: { description: Success }
     Created: { description: Created }

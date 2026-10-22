@@ -79,7 +79,14 @@ describe('route enumeration (Review Focus #5)', () => {
       headers: headers(a.cookie),
       payload: { name: 'Production' },
     });
+    const conn = await t.app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${a.orgId}/connections`,
+      headers: headers(a.cookie),
+      payload: { provider: 'mock', displayName: 'Mock', executionLocation: 'cloud', config: {} },
+    });
     const ids: Record<string, string> = {
+      id: (conn.json() as { id: string }).id,
       orgId: a.orgId,
       productId: productA,
       environmentId: (env.json() as { id: string }).id,

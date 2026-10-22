@@ -2,19 +2,26 @@ import { Inject, Injectable, type CanActivate, type ExecutionContext } from '@ne
 import { Reflector } from '@nestjs/core';
 import type { PrismaClient } from '@pcp/database';
 import type { Permission, Role } from '@pcp/shared-contracts';
-import { can } from '@pcp/tenant-security';
+import { can, withTenant } from '@pcp/tenant-security';
 import { PRISMA } from '../tokens.js';
 import {
   IS_PUBLIC,
   REQUIRED_PERMISSION,
   SESSION_ONLY,
   TENANT_SCOPE,
-  type TenantScopeParam,
+  type TenantResource,
+  type TenantScopeOptions,
 } from './decorators.js';
 import { notFound } from './errors.js';
 import { requireAuth, type ApiRequest } from './request.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const IMPLIED: Record<string, TenantResource> = {
+  orgId: 'organization',
+  productId: 'product',
+  environmentId: 'environment',
+};
 
 interface Membership {
   organization_id: string;
@@ -41,10 +48,7 @@ export class TenantGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(SESSION_ONLY, targets)) return true;
 
     const permission = this.reflector.getAllAndOverride<Permission | undefined>(REQUIRED_PERMISSION, targets);
-    const scope = this.reflector.getAllAndOverride<{ param: TenantScopeParam } | undefined>(
-      TENANT_SCOPE,
-      targets,
-    );
+    const scope = this.reflector.getAllAndOverride<TenantScopeOptions | undefined>(TENANT_SCOPE, targets);
     if (!permission || !scope)
       throw new Error(
         `route ${context.getClass().name}.${context.getHandler().name} lacks @RequirePermission/@TenantScope`,
@@ -55,7 +59,8 @@ export class TenantGuard implements CanActivate {
     const id = (req.params as Record<string, string | undefined>)[scope.param];
     if (!id || !UUID.test(id)) throw notFound();
 
-    const resolved = await this.resolve(scope.param, id, user.id);
+    const resource = 'resource' in scope ? scope.resource : IMPLIED[scope.param]!;
+    const resolved = await this.resolve(resource, id, user.id);
     if (!resolved) throw notFound();
 
     const [membership] = await this.prisma.$queryRaw<Membership[]>`
@@ -72,18 +77,36 @@ export class TenantGuard implements CanActivate {
       environmentIds: 'all' as const,
       requestId: String(req.id),
     };
-    if (!can(ctx, permission, resolved.productId ? { productId: resolved.productId } : {})) throw notFound();
+    let productId = resolved.productId;
+    if (resource === 'connection' && ctx.productIds !== 'all') {
+      // Product-scoped members reach a connection only through a resource scope on one of their products.
+      const allowed = ctx.productIds;
+      const hit = await withTenant(this.prisma, ctx, (tx) =>
+        tx.connectionResourceScope.findFirst({
+          where: { connectionId: id, productId: { in: allowed } },
+          select: { productId: true },
+        }),
+      );
+      if (!hit) throw notFound();
+      productId = hit.productId;
+    }
+    if (!can(ctx, permission, productId ? { productId } : {})) throw notFound();
     req.tenant = ctx;
     return true;
   }
 
   private async resolve(
-    param: TenantScopeParam,
+    resource: TenantResource,
     id: string,
     userId: string,
   ): Promise<{ organizationId: string; productId?: string } | null> {
-    if (param === 'orgId') return { organizationId: id };
-    if (param === 'productId') {
+    if (resource === 'organization') return { organizationId: id };
+    if (resource === 'connection') {
+      const [row] = await this.prisma.$queryRaw<{ org: string | null }[]>`
+        SELECT pcp_resolve_connection_org(${id}::uuid, ${userId}::uuid)::text AS org`;
+      return row?.org ? { organizationId: row.org } : null;
+    }
+    if (resource === 'product') {
       const [row] = await this.prisma.$queryRaw<{ org: string | null }[]>`
         SELECT pcp_resolve_product_org(${id}::uuid, ${userId}::uuid)::text AS org`;
       return row?.org ? { organizationId: row.org, productId: id } : null;

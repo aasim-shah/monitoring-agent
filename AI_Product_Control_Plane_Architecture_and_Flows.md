@@ -1299,7 +1299,9 @@ GET    /api/v1/products/:productId/overview
 
 ```http
 GET    /api/v1/connectors/catalog
-POST   /api/v1/connections
+POST   /api/v1/organizations/:orgId/connections
+GET    /api/v1/organizations/:orgId/connections
+GET    /api/v1/connections/:id
 POST   /api/v1/connections/:id/authorize
 GET    /api/v1/oauth/:provider/callback
 POST   /api/v1/connections/:id/validate

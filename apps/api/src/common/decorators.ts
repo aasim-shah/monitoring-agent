@@ -7,7 +7,12 @@ export const ALLOW_MFA_PENDING = 'pcp:allow-mfa-pending';
 export const REQUIRED_PERMISSION = 'pcp:permission';
 export const TENANT_SCOPE = 'pcp:tenant-scope';
 
-export type TenantScopeParam = 'orgId' | 'productId' | 'environmentId';
+export type TenantResource = 'organization' | 'product' | 'environment' | 'connection';
+
+/** Route parameter that identifies the tenant resource; `orgId`, `productId`, `environmentId` imply theirs. */
+export type TenantScopeOptions =
+  | { param: 'orgId' | 'productId' | 'environmentId' }
+  | { param: string; resource: TenantResource };
 
 /** No session required. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
@@ -22,4 +27,4 @@ export const AllowMfaPending = () => applyDecorators(SetMetadata(ALLOW_MFA_PENDI
 export const RequirePermission = (permission: Permission) => SetMetadata(REQUIRED_PERMISSION, permission);
 
 /** Which route parameter identifies the tenant resource. */
-export const TenantScope = (scope: { param: TenantScopeParam }) => SetMetadata(TENANT_SCOPE, scope);
+export const TenantScope = (scope: TenantScopeOptions) => SetMetadata(TENANT_SCOPE, scope);

@@ -14,7 +14,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M1 Monorepo, CI, Compose | Done | Exit gate met locally (clean clone → `docker compose up` healthy); first GitHub CI run pending a remote |
 | M2 Identity, tenancy, RLS, RBAC, audit | Done | Branch `feat/m2-identity-tenancy`; also delivered M4.1 envelope encryption (in progress: connection secrets model pending) |
 | M3 Dashboard shell | Done | Branch `feat/m3-dashboard-shell`; Playwright journeys pass against the Compose stack |
-| M4 Connectors and jobs | In progress | Branch `feat/m4-connectors`; data model done |
+| M4 Connectors and jobs | In progress | Branch `feat/m4-connectors`; data model, SDK, runtime, jobs, connections API done; Compose wiring next |
 | M5–M19 | Not started | |
 
 ## Maintenance
@@ -46,7 +46,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M3.3 | Typed API client | Done | [M3.3](M3.3-api-client.md) |
 | M4.1 | Envelope encryption | Done | [envelope](M2.3-identity-primitives.md), [storage](M4.2-connector-runtime.md) |
 | M4.2 | Connector SDK runtime | Done | [SDK](M4.2-connector-sdk.md), [runtime](M4.2-connector-runtime.md) |
-| M4.3 | Connection lifecycle and registry | Not started | — |
+| M4.3 | Connection lifecycle and registry | Done | [M4.3](M4.3-connections-api.md) |
 | M4.4 | Job framework | Done | [M4.4](M4.4-jobs.md) |
 | M5.1 | Agent CA and certificate issuance | Not started | — |
 | M5.2 | Enrollment | Not started | — |

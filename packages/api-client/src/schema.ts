@@ -632,8 +632,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Connector catalog with capabilities
-         * @description Connector catalog with capabilities.
+         * Connector catalog with capabilities, credential fields, and config schema
+         * @description Connector catalog with capabilities, credential fields, and config schema.
          */
         get: operations["getConnectorCatalog"];
         put?: never;
@@ -644,18 +644,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/connections": {
+    "/api/v1/organizations/{orgId}/connections": {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+            };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Connections visible to the caller (product-scoped members see scoped ones only)
+         * @description Connections visible to the caller (product-scoped members see scoped ones only). Requires `connection.view`.
+         */
+        get: operations["listConnections"];
         put?: never;
         /**
          * Create connection (draft)
-         * @description Create connection (draft).
+         * @description Create connection (draft). Requires `connection.configure`.
          */
         post: operations["createConnection"];
         delete?: never;
@@ -674,12 +681,16 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Connection detail (never includes credentials)
+         * @description Connection detail (never includes credentials). Requires `connection.view`.
+         */
+        get: operations["getConnection"];
         put?: never;
         post?: never;
         /**
-         * Delete connection (crypto-shred secrets)
-         * @description Delete connection (crypto-shred secrets).
+         * Delete connection (crypto-shred secrets; status disconnected)
+         * @description Delete connection (crypto-shred secrets; status disconnected). Requires `connection.configure`.
          */
         delete: operations["deleteConnection"];
         options?: never;
@@ -700,8 +711,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Submit token or start OAuth
-         * @description Submit token or start OAuth.
+         * Store encrypted credentials and queue validation
+         * @description Store encrypted credentials and queue validation. Requires `connection.configure`.
          */
         post: operations["authorizeConnection"];
         delete?: never;
@@ -746,8 +757,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Queue validation
-         * @description Queue validation.
+         * Queue a validation job
+         * @description Queue a validation job. Requires `connection.configure`.
          */
         post: operations["validateConnection"];
         delete?: never;
@@ -767,8 +778,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Accessible provider resources
-         * @description Accessible provider resources.
+         * Run discovery now and list provider resources for scoping
+         * @description Run discovery now and list provider resources for scoping. Requires `connection.configure`.
          */
         get: operations["listConnectionResources"];
         put?: never;
@@ -792,8 +803,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Assign resources to products/environments
-         * @description Assign resources to products/environments.
+         * Replace the resource-to-product scopes
+         * @description Replace the resource-to-product scopes. Requires `connection.configure`.
          */
         post: operations["setConnectionResourceScopes"];
         delete?: never;
@@ -815,8 +826,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Queue discovery
-         * @description Queue discovery.
+         * Queue a discovery job
+         * @description Queue a discovery job. Requires `connection.configure`.
          */
         post: operations["discoverConnection"];
         delete?: never;
@@ -836,8 +847,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Sync history
-         * @description Sync history.
+         * Latest 50 validation, discovery, and sync runs
+         * @description Latest 50 validation, discovery, and sync runs. Requires `connection.view`.
          */
         get: operations["listSyncRuns"];
         put?: never;
@@ -2665,6 +2676,113 @@ export interface components {
                 environments: number;
             };
         };
+        ConnectorCatalog: {
+            connectors: {
+                type: string;
+                version: string;
+                displayName: string;
+                capabilities: string[];
+                executionLocations: ("cloud" | "private")[];
+                credentialFields?: {
+                    name: string;
+                    label: string;
+                    secret: boolean;
+                }[];
+                configSchema: {
+                    [key: string]: unknown;
+                };
+            }[];
+        };
+        CreateConnectionRequest: {
+            provider: string;
+            displayName: string;
+            /** @enum {string} */
+            executionLocation: "cloud" | "private";
+            /** @description Non-secret configuration validated by the connector */
+            config?: {
+                [key: string]: unknown;
+            };
+        };
+        AuthorizeConnectionRequest: {
+            /** @description Values for the connector's credentialFields; encrypted at rest and never returned */
+            credentials: {
+                [key: string]: string;
+            };
+        };
+        ResourceScope: {
+            externalId: string;
+            resourceType: string;
+            name: string;
+            /** Format: uuid */
+            productId: string;
+            /** Format: uuid */
+            environmentId?: string | null;
+        };
+        Connection: {
+            /** Format: uuid */
+            id: string;
+            provider: string;
+            displayName: string;
+            /** @enum {string} */
+            executionLocation: "cloud" | "private";
+            /** @enum {string} */
+            status: "draft" | "pending_auth" | "pending_validation" | "connected" | "degraded" | "revoked" | "disconnected";
+            statusReason: string | null;
+            config: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            lastValidatedAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            scopes: components["schemas"]["ResourceScope"][];
+        };
+        ConnectionDetail: components["schemas"]["Connection"] & {
+            hasCredentials: boolean;
+        };
+        ConnectionList: {
+            connections: components["schemas"]["Connection"][];
+        };
+        ConnectionDeleted: {
+            /** @enum {string} */
+            status: "disconnected" | "revoked";
+        };
+        JobAccepted: {
+            jobId: string;
+        };
+        ConnectionResourceList: {
+            resources: {
+                externalId: string;
+                resourceType: string;
+                name: string;
+            }[];
+        };
+        ResourceScopesRequest: {
+            scopes: components["schemas"]["ResourceScope"][];
+        };
+        ResourceScopeList: {
+            scopes: components["schemas"]["ResourceScope"][];
+        };
+        SyncRunList: {
+            runs: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "validate" | "discover" | "sync";
+                /** @enum {string} */
+                status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+                /** Format: date-time */
+                startedAt?: string | null;
+                /** Format: date-time */
+                finishedAt?: string | null;
+                errorCode?: string | null;
+                /** @description Redacted before storage */
+                errorMessage?: string | null;
+                items?: number | null;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+        };
     };
     responses: {
         /** @description Success */
@@ -3581,7 +3699,39 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorCatalog"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionList"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -3590,12 +3740,53 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConnectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            201: components["responses"]["Created"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionDetail"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -3612,7 +3803,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionDeleted"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -3627,11 +3826,25 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthorizeConnectionRequest"];
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     oauthCallback: {
@@ -3663,9 +3876,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listConnectionResources: {
@@ -3680,9 +3902,20 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionResourceList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     setConnectionResourceScopes: {
@@ -3695,11 +3928,25 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResourceScopesRequest"];
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResourceScopeList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     discoverConnection: {
@@ -3714,9 +3961,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listSyncRuns: {
@@ -3731,7 +3987,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncRunList"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

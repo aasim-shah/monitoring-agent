@@ -32,6 +32,8 @@ export async function createTestApp(
     MASTER_KEY,
     APP_ORIGIN,
     BOOTSTRAP_MODE: 'off',
+    NODE_ENV: 'test',
+    PCP_ENABLE_MOCK_CONNECTOR: '1',
     ...opts.env,
   };
   const config = loadConfig(env);

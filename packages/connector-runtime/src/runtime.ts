@@ -141,16 +141,17 @@ export class ConnectorRuntime {
     }
 
     await withTenant(this.prisma, ctx, async (tx) => {
-      // A connection deleted meanwhile stays deleted (never revived by a late job).
-      const current = await tx.connection.findUnique({ where: { id: c.id }, select: { status: true } });
-      if (!current || current.status === 'disconnected' || current.status === 'revoked') {
+      // A connection deleted meanwhile stays deleted (never revived by a late job). The status
+      // condition sits in the UPDATE itself so a delete committing mid-validation still wins.
+      const { count } = await tx.connection.updateMany({
+        where: { id: c.id, status: { notIn: ['disconnected', 'revoked'] } },
+        data: { status: outcome.status, statusReason: outcome.reason ?? null, lastValidatedAt: this.now() },
+      });
+      if (count === 0) {
+        const current = await tx.connection.findUnique({ where: { id: c.id }, select: { status: true } });
         outcome = { status: current?.status ?? 'disconnected' };
         return;
       }
-      await tx.connection.update({
-        where: { id: c.id },
-        data: { status: outcome.status, statusReason: outcome.reason ?? null, lastValidatedAt: this.now() },
-      });
       await tx.connectionHealth.create({
         data: {
           organizationId: c.organizationId,
