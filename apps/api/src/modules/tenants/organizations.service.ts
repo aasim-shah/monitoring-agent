@@ -4,12 +4,16 @@ import type { Organization, PrismaClient } from '@pcp/database';
 import type { TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 import { PRISMA } from '../../tokens.js';
+import { AuditService } from '../auditing/audit.service.js';
 
 type Settings = { dataRetentionDays?: number };
 
 @Injectable()
 export class OrganizationsService {
-  constructor(@Inject(PRISMA) private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly prisma: PrismaClient,
+    private readonly audit: AuditService,
+  ) {}
 
   /** Creates the organization and its first owner in one tenant-scoped transaction. */
   async create(
@@ -27,7 +31,20 @@ export class OrganizationsService {
     };
     return withTenant(this.prisma, ctx, async (tx) => {
       const org = await tx.organization.create({ data: { id: ctx.organizationId, ...input } });
-      await tx.organizationMember.create({ data: { organizationId: org.id, userId, role: 'owner' } });
+      const member = await tx.organizationMember.create({
+        data: { organizationId: org.id, userId, role: 'owner' },
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'organization.created',
+        targetType: 'organization',
+        targetId: org.id,
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'member.owner_created',
+        targetType: 'member',
+        targetId: member.id,
+        metadata: { userId },
+      });
       return org;
     });
   }
@@ -44,7 +61,7 @@ export class OrganizationsService {
   ): Promise<Organization> {
     return withTenant(this.prisma, ctx, async (tx) => {
       const current = await tx.organization.findUniqueOrThrow({ where: { id: ctx.organizationId } });
-      return tx.organization.update({
+      const updated = await tx.organization.update({
         where: { id: ctx.organizationId },
         data: {
           name: input.name,
@@ -52,6 +69,13 @@ export class OrganizationsService {
           settings: input.settings ? { ...(current.settings as Settings), ...input.settings } : undefined,
         },
       });
+      await this.audit.record(tx, ctx, {
+        action: 'organization.settings_updated',
+        targetType: 'organization',
+        targetId: ctx.organizationId,
+        metadata: { fields: Object.keys(input) },
+      });
+      return updated;
     });
   }
 }

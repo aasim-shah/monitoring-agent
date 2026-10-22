@@ -4,7 +4,8 @@
     "rootDir": ".",
     "outDir": "dist",
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "declaration": false
   },
   "include": ["src", "test", "vitest.config.ts"]
 }
