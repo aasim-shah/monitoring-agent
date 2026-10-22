@@ -18,6 +18,7 @@ import { IdentityModule } from './modules/identity/identity.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
 import { MembersModule } from './modules/members/members.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
+import { TelemetryModule } from './modules/telemetry/telemetry.module.js';
 import { TenantsModule } from './modules/tenants/tenants.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { APP_CONFIG, CLOCK, KEY_RING, READINESS_CHECKS } from './tokens.js';
@@ -57,6 +58,7 @@ export class AppModule {
         MembersModule,
         ConnectionsModule.register(env),
         AgentsModule,
+        TelemetryModule,
       ],
       controllers: [HealthController],
       providers: [

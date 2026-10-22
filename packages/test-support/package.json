@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "@pcp/database": "workspace:*",
-    "@testcontainers/redis": "11.14.0"
+    "@testcontainers/redis": "11.14.0",
+    "testcontainers": "11.14.0"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

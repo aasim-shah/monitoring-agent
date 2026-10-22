@@ -71,7 +71,8 @@ export const metricQuerySchema = z
 export type MetricQuery = z.infer<typeof metricQuerySchema>;
 
 export interface MetricResult {
-  series: Array<{ labels: Record<string, string>; points: Array<[number, number]> }>;
+  /** `[epochSeconds, value]`; `null` marks a step with no data (never shown as zero, BR-04-07). */
+  series: Array<{ labels: Record<string, string>; points: Array<[number, number | null]> }>;
   freshness: 'current' | 'stale' | 'unavailable';
   completeness: 'complete' | 'partial' | 'unavailable';
   gaps: string[];

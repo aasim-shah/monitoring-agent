@@ -33,6 +33,7 @@ const schema = z
     AGENT_OPAMP_URL: z.string().url().optional(),
     AGENT_PROXY_ADDRESSES: z.string().optional(),
     INTERNAL_TOKEN: z.string().min(24).optional(),
+    VM_QUERY_URL: z.string().url().optional(),
   })
   .refine(
     (c) =>
@@ -81,6 +82,8 @@ export interface AppConfig {
   agents?: AgentConfig;
   /** Shared secret for private-network service calls; internal routes are off without it. */
   internalToken?: string;
+  /** VictoriaMetrics base URL for reads (private network only, BR-04-05). */
+  vmQueryUrl?: string;
 }
 
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
@@ -109,6 +112,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
         }
       : undefined,
     internalToken: c.INTERNAL_TOKEN,
+    vmQueryUrl: c.VM_QUERY_URL?.replace(/\/+$/, ''),
     agents: c.AGENT_CA_CERT
       ? {
           caCertPem: fromBase64(c.AGENT_CA_CERT),

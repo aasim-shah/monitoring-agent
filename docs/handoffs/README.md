@@ -61,7 +61,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M6.3 | `pcpcontrol` extension (heartbeat, tasks, discovery) | Not started | — |
 | M6.4 | OpAMP server and supervisor | Not started | — |
 | M6.5 | Ingest gateway | Done | [lookup](M6.5-internal-lookup.md), [gateway](M6.5-ingest-gateway.md) |
-| M6.6 | Telemetry query module | Not started | — |
+| M6.6 | Telemetry query module | Done | [M6.6](M6.6-telemetry-query.md) |
 | M6.7 | Installer and systemd units | Not started | — |
 | M6.8 | Host overview UI | Not started | — |
 | M7.1 | Webhook ingestion framework | Not started | — |

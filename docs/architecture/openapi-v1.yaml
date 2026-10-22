@@ -962,6 +962,55 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M5
+  /api/v1/products/{productId}/infrastructure:
+    parameters: [{ $ref: '#/components/parameters/productId' }]
+    get:
+      operationId: getInfrastructure
+      tags: [telemetry]
+      summary: Hosts with current CPU, memory, and disk usage
+      description: One row per agent with current usage (null when no recent sample). Requires `telemetry.query`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hosts]
+                properties:
+                  hosts:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        [
+                          agentId,
+                          hostname,
+                          environmentName,
+                          status,
+                          stale,
+                          cpuPercent,
+                          memoryPercent,
+                          diskPercent,
+                          lastSampleAt,
+                        ]
+                      properties:
+                        agentId: { type: string, format: uuid }
+                        hostname: { type: string }
+                        environmentName: { type: string }
+                        status: { type: string, enum: [active, degraded, revoked] }
+                        stale: { type: boolean }
+                        cpuPercent: { type: [number, 'null'] }
+                        memoryPercent: { type: [number, 'null'] }
+                        diskPercent: { type: [number, 'null'] }
+                        lastSampleAt: { type: [string, 'null'], format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: Telemetry storage unavailable
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M6
   /api/v1/products/{productId}/agents:
     parameters: [{ $ref: '#/components/parameters/productId' }]
     get:
@@ -1068,6 +1117,60 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M5
+  /api/v1/agents/{id}/metrics:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getHostMetrics
+      tags: [telemetry]
+      summary: Host CPU, memory, disk, and network for one agent
+      description: >-
+        Fixed host queries over the selected range. Points are [epochSeconds, value]; null marks a step without
+        data (never zero). Requires `telemetry.query`.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - {
+            name: range,
+            in: query,
+            required: false,
+            schema: { type: string, enum: ['15m', '1h', '6h', '24h', '7d'], default: '1h' },
+          }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [range, stepSeconds, series, lastSampleAt, completeness, gaps]
+                properties:
+                  range: { type: string }
+                  stepSeconds: { type: integer }
+                  series:
+                    type: object
+                    required: [cpu, memory, disk, networkIn, networkOut]
+                    properties:
+                      cpu: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+                      memory: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+                      networkIn: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+                      networkOut: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+                      disk:
+                        type: array
+                        items:
+                          type: object
+                          required: [mountpoint, points]
+                          properties:
+                            mountpoint: { type: string }
+                            points: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+                  lastSampleAt: { type: [string, 'null'], format: date-time }
+                  completeness: { type: string, enum: [complete, partial, unavailable] }
+                  gaps: { type: array, items: { type: string } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: Telemetry storage unavailable
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M6
   /api/v1/agents/{id}/revoke:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
@@ -2834,6 +2937,12 @@ components:
                   receivedAt: { type: string, format: date-time }
                   health: { type: string }
                   queueDepth: { type: integer }
+    MetricPoint:
+      type: array
+      description: '[epochSeconds, value]; value is null for a step without data (never shown as zero)'
+      minItems: 2
+      maxItems: 2
+      items: { type: [number, 'null'] }
   responses:
     Ok: { description: Success }
     Created: { description: Created }

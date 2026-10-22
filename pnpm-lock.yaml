@@ -583,6 +583,9 @@ importers:
       '@testcontainers/redis':
         specifier: 11.14.0
         version: 11.14.0
+      testcontainers:
+        specifier: 11.14.0
+        version: 11.14.0
     devDependencies:
       '@types/node':
         specifier: 22.20.5

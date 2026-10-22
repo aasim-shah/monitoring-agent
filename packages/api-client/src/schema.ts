@@ -910,6 +910,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/{productId}/infrastructure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: components["parameters"]["productId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Hosts with current CPU, memory, and disk usage
+         * @description One row per agent with current usage (null when no recent sample). Requires `telemetry.query`.
+         */
+        get: operations["getInfrastructure"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/{productId}/agents": {
         parameters: {
             query?: never;
@@ -994,6 +1017,29 @@ export interface paths {
          * @description Latest 20 tasks with results. Requires `agent.view`.
          */
         get: operations["listAgentTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Host CPU, memory, disk, and network for one agent
+         * @description Fixed host queries over the selected range. Points are [epochSeconds, value]; null marks a step without data (never zero). Requires `telemetry.query`.
+         */
+        get: operations["getHostMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2958,6 +3004,8 @@ export interface components {
                 queueDepth: number;
             }[];
         };
+        /** @description [epochSeconds, value]; value is null for a step without data (never shown as zero) */
+        MetricPoint: (number | null)[];
     };
     responses: {
         /** @description Success */
@@ -4270,6 +4318,55 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    getInfrastructure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: components["parameters"]["productId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        hosts: {
+                            /** Format: uuid */
+                            agentId: string;
+                            hostname: string;
+                            environmentName: string;
+                            /** @enum {string} */
+                            status: "active" | "degraded" | "revoked";
+                            stale: boolean;
+                            cpuPercent: number | null;
+                            memoryPercent: number | null;
+                            diskPercent: number | null;
+                            /** Format: date-time */
+                            lastSampleAt: string | null;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Telemetry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     listAgents: {
         parameters: {
             query?: never;
@@ -4397,6 +4494,61 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getHostMetrics: {
+        parameters: {
+            query?: {
+                range?: "15m" | "1h" | "6h" | "24h" | "7d";
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        range: string;
+                        stepSeconds: number;
+                        series: {
+                            cpu: components["schemas"]["MetricPoint"][];
+                            memory: components["schemas"]["MetricPoint"][];
+                            networkIn: components["schemas"]["MetricPoint"][];
+                            networkOut: components["schemas"]["MetricPoint"][];
+                            disk: {
+                                mountpoint: string;
+                                points: components["schemas"]["MetricPoint"][];
+                            }[];
+                        };
+                        /** Format: date-time */
+                        lastSampleAt: string | null;
+                        /** @enum {string} */
+                        completeness: "complete" | "partial" | "unavailable";
+                        gaps: string[];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Telemetry storage unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     revokeAgent: {
