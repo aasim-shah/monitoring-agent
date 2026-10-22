@@ -209,7 +209,10 @@ export class ConnectionsService {
         });
         if (!env) throw new ApiException(400, 'validation_failed', 'Invalid fields: environmentId');
       }
-      await tx.connectionResourceScope.deleteMany({ where: { connectionId: id } });
+      // Product-scoped callers replace only the scopes on their own products.
+      await tx.connectionResourceScope.deleteMany({
+        where: allowed === 'all' ? { connectionId: id } : { connectionId: id, productId: { in: allowed } },
+      });
       await tx.connectionResourceScope.createMany({
         data: scopes.map((s) => ({ organizationId: ctx.organizationId, connectionId: id, ...s })),
         skipDuplicates: true,
@@ -221,7 +224,7 @@ export class ConnectionsService {
         metadata: { count: scopes.length, productIds },
       });
       return tx.connectionResourceScope.findMany({
-        where: { connectionId: id },
+        where: allowed === 'all' ? { connectionId: id } : { connectionId: id, productId: { in: allowed } },
         orderBy: { createdAt: 'asc' },
       });
     });

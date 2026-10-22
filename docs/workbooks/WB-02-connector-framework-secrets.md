@@ -150,7 +150,9 @@ Spec §15.2:
 
 ```http
 GET    /api/v1/connectors/catalog
-POST   /api/v1/connections
+POST   /api/v1/organizations/:orgId/connections
+GET    /api/v1/organizations/:orgId/connections
+GET    /api/v1/connections/:id
 POST   /api/v1/connections/:id/authorize
 GET    /api/v1/oauth/:provider/callback
 POST   /api/v1/connections/:id/validate
@@ -199,10 +201,10 @@ Integrations → Connector catalog, Connect wizard (permissions, execution locat
 
 ## 12. Task checklist
 
-- [ ] M4.1 Envelope encryption
-- [ ] M4.2 Connector SDK runtime
-- [ ] M4.3 Connection lifecycle and registry
-- [ ] M4.4 Job framework
+- [x] M4.1 Envelope encryption ([envelope](../handoffs/M2.3-identity-primitives.md), [storage](../handoffs/M4.2-connector-runtime.md))
+- [x] M4.2 Connector SDK runtime ([SDK](../handoffs/M4.2-connector-sdk.md), [runtime](../handoffs/M4.2-connector-runtime.md))
+- [x] M4.3 Connection lifecycle and registry ([API](../handoffs/M4.3-connections-api.md))
+- [x] M4.4 Job framework ([jobs](../handoffs/M4.4-jobs.md), [Compose](../handoffs/M4-compose.md))
 
 ## 13. Acceptance criteria
 
@@ -212,4 +214,4 @@ Integrations → Connector catalog, Connect wizard (permissions, execution locat
 
 ## 14. Open items
 
-- Duplicate-connection policy (warn vs block) to confirm with product owner. Default: warn.
+- Duplicate-connection policy (warn vs block) to confirm with product owner. Default: warn. Not implemented in M4: the API accepts duplicates silently; the warning lands with the connections UI (M5).

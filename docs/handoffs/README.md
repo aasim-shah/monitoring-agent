@@ -12,9 +12,9 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 |---|---|---|
 | M0 Contracts and decisions | Delivered, awaiting approval | ADRs (M0.1) and threat model (M0.3) need tech lead + security owner acceptance; M0.2, M0.4 done |
 | M1 Monorepo, CI, Compose | Done | Exit gate met locally (clean clone → `docker compose up` healthy); first GitHub CI run pending a remote |
-| M2 Identity, tenancy, RLS, RBAC, audit | Done | Branch `feat/m2-identity-tenancy`; also delivered M4.1 envelope encryption (in progress: connection secrets model pending) |
+| M2 Identity, tenancy, RLS, RBAC, audit | Done | Branch `feat/m2-identity-tenancy`; also delivered M4.1 envelope encryption |
 | M3 Dashboard shell | Done | Branch `feat/m3-dashboard-shell`; Playwright journeys pass against the Compose stack |
-| M4 Connectors and jobs | In progress | Branch `feat/m4-connectors`; data model, SDK, runtime, jobs, connections API done; Compose wiring next |
+| M4 Connectors and jobs | Done | Branch `feat/m4-connectors`; data model, SDK, runtime, jobs, connections API, [Compose](M4-compose.md); [execution log](M4-execution-log.md) |
 | M5–M19 | Not started | |
 
 ## Maintenance

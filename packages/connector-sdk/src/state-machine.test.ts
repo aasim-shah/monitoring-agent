@@ -5,6 +5,7 @@ describe('connection state machine (spec §9.1)', () => {
   it('follows the token flow to connected', () => {
     expect(transition('draft', 'auth_completed')).toBe('pending_validation');
     expect(transition('pending_validation', 'validated')).toBe('connected');
+    expect(transition('pending_validation', 'auth_completed')).toBe('pending_validation');
   });
 
   it('follows the OAuth flow', () => {

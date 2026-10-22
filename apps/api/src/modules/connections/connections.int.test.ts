@@ -8,6 +8,7 @@ import { inject } from 'vitest';
 import { MASTER_KEY, createTestApp, type TestApp } from '../../../test/app-factory.js';
 import {
   createProduct,
+  enrollMfa,
   headers,
   login,
   ownerWithOrg,
@@ -175,6 +176,54 @@ describe('connections API', () => {
     await new Promise((r) => setTimeout(r, 1500));
     const [row] = await sql<{ status: string }>(`SELECT status FROM connections WHERE id = $1`, [conn.id]);
     expect(row!.status).toBe('disconnected');
+  });
+
+  it('accepts credentials again while validation is still pending (double submit)', async () => {
+    const owner = await ownerWithOrg(t);
+    const conn = await mockConnection(owner);
+    const url = `/api/v1/connections/${conn.id}/authorize`;
+    const [first, second] = await Promise.all([
+      call('POST', url, owner.cookie, { credentials: { token: TOKEN } }),
+      call('POST', url, owner.cookie, { credentials: { token: TOKEN } }),
+    ]);
+    expect([first.statusCode, second.statusCode]).toEqual([200, 200]);
+    const again = await call('POST', url, owner.cookie, { credentials: { token: TOKEN } });
+    expect(again.statusCode, again.body).toBe(200);
+  });
+
+  it("a product-scoped admin replaces only their products' scopes", async () => {
+    const owner = await ownerWithOrg(t);
+    const productA = await createProduct(t, owner, 'A');
+    const productB = await createProduct(t, owner, 'B');
+    const conn = await mockConnection(owner);
+    const scope = (externalId: string, productId: string) => ({
+      externalId,
+      resourceType: 'mock_resource',
+      name: externalId,
+      productId,
+    });
+    await call('POST', `/api/v1/connections/${conn.id}/resource-scopes`, owner.cookie, {
+      scopes: [scope('mock-1', productA), scope('mock-2', productB)],
+    });
+    const email = await signUpAndVerify(t);
+    const [u] = await sql<{ id: string }>(`SELECT id FROM users WHERE email = $1`, [email]);
+    await sql(
+      `INSERT INTO organization_members (id, organization_id, user_id, role, all_products, product_ids)
+       VALUES ($1, $2, $3, 'admin', false, ARRAY[$4]::uuid[])`,
+      [randomUUID(), owner.orgId, u!.id, productA],
+    );
+    const admin = await login(t, email);
+    await enrollMfa(t, admin);
+    const res = await call('POST', `/api/v1/connections/${conn.id}/resource-scopes`, admin, {
+      scopes: [scope('mock-3', productA)],
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().scopes.map((s: { externalId: string }) => s.externalId)).toEqual(['mock-3']);
+    const rows = await sql<{ external_id: string }>(
+      `SELECT external_id FROM connection_resource_scopes WHERE connection_id = $1 ORDER BY external_id`,
+      [conn.id],
+    );
+    expect(rows.map((r) => r.external_id)).toEqual(['mock-2', 'mock-3']);
   });
 
   it('hides connection management from viewers (404)', async () => {

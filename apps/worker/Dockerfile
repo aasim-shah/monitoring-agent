@@ -12,6 +12,8 @@ RUN pnpm deploy --filter=@pcp/worker --prod /out
 
 FROM node:22.20.0-alpine
 ENV NODE_ENV=production
+# Prisma's musl query engine links OpenSSL 3.
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=build --chown=node:node /out .
 USER node

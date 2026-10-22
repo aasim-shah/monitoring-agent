@@ -102,9 +102,13 @@ services:
     environment:
       <<: *node-env
       WORKER_HEALTH_PORT: '3002'
+      DATABASE_URL: *database-url
+      SCHEDULER_DATABASE_URL: postgres://pcp_scheduler:${PCP_SCHEDULER_PASSWORD:?PCP_SCHEDULER_PASSWORD must be set (see .env.example)}@postgres:5432/pcp
       REDIS_URL: *redis-url
+      MASTER_KEY: ${MASTER_KEY:?MASTER_KEY must be set (see .env.example)}
     networks: [internal]
     depends_on:
+      migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3002/readyz']

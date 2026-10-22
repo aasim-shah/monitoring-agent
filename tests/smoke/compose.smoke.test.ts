@@ -82,6 +82,23 @@ describe.each([
     expect(res.status).toBe(202);
   });
 
+  it('worker is ready with PostgreSQL and Redis', async () => {
+    const r = await compose(project, file, [
+      'exec',
+      '-T',
+      'worker',
+      'wget',
+      '-q',
+      '-O',
+      '-',
+      'http://127.0.0.1:3002/readyz',
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    const report = JSON.parse(r.stdout) as { status: string; checks: { name: string; ok: boolean }[] };
+    expect(report.status).toBe('ready');
+    expect(report.checks.map((c) => c.name).sort()).toEqual(['postgres', 'redis']);
+  });
+
   it('bootstrap mode refuses agent, OAuth, and webhook routes', async () => {
     for (const path of ['/agent/v1/enroll', '/webhooks/github/x', '/api/v1/oauth/google/callback']) {
       const res = await fetch(`http://127.0.0.1:${httpPort}${path}`, { method: 'POST' });

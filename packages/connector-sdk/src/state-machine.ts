@@ -19,7 +19,13 @@ const LIVE_EXITS: Partial<Record<StatusEvent, ConnectionStatus>> = {
 const TRANSITIONS: Record<ConnectionStatus, Partial<Record<StatusEvent, ConnectionStatus>>> = {
   draft: { auth_started: 'pending_auth', auth_completed: 'pending_validation', ...LIVE_EXITS },
   pending_auth: { auth_completed: 'pending_validation', ...LIVE_EXITS },
-  pending_validation: { validated: 'connected', validation_failed: 'degraded', ...LIVE_EXITS },
+  pending_validation: {
+    validated: 'connected',
+    validation_failed: 'degraded',
+    // Credentials resubmitted before the worker validated the first set.
+    auth_completed: 'pending_validation',
+    ...LIVE_EXITS,
+  },
   connected: {
     validated: 'connected',
     validation_failed: 'degraded',
