@@ -168,6 +168,20 @@ describe('ConnectorRuntime.validate', () => {
 });
 
 describe('credential storage', () => {
+  it('stores concurrent credential submissions without a unique-key race', async () => {
+    const id = await connection('ok');
+    await sql(`DELETE FROM connection_secrets WHERE connection_id = $1`, [id]);
+    const results = await Promise.allSettled(
+      Array.from({ length: 6 }, (_, i) =>
+        withTenant(prisma, ctx(orgA), (tx) =>
+          storeCredentials(tx, ctx(orgA), id, { token: `${TOKEN}-${i}` }, keyRing),
+        ),
+      ),
+    );
+    expect(results.filter((r) => r.status === 'rejected')).toEqual([]);
+    expect(await sql(`SELECT 1 FROM connection_secrets WHERE connection_id = $1`, [id])).toHaveLength(1);
+  });
+
   it('leaves no plaintext credential anywhere in the database', async () => {
     await connection('ok');
     const tables = await sql(`SELECT tablename FROM pg_tables WHERE schemaname = 'public'`);

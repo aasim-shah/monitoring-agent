@@ -85,19 +85,18 @@ describe('login', () => {
   });
 
   it('rate limits 11 attempts per minute from one IP', async () => {
+    // Fixed one-minute windows: 21 attempts always put 11 in one window, even across a boundary.
     const ip = uniqueIp();
     const statuses: number[] = [];
-    for (let i = 0; i < 11; i++) {
-      statuses.push(
-        (await post('/api/v1/auth/login', { email: uniqueEmail(), password: 'x'.repeat(12) }, { ip }))
-          .statusCode,
-      );
+    let last;
+    for (let i = 0; i < 21 && last?.statusCode !== 429; i++) {
+      last = await post('/api/v1/auth/login', { email: uniqueEmail(), password: 'x'.repeat(12) }, { ip });
+      statuses.push(last.statusCode);
     }
-    expect(statuses.slice(0, 10).every((s) => s === 401)).toBe(true);
-    const last = await post('/api/v1/auth/login', { email: uniqueEmail(), password: 'x'.repeat(12) }, { ip });
-    expect(last.statusCode).toBe(429);
-    expect(last.json().code).toBe('rate_limited');
-    expect(Number(last.headers['retry-after'])).toBeGreaterThan(0);
+    expect(statuses.filter((s) => s === 401).length).toBeGreaterThanOrEqual(10);
+    expect(last!.statusCode).toBe(429);
+    expect(last!.json().code).toBe('rate_limited');
+    expect(Number(last!.headers['retry-after'])).toBeGreaterThan(0);
   });
 
   it('sets a Secure, HttpOnly, SameSite=Lax session cookie and supports logout', async () => {

@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { webcrypto } from 'node:crypto';
 import * as x509 from '@peculiar/x509';
 import { generateDevPki, type DevPki } from '../src/modules/agents/ca/pki.js';
-import type { TestApp } from './app-factory.js';
+import { uniqueIp, type TestApp } from './app-factory.js';
 import { createProduct, headers, type Owner } from './auth-helpers.js';
 
 export const CADDY_ADDRESS = '172.30.0.10';
@@ -107,6 +107,7 @@ export async function enrolledAgent(
   const res = await t.app.inject({
     method: 'POST',
     url: '/agent/v1/enroll',
+    remoteAddress: uniqueIp(),
     payload: await enrollRequest(e.token, host),
   });
   if (res.statusCode !== 201) throw new Error(`enroll failed ${res.statusCode} ${res.body}`);

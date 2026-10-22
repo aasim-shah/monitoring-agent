@@ -130,9 +130,10 @@ describe('agent enrollment (WB-03)', () => {
   });
 
   it('limits enrollment attempts per IP', async () => {
+    // 21 attempts always put 11 in one fixed one-minute window.
     const ip = uniqueIp();
-    const codes = [];
-    for (let i = 0; i < 11; i++)
+    const codes: number[] = [];
+    for (let i = 0; i < 21 && codes.at(-1) !== 429; i++)
       codes.push((await enroll(await enrollRequest(`pcp_enr_${'B'.repeat(43)}`), ip)).statusCode);
     expect(codes.at(-1)).toBe(429);
   });

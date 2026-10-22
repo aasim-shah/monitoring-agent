@@ -1317,7 +1317,7 @@ DELETE /api/v1/connections/:id
 ```http
 POST   /api/v1/environments/:environmentId/agent-enrollments
 GET    /api/v1/environments/:environmentId/agent-enrollments
-GET    /api/v1/agents
+GET    /api/v1/products/:productId/agents
 GET    /api/v1/agents/:id
 POST   /api/v1/agents/:id/revoke
 GET    /api/v1/monitoring-packs

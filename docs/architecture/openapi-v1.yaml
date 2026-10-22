@@ -938,29 +938,45 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M5
-  /api/v1/agents:
+  /api/v1/products/{productId}/agents:
+    parameters: [{ $ref: '#/components/parameters/productId' }]
     get:
       operationId: listAgents
       tags: [agents]
-      summary: Fleet list
-      description: Fleet list.
+      summary: Fleet list for a product
+      description: Fleet list for a product, with derived status (degraded after 90 s, stale after 5 min). Requires `agent.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agents]
+                properties:
+                  agents: { type: array, items: { $ref: '#/components/schemas/AgentSummary' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M5
   /api/v1/agents/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getAgent
       tags: [agents]
       summary: Agent detail
-      description: Agent detail.
+      description: Agent detail with certificate and the last 20 heartbeats. Requires `agent.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetail'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M5
   /api/v1/agents/{id}/revoke:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
@@ -1188,11 +1204,27 @@ paths:
       operationId: agentHeartbeat
       tags: [agent-protocol]
       summary: Heartbeat
-      description: Heartbeat.
+      description: >-
+        Heartbeat (packages/agent-protocol Heartbeat) every 30 s. A sequence not above the last one seen is
+        acknowledged with accepted false and not stored; clock skew over 5 min is recorded.
       security: [{ agentMtls: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
+        '202':
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, policyVersion]
+                properties:
+                  accepted: { type: boolean }
+                  policyVersion: { type: integer }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M5
   /agent/v1/rotate:
     servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
@@ -2590,6 +2622,61 @@ components:
               uses: { type: integer }
               revokedAt: { type: [string, 'null'], format: date-time }
               createdAt: { type: string, format: date-time }
+    AgentSummary:
+      type: object
+      required:
+        [
+          id,
+          hostname,
+          os,
+          arch,
+          agentVersion,
+          environmentId,
+          environmentName,
+          status,
+          stale,
+          lastHeartbeatAt,
+          clockSkewSeconds,
+          duplicateMachineId,
+          createdAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        hostname: { type: string }
+        os: { type: string }
+        arch: { type: string }
+        agentVersion: { type: string }
+        environmentId: { type: string, format: uuid }
+        environmentName: { type: string }
+        status: { type: string, enum: [active, degraded, revoked] }
+        stale: { type: boolean }
+        lastHeartbeatAt: { type: [string, 'null'], format: date-time }
+        clockSkewSeconds: { type: [integer, 'null'] }
+        duplicateMachineId: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    AgentDetail:
+      allOf:
+        - $ref: '#/components/schemas/AgentSummary'
+        - type: object
+          required: [capabilities, policyVersion, certificate, recentHeartbeats]
+          properties:
+            capabilities: { type: array, items: { type: string } }
+            policyVersion: { type: integer }
+            certificate:
+              type: [object, 'null']
+              required: [notAfter, fingerprintSha256]
+              properties:
+                notAfter: { type: string, format: date-time }
+                fingerprintSha256: { type: string }
+            recentHeartbeats:
+              type: array
+              items:
+                type: object
+                required: [receivedAt, health, queueDepth]
+                properties:
+                  receivedAt: { type: string, format: date-time }
+                  health: { type: string }
+                  queueDepth: { type: integer }
   responses:
     Ok: { description: Success }
     Created: { description: Created }

@@ -34,7 +34,9 @@ beforeAll(async () => {
 describe('AgentCa.issue', () => {
   it('issues a 30-day clientAuth certificate for CN=<agentId> chaining to the root (TC-03-04)', async () => {
     const agentId = randomUUID();
-    const now = new Date('2026-10-22T12:00:00Z');
+    // A few seconds after beforeAll generated the dev CA: its validity starts at that
+    // second, and verification at exactly notBefore is treated as not yet valid.
+    const now = new Date(Math.floor(Date.now() / 1000) * 1000 + 5000);
     const issued = await ca.issue(await p256(), agentId, now);
     const cert = new x509.X509Certificate(issued.certificatePem);
     expect(cert.subject).toBe(`CN=${agentId}`);

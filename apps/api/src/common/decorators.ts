@@ -9,7 +9,7 @@ export const TENANT_SCOPE = 'pcp:tenant-scope';
 export const AGENT_ROUTE = 'pcp:agent-route';
 export const AGENT_ENROLL = 'pcp:agent-enroll';
 
-export type TenantResource = 'organization' | 'product' | 'environment' | 'connection';
+export type TenantResource = 'organization' | 'product' | 'environment' | 'connection' | 'agent';
 
 /** Route parameter that identifies the tenant resource; `orgId`, `productId`, `environmentId` imply theirs. */
 export type TenantScopeOptions =

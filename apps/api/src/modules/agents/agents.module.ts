@@ -6,16 +6,25 @@ import { CLOCK, KEY_RING, PRISMA, REDIS } from '../../tokens.js';
 import { RateLimiter } from '../identity/rate-limiter.js';
 import { AgentAuthGuard } from './agent-auth.guard.js';
 import { AgentIdentityCache } from './agent-identity.cache.js';
+import { AgentsController } from './agents.controller.js';
+import { AgentsService } from './agents.service.js';
 import { EnrollController } from './enroll.controller.js';
 import { EnrollService } from './enroll.service.js';
 import { EnrollmentsController } from './enrollments.controller.js';
 import { EnrollmentsService } from './enrollments.service.js';
+import { HeartbeatController } from './heartbeat.controller.js';
 import { agentSettingsProvider } from './settings.provider.js';
 import { EnrollmentTokens } from './tokens.js';
 import { WhoamiController } from './whoami.controller.js';
 
 @Module({
-  controllers: [EnrollmentsController, EnrollController, WhoamiController],
+  controllers: [
+    EnrollmentsController,
+    EnrollController,
+    WhoamiController,
+    HeartbeatController,
+    AgentsController,
+  ],
   providers: [
     agentSettingsProvider,
     {
@@ -32,6 +41,7 @@ import { WhoamiController } from './whoami.controller.js';
     AgentAuthGuard,
     EnrollmentsService,
     EnrollService,
+    AgentsService,
   ],
   exports: [AgentAuthGuard],
 })

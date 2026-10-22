@@ -886,16 +886,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/agents": {
+    "/api/v1/products/{productId}/agents": {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Product ID */
+                productId: components["parameters"]["productId"];
+            };
             cookie?: never;
         };
         /**
-         * Fleet list
-         * @description Fleet list.
+         * Fleet list for a product
+         * @description Fleet list for a product, with derived status (degraded after 90 s, stale after 5 min). Requires `agent.view`.
          */
         get: operations["listAgents"];
         put?: never;
@@ -918,7 +921,7 @@ export interface paths {
         };
         /**
          * Agent detail
-         * @description Agent detail.
+         * @description Agent detail with certificate and the last 20 heartbeats. Requires `agent.view`.
          */
         get: operations["getAgent"];
         put?: never;
@@ -1275,6 +1278,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent/v1/whoami": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Confirm the client certificate is accepted
+         * @description Confirm the client certificate is accepted (used by pcp-agentctl status).
+         */
+        get: operations["agentWhoami"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent/v1/heartbeat": {
         parameters: {
             query?: never;
@@ -1286,7 +1309,7 @@ export interface paths {
         put?: never;
         /**
          * Heartbeat
-         * @description Heartbeat.
+         * @description Heartbeat (packages/agent-protocol Heartbeat) every 30 s. A sequence not above the last one seen is acknowledged with accepted false and not stored; clock skew over 5 min is recorded.
          */
         post: operations["agentHeartbeat"];
         delete?: never;
@@ -2830,6 +2853,41 @@ export interface components {
                 createdAt: string;
             }[];
         };
+        AgentSummary: {
+            /** Format: uuid */
+            id: string;
+            hostname: string;
+            os: string;
+            arch: string;
+            agentVersion: string;
+            /** Format: uuid */
+            environmentId: string;
+            environmentName: string;
+            /** @enum {string} */
+            status: "active" | "degraded" | "revoked";
+            stale: boolean;
+            /** Format: date-time */
+            lastHeartbeatAt: string | null;
+            clockSkewSeconds: number | null;
+            duplicateMachineId: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AgentDetail: components["schemas"]["AgentSummary"] & {
+            capabilities: string[];
+            policyVersion: number;
+            certificate: {
+                /** Format: date-time */
+                notAfter: string;
+                fingerprintSha256: string;
+            } | null;
+            recentHeartbeats: {
+                /** Format: date-time */
+                receivedAt: string;
+                health: string;
+                queueDepth: number;
+            }[];
+        };
     };
     responses: {
         /** @description Success */
@@ -4117,12 +4175,25 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Product ID */
+                productId: components["parameters"]["productId"];
+            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        agents: components["schemas"]["AgentSummary"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -4139,7 +4210,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentDetail"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -4448,7 +4527,7 @@ export interface operations {
             };
         };
     };
-    agentHeartbeat: {
+    agentWhoami: {
         parameters: {
             query?: never;
             header?: never;
@@ -4457,7 +4536,49 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            204: components["responses"]["NoContent"];
+            /** @description Authenticated agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        agentId: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    agentHeartbeat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Acknowledged */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        accepted: boolean;
+                        policyVersion: number;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };
