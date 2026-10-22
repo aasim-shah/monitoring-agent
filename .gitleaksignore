@@ -1,0 +1,2 @@
+# Test fixture flagged in history (fake enrollment token in a schema validation test).
+b319d98f239a9506930b4d80f1e6a596831788ab:packages/agent-protocol/src/validate.test.ts:generic-api-key:6

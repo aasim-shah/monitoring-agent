@@ -3,7 +3,7 @@ import { validateMessage } from './index.js';
 
 const enroll = {
   protocolVersion: '1.0',
-  enrollmentToken: 'tok_0123456789abcdef',
+  enrollmentToken: 'x'.repeat(24), // test value; real tokens are 256-bit random
   agentVersion: '1.0.0',
   agentType: 'host',
   csrPem: '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----',

@@ -15,6 +15,12 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M2 Identity, tenancy, RLS, RBAC, audit | Done | Branch `feat/m2-identity-tenancy`; also delivered M4.1 envelope encryption (in progress: connection secrets model pending) |
 | M3–M19 | Not started | Next: M3 dashboard shell |
 
+## Maintenance
+
+| Change | Status | Handoff |
+|---|---|---|
+| CI dependency and secret scan fixes (first GitHub run) | Done | [CI-dependency-security](CI-dependency-security.md) |
+
 ## Tasks
 
 | Task | Title | Status | Handoff |

@@ -34,11 +34,11 @@
     "prisma": "6.19.3"
   },
   "devDependencies": {
-    "@testcontainers/postgresql": "10.28.0",
+    "@testcontainers/postgresql": "11.14.0",
     "@types/node": "22.20.5",
     "@types/pg": "8.15.6",
     "eslint": "9.39.5",
     "typescript": "5.9.3",
-    "vitest": "3.2.7"
+    "vitest": "4.1.12"
   }
 }

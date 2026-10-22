@@ -1,0 +1,6 @@
+# OSV-Scanner configuration. Every ignore needs a reason and an expiry.
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2027-01-31
+reason = "braces <=3.0.3 has no fixed release (stack exhaustion on deeply nested glob patterns). It is reachable only through development tooling (eslint, fast-glob, micromatch), never in production images, and the patterns it parses are repository-controlled, not user input. Re-evaluate when a fix ships."
