@@ -142,6 +142,39 @@ beforeAll(async () => {
         `INSERT INTO agent_stream_sessions (id, organization_id, agent_id, task_id, expires_at) VALUES ($1, $2, $3, $4, now() + interval '10 minutes')`,
         [randomUUID(), org, agent, task],
       );
+      const host = randomUUID();
+      const service = randomUUID();
+      await c.query(
+        `INSERT INTO assets (id, organization_id, asset_type, name, source, identity_key)
+         VALUES ($1, $2, 'host', 'vps-1', 'agent', $4), ($3, $2, 'service', 'redis', 'agent', $5)`,
+        [host, org, service, `agent:${host}`, `svc:${service}`],
+      );
+      await c.query(
+        `INSERT INTO asset_aliases (id, organization_id, asset_id, candidate_asset_id, reason) VALUES ($1, $2, $3, $4, 'same name')`,
+        [randomUUID(), org, host, service],
+      );
+      await c.query(
+        `INSERT INTO asset_observations (id, organization_id, asset_id, source, attributes) VALUES ($1, $2, $3, 'agent', '{}')`,
+        [randomUUID(), org, host],
+      );
+      await c.query(
+        `INSERT INTO product_assets (organization_id, product_id, asset_id) VALUES ($1, $2, $3)`,
+        [org, product, host],
+      );
+      const edge = randomUUID();
+      await c.query(
+        `INSERT INTO asset_relationships (id, organization_id, source_asset_id, target_asset_id, relationship_type, confidence, updated_at)
+         VALUES ($1, $2, $3, $4, 'HOSTS', 0.95, now())`,
+        [edge, org, host, service],
+      );
+      await c.query(
+        `INSERT INTO relationship_evidence (id, organization_id, relationship_id, kind) VALUES ($1, $2, $3, 'direct')`,
+        [randomUUID(), org, edge],
+      );
+      await c.query(
+        `INSERT INTO discovery_runs (id, organization_id, product_id, source) VALUES ($1, $2, $3, 'agent')`,
+        [randomUUID(), org, product],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

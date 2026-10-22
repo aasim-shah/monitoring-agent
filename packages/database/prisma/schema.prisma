@@ -217,6 +217,8 @@ model Product {
   organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   environments   Environment[]
   resourceScopes ConnectionResourceScope[]
+  assets         ProductAsset[]
+  discoveryRuns  DiscoveryRun[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -480,6 +482,8 @@ model Agent {
   lastHeartbeatAt  DateTime?   @map("last_heartbeat_at") @db.Timestamptz(6)
   lastSequence     BigInt?     @map("last_sequence")
   clockSkewSeconds Int?        @map("clock_skew_seconds")
+  /// Egress IP of the agent as the edge proxy saw it (dns-to-host correlation, M9).
+  lastSeenIp       String?     @map("last_seen_ip")
   revokedAt        DateTime?   @map("revoked_at") @db.Timestamptz(6)
   createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -653,4 +657,213 @@ model AgentPackAssignment {
 
   @@unique([agentId, packId])
   @@map("agent_pack_assignments")
+}
+
+// ===== M9: asset graph (spec §10, WB-10) =====
+
+enum AssetType {
+  host
+  service
+  database
+  website
+  domain
+  repository
+  worker
+  external
+
+  @@map("asset_type")
+}
+
+enum AssetLifecycle {
+  discovered
+  active
+  unreachable
+  missing
+  retired
+  manually_managed
+
+  @@map("asset_lifecycle")
+}
+
+enum AssetSource {
+  agent
+  connector
+  product_config
+  manual
+
+  @@map("asset_source")
+}
+
+enum RelationshipType {
+  HOSTS
+  ROUTES_TO
+  CONNECTS_TO
+  DEPENDS_ON
+  DEPLOYS
+  MONITORED_BY
+  REPORTS_TO
+  DEPLOYED_ON
+
+  @@map("relationship_type")
+}
+
+enum Verification {
+  proposed
+  verified
+  rejected
+  drifted
+
+  @@map("verification")
+}
+
+enum EvidenceKind {
+  direct
+  ip_match
+  connection
+  name
+  manual
+  contradiction
+
+  @@map("evidence_kind")
+}
+
+enum AliasStatus {
+  open
+  merged
+  kept_separate
+
+  @@map("alias_status")
+}
+
+/// A canonical asset; identity_key is unique per organization and never shared across them (BR-10-01).
+model Asset {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  assetType      AssetType      @map("asset_type")
+  name           String
+  lifecycle      AssetLifecycle @default(discovered)
+  source         AssetSource
+  /// `agent:<id>`, `agent:<id>/<pack>`, `connection:<id>`, `domain:<host>`, `manual:<uuid>`, `weak:<uuid>`.
+  identityKey    String         @map("identity_key")
+  /// Redacted before storage (BR-10-08).
+  attributes     Json           @default("{}")
+  firstSeenAt    DateTime       @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt     DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  missedRuns     Int            @default(0) @map("missed_runs")
+  retiredAt      DateTime?      @map("retired_at") @db.Timestamptz(6)
+
+  products     ProductAsset[]
+  observations AssetObservation[]
+  outgoing     AssetRelationship[] @relation("source")
+  incoming     AssetRelationship[] @relation("target")
+  aliases      AssetAlias[]        @relation("aliasAsset")
+  candidateFor AssetAlias[]        @relation("aliasCandidate")
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, identityKey])
+  @@index([organizationId, assetType])
+  @@map("assets")
+}
+
+/// Weak match (name/IP) awaiting review: never merged automatically (BR-10-02).
+model AssetAlias {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String      @map("organization_id") @db.Uuid
+  assetId          String      @map("asset_id") @db.Uuid
+  candidateAssetId String      @map("candidate_asset_id") @db.Uuid
+  reason           String
+  status           AliasStatus @default(open)
+  resolvedByUserId String?     @map("resolved_by_user_id") @db.Uuid
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  asset     Asset @relation("aliasAsset", fields: [organizationId, assetId], references: [organizationId, id], onDelete: Cascade)
+  candidate Asset @relation("aliasCandidate", fields: [organizationId, candidateAssetId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("asset_aliases")
+}
+
+model AssetObservation {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  assetId        String      @map("asset_id") @db.Uuid
+  source         AssetSource
+  observedAt     DateTime    @default(now()) @map("observed_at") @db.Timestamptz(6)
+  attributes     Json        @default("{}")
+
+  asset Asset @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([assetId, observedAt(sort: Desc)])
+  @@map("asset_observations")
+}
+
+/// One asset can belong to several products (UC-10-12, shared host).
+model ProductAsset {
+  organizationId String   @map("organization_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  assetId        String   @map("asset_id") @db.Uuid
+  environmentId  String?  @map("environment_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  asset   Asset   @relation(fields: [organizationId, assetId], references: [organizationId, id], onDelete: Cascade)
+
+  @@id([productId, assetId])
+  @@index([organizationId, assetId])
+  @@map("product_assets")
+}
+
+/// An evidence-backed edge (BR-10-05).
+model AssetRelationship {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String           @map("organization_id") @db.Uuid
+  sourceAssetId    String           @map("source_asset_id") @db.Uuid
+  targetAssetId    String           @map("target_asset_id") @db.Uuid
+  relationshipType RelationshipType @map("relationship_type")
+  confidence       Decimal          @db.Decimal(3, 2)
+  verification     Verification     @default(proposed)
+  ruleId           String?          @map("rule_id")
+  verifiedByUserId String?          @map("verified_by_user_id") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  source   Asset                  @relation("source", fields: [organizationId, sourceAssetId], references: [organizationId, id], onDelete: Cascade)
+  target   Asset                  @relation("target", fields: [organizationId, targetAssetId], references: [organizationId, id], onDelete: Cascade)
+  evidence RelationshipEvidence[]
+
+  @@unique([organizationId, id])
+  @@unique([sourceAssetId, targetAssetId, relationshipType])
+  @@index([organizationId, verification])
+  @@index([targetAssetId])
+  @@map("asset_relationships")
+}
+
+model RelationshipEvidence {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  relationshipId String       @map("relationship_id") @db.Uuid
+  kind           EvidenceKind
+  detail         Json         @default("{}")
+  observedAt     DateTime     @default(now()) @map("observed_at") @db.Timestamptz(6)
+
+  relationship AssetRelationship @relation(fields: [organizationId, relationshipId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([relationshipId, observedAt(sort: Desc)])
+  @@map("relationship_evidence")
+}
+
+model DiscoveryRun {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  productId      String      @map("product_id") @db.Uuid
+  source         AssetSource
+  status         RunStatus   @default(running)
+  startedAt      DateTime    @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime?   @map("completed_at") @db.Timestamptz(6)
+  stats          Json        @default("{}")
+
+  product Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([productId, source, startedAt(sort: Desc)])
+  @@map("discovery_runs")
 }
