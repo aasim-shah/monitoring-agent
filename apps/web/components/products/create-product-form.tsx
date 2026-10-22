@@ -26,9 +26,9 @@ export function CreateProductForm({ orgId }: { orgId: string }) {
         {
           name: 'domains',
           label: 'Domains',
-          hint: 'Comma-separated. Discovery hints, not proof of ownership.',
+          hint: 'Hostnames or URLs, comma-separated. Discovery hints, not proof of ownership.',
         },
-        { name: 'repositories', label: 'Repositories', hint: 'owner/name, comma-separated' },
+        { name: 'repositories', label: 'Repositories', hint: 'GitHub URLs or owner/name, comma-separated' },
       ]}
       submitLabel="Create product"
       pendingLabel="Creating…"
