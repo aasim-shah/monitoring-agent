@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sealCredentials } from '../../apps/web/lib/seal.js';
@@ -108,6 +108,7 @@ afterAll(async () => {
   if (file) await compose(['down', '-v', '--remove-orphans']);
 });
 
+let orgId = '';
 let productId = '';
 let environmentId = '';
 
@@ -133,6 +134,7 @@ async function setupOwner() {
     200,
   );
   const org = await api('POST', '/api/v1/organizations', { name: 'Agent E2E', timezone: 'UTC' });
+  orgId = org.json.id as string;
   const { secret } = (await api('POST', '/api/v1/auth/mfa/enroll', {})).json;
   expect((await api('POST', '/api/v1/auth/mfa/verify', { code: totp(secret) })).status).toBe(200);
   const product = await api('POST', `/api/v1/organizations/${org.json.id}/products`, { name: 'E2E' });
@@ -436,5 +438,149 @@ describe('service discovery and monitoring packs (M6b exit gate)', () => {
     expect(
       (await inHost('grep -c \'"redis"\' /var/lib/pcp-agent/collector.yaml || true')).stdout.trim(),
     ).toBe('0');
+  });
+});
+
+describe('private connector worker (M8 exit gate)', () => {
+  it('reports MongoDB health for a FireMaps-like database through the private worker', async () => {
+    const MONGO = 'pcp-e2e-firemaps-mongo';
+    const WORKER = 'pcp-e2e-private-worker';
+    const password = 'firemaps-monitor-e2e-secret';
+    const built = await run('docker', [
+      'build',
+      '-q',
+      '-t',
+      'pcp-private-worker:e2e',
+      '-f',
+      'agents/private-connector-worker/Dockerfile',
+      '.',
+    ]);
+    expect(built.status, built.stderr).toBe(0);
+    await run('docker', ['rm', '-f', MONGO, WORKER]);
+    const mongo = await run('docker', [
+      'run',
+      '-d',
+      '--name',
+      MONGO,
+      '--network',
+      `${PROJECT}_edge`,
+      '-e',
+      'MONGO_INITDB_ROOT_USERNAME=root',
+      '-e',
+      'MONGO_INITDB_ROOT_PASSWORD=root',
+      'mongo:8.0',
+    ]);
+    expect(mongo.status, mongo.stderr).toBe(0);
+    const mongosh = (js: string) =>
+      run('docker', [
+        'exec',
+        MONGO,
+        'mongosh',
+        '--quiet',
+        '-u',
+        'root',
+        '-p',
+        'root',
+        '--authenticationDatabase',
+        'admin',
+        '--eval',
+        js,
+      ]);
+    await until('MongoDB', async () =>
+      (await mongosh('db.runCommand({ ping: 1 }).ok')).stdout.trim() === '1' ? true : undefined,
+    );
+    const fixture = await mongosh(`
+      const fm = db.getSiblingDB('firemaps');
+      fm.incidents.insertMany(Array.from({ length: 500 }, (_, i) => ({ createdAt: new Date(Date.now() - (i % 7) * 864e5), severity: i % 3 })));
+      fm.stations.insertMany([{ name: 'North' }, { name: 'South' }]);
+      db.getSiblingDB('admin').createUser({ user: 'pcp_monitor', pwd: '${password}',
+        roles: [{ role: 'read', db: 'firemaps' }, { role: 'clusterMonitor', db: 'admin' }] });
+      print('ok');`);
+    expect(fixture.stdout, fixture.stderr).toContain('ok');
+
+    // The credentials exist only in the worker's secret file.
+    const secrets = join(work, 'worker-secrets');
+    mkdirSync(secrets, { recursive: true });
+    writeFileSync(join(secrets, 'firemaps-mongo.yaml'), `username: pcp_monitor\npassword: ${password}\n`);
+    chmodSync(secrets, 0o755);
+    chmodSync(join(secrets, 'firemaps-mongo.yaml'), 0o644);
+    chmodSync(join(work, 'caddy-root.crt'), 0o644);
+
+    const e = await api('POST', `/api/v1/environments/${environmentId}/agent-enrollments`, {
+      agentType: 'private_worker',
+    });
+    expect(e.status).toBe(201);
+    expect(e.json.installCommand).toContain('enroll-and-run');
+    const worker = await run('docker', [
+      'run',
+      '-d',
+      '--name',
+      WORKER,
+      '--network',
+      `${PROJECT}_edge`,
+      '--add-host',
+      `agent.localhost:${CADDY}`,
+      '-v',
+      `${secrets}:/etc/pcp-worker/secrets:ro`,
+      '-v',
+      `${join(work, 'caddy-root.crt')}:/etc/pcp-worker/caddy-root.crt:ro`,
+      'pcp-private-worker:e2e',
+      'enroll-and-run',
+      '--token',
+      e.json.token,
+      '--control-url',
+      'https://agent.localhost',
+      '--ca-file',
+      '/etc/pcp-worker/caddy-root.crt',
+    ]);
+    expect(worker.status, worker.stderr).toBe(0);
+    const workerAgent = await until('private worker enrolled', async () => {
+      const agents = (await api('GET', `/api/v1/products/${productId}/agents`)).json.agents as Json[];
+      return agents.find((a) => a.agentType === 'private_worker');
+    });
+
+    const created = await api('POST', `/api/v1/organizations/${orgId}/connections`, {
+      provider: 'mongodb',
+      displayName: 'FireMaps',
+      executionLocation: 'private',
+      config: {
+        workerAgentId: workerAgent.id,
+        secretRef: 'firemaps-mongo',
+        host: MONGO,
+        port: 27017,
+        database: 'firemaps',
+        tls: false,
+        allowInsecure: true,
+      },
+    });
+    expect(created.status, JSON.stringify(created.json)).toBe(201);
+    const id = created.json.id as string;
+
+    const connected = await until(
+      'MongoDB connection validated by the worker',
+      async () => {
+        const c = (await api('GET', `/api/v1/connections/${id}`)).json;
+        if (c.status === 'degraded') throw new Error(`validation failed: ${c.statusReason}`);
+        return c.status === 'connected' ? c : undefined;
+      },
+      180_000,
+    );
+    expect(connected.statusReason).toBeNull();
+    const health = await until('MongoDB health', async () => {
+      const h = (await api('GET', `/api/v1/connections/${id}/health`)).json;
+      return h.latest?.ok ? h.latest : undefined;
+    });
+    expect(health.data).toMatchObject({
+      engine: 'mongodb',
+      connections: expect.any(Number),
+      database: { name: 'firemaps', collections: 2, objects: 502 },
+    });
+
+    // WB-07 acceptance 3: no database credential in the control-plane database.
+    const dump = await compose(['exec', '-T', 'postgres', 'pg_dump', '-U', 'postgres', '-d', 'pcp']);
+    expect(dump.status, dump.stderr).toBe(0);
+    expect(dump.stdout).toContain('firemaps-mongo');
+    expect(dump.stdout).not.toContain(password);
+    await run('docker', ['rm', '-f', MONGO, WORKER]);
   });
 });
