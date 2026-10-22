@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pcp.local/agent-protocol/inventory.schema.json",
+  "title": "Inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["collectedAt", "services", "listeners", "warnings"],
+  "properties": {
+    "collectedAt": { "type": "string", "format": "date-time" },
+    "services": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pack", "name", "ports", "processCount", "evidence"],
+        "properties": {
+          "pack": { "type": "string", "maxLength": 64 },
+          "name": { "type": "string", "maxLength": 128 },
+          "ports": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["address", "port"],
+              "properties": {
+                "address": { "type": "string", "maxLength": 64 },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+              }
+            }
+          },
+          "processCount": { "type": "integer", "minimum": 0 },
+          "evidence": { "type": "array", "maxItems": 10, "items": { "type": "string", "maxLength": 200 } }
+        }
+      }
+    },
+    "listeners": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address", "port"],
+        "properties": {
+          "address": { "type": "string", "maxLength": 64 },
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "pack", "address", "port"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["exposed_service"] },
+          "pack": { "type": "string", "maxLength": 64 },
+          "address": { "type": "string", "maxLength": 64 },
+          "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        }
+      }
+    }
+  }
+}

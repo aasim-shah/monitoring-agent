@@ -161,6 +161,11 @@ func (c *Client) PostResult(ctx context.Context, taskID string, r TaskResult) er
 	return c.do(ctx, http.MethodPost, "/agent/v1/tasks/"+taskID+"/result", r, nil)
 }
 
+// PostInventory reports the services discovery found on this host (M6b).
+func (c *Client) PostInventory(ctx context.Context, inv proto.Inventory) error {
+	return c.do(ctx, http.MethodPost, "/agent/v1/inventory", inv, nil)
+}
+
 // Whoami confirms the current certificate is accepted.
 func (c *Client) Whoami(ctx context.Context) (string, error) {
 	var out struct {

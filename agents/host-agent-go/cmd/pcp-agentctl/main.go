@@ -16,12 +16,14 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	proto "pcp.local/agentprotocol"
 	"pcp.local/hostagent/internal/collector"
 	"pcp.local/hostagent/internal/control"
+	"pcp.local/hostagent/internal/discovery"
 )
 
 // Set at build time with -ldflags "-X main.version=…".
@@ -133,10 +135,13 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	c, id, err := control.Connect(*dir, st)
+	c0, id, err := control.Connect(*dir, st)
 	if err != nil {
 		return err
 	}
+	// Rotation swaps the client while the heartbeat and inventory goroutines use it.
+	var client atomic.Pointer[control.Client]
+	client.Store(c0)
 	key, err := base64.StdEncoding.DecodeString(st.TaskSigningPublicKey)
 	if err != nil {
 		return err
@@ -146,7 +151,7 @@ func run(args []string) error {
 	started := time.Now()
 	// Millisecond timestamps keep the sequence increasing across restarts and stay below 2^53.
 	beat := func() {
-		ok, err := c.Heartbeat(ctx, proto.Heartbeat{Sequence: time.Now().UnixMilli(), AgentVersion: version, PolicyVersion: 1, Capabilities: []string{"host.health", "host.inventory"}, Health: "ok"})
+		ok, err := client.Load().Heartbeat(ctx, proto.Heartbeat{Sequence: time.Now().UnixMilli(), AgentVersion: version, PolicyVersion: 1, Capabilities: []string{"host.health", "host.inventory"}, Health: "ok"})
 		if err != nil {
 			log.Printf("heartbeat: %v", err)
 		} else if !ok {
@@ -170,10 +175,13 @@ func run(args []string) error {
 			}
 		}
 	}()
+	go reportInventory(ctx, &client)
 	for ctx.Err() == nil {
+		c := client.Load()
 		if rotated, err := rotateIfDue(ctx, c, id, st, *dir); err != nil {
 			log.Printf("rotation: %v", err)
 		} else if rotated != nil {
+			client.Store(rotated)
 			c = rotated
 		}
 		tasks, rejected, err := c.PollTasks(ctx, 25*time.Second, ed25519.PublicKey(key))
@@ -199,6 +207,28 @@ func run(args []string) error {
 		}
 	}
 	return nil
+}
+
+// reportInventory posts what discovery finds in /proc at start and every 5 minutes.
+// Failures are logged and retried on the next tick.
+func reportInventory(ctx context.Context, client *atomic.Pointer[control.Client]) {
+	procfs := os.DirFS("/proc")
+	t := time.NewTicker(5 * time.Minute)
+	defer t.Stop()
+	for {
+		inv, err := discovery.Scan(procfs, time.Now())
+		if err == nil {
+			err = client.Load().PostInventory(ctx, inv)
+		}
+		if err != nil && ctx.Err() == nil {
+			log.Printf("inventory: %v", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }
 
 // handle answers the task types this build supports; others fail explicitly.

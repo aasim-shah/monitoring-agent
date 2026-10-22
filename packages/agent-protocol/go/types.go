@@ -54,6 +54,38 @@ type Heartbeat struct {
 	SentAt                   string   `json:"sentAt"`
 }
 
+type InventoryServicesPorts struct {
+	Address string `json:"address"`
+	Port    int64  `json:"port"`
+}
+
+type InventoryServices struct {
+	Pack         string                   `json:"pack"`
+	Name         string                   `json:"name"`
+	Ports        []InventoryServicesPorts `json:"ports"`
+	ProcessCount int64                    `json:"processCount"`
+	Evidence     []string                 `json:"evidence"`
+}
+
+type InventoryListeners struct {
+	Address string `json:"address"`
+	Port    int64  `json:"port"`
+}
+
+type InventoryWarnings struct {
+	Kind    string `json:"kind"`
+	Pack    string `json:"pack"`
+	Address string `json:"address"`
+	Port    int64  `json:"port"`
+}
+
+type Inventory struct {
+	CollectedAt string               `json:"collectedAt"`
+	Services    []InventoryServices  `json:"services"`
+	Listeners   []InventoryListeners `json:"listeners"`
+	Warnings    []InventoryWarnings  `json:"warnings"`
+}
+
 type StreamChunk struct {
 	SessionId string   `json:"sessionId"`
 	Sequence  int64    `json:"sequence"`

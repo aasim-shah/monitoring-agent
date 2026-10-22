@@ -55,6 +55,45 @@ queueDepth: number
 sentAt: string
 }
 
+export interface Inventory {
+collectedAt: string
+/**
+ * @maxItems 100
+ */
+services: {
+pack: string
+name: string
+/**
+ * @maxItems 50
+ */
+ports: {
+address: string
+port: number
+}[]
+processCount: number
+/**
+ * @maxItems 10
+ */
+evidence: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]
+}[]
+/**
+ * @maxItems 500
+ */
+listeners: {
+address: string
+port: number
+}[]
+/**
+ * @maxItems 100
+ */
+warnings: {
+kind: "exposed_service"
+pack: string
+address: string
+port: number
+}[]
+}
+
 export interface StreamChunk {
 sessionId: string
 sequence: number

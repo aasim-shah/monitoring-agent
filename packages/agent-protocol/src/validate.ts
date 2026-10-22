@@ -9,6 +9,7 @@ export const MESSAGE_KINDS = [
   'heartbeat',
   'agent-task',
   'stream-chunk',
+  'inventory',
 ] as const;
 export type MessageKind = (typeof MESSAGE_KINDS)[number];
 
