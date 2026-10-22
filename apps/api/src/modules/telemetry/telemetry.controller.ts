@@ -8,6 +8,7 @@ import { requireTenant } from '../../common/tenant.js';
 import { CLOCK, PRISMA } from '../../tokens.js';
 import { agentStatus } from '../agents/status.js';
 import { FLEET_QUERIES, HOST_QUERIES, RANGES, type RangeKey } from './host-metrics.js';
+import { SERVICE_CHARTS } from './service-metrics.js';
 import { TelemetryQueryService } from './query.service.js';
 
 type Point = [number, number | null];
@@ -70,6 +71,61 @@ export class TelemetryController {
       lastSampleAt: last ? new Date(last[0] * 1000).toISOString() : null,
       completeness: cpu.completeness,
       gaps: cpu.gaps,
+    };
+  }
+
+  /** Charts for one enabled monitoring pack (WB-11): fixed PromQL per pack. */
+  @RequirePermission('telemetry.query')
+  @TenantScope({ param: 'id', resource: 'agent' })
+  @Get('agents/:id/services/:packId/metrics')
+  async serviceMetrics(
+    @Req() req: ApiRequest,
+    @Param('id') agentId: string,
+    @Param('packId') packId: string,
+    @Query('range') rangeKey = '1h',
+  ) {
+    const charts = Object.hasOwn(SERVICE_CHARTS, packId) ? SERVICE_CHARTS[packId] : undefined;
+    if (!charts) throw notFound();
+    if (!(rangeKey in RANGES))
+      throw new ApiException(400, 'invalid_range', `range must be one of ${Object.keys(RANGES).join(', ')}`);
+    const range = RANGES[rangeKey as RangeKey];
+    const ctx = requireTenant(req);
+    const agent = await withTenant(this.prisma, ctx, (tx) =>
+      tx.agent.findUnique({
+        where: { id: agentId },
+        select: { productId: true, packs: { where: { packId }, select: { status: true } } },
+      }),
+    );
+    if (!agent || agent.packs.length === 0) throw notFound();
+    const end = this.now();
+    const results = await Promise.all(
+      charts.map((c) =>
+        this.telemetry.query(
+          ctx,
+          {
+            promql: c.promql,
+            start: new Date(end.getTime() - range.seconds * 1000).toISOString(),
+            end: end.toISOString(),
+            stepSeconds: range.step,
+          },
+          { productId: agent.productId, agentId },
+        ),
+      ),
+    );
+    return {
+      packId,
+      range: rangeKey,
+      stepSeconds: range.step,
+      status: agent.packs[0]!.status,
+      charts: charts.map((c, i) => ({
+        key: c.key,
+        title: c.title,
+        unit: c.unit,
+        series: results[i]!.series.map((s) => ({
+          label: c.label ? c.label(s.labels) : c.title,
+          points: s.points as Point[],
+        })),
+      })),
     };
   }
 

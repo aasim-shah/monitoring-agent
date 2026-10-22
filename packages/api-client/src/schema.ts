@@ -1048,6 +1048,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{id}/services/{packId}/metrics": {
+        parameters: {
+            query?: {
+                range?: "15m" | "1h" | "6h" | "24h" | "7d";
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+                /** @description Monitoring pack ID */
+                packId: components["parameters"]["packId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Charts for one enabled monitoring pack
+         * @description Fixed PromQL per pack, scoped to the agent. 404 when the pack is not enabled. Requires `telemetry.query`.
+         */
+        get: operations["getServiceMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{id}/revoke": {
         parameters: {
             query?: never;
@@ -4668,6 +4695,52 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    getServiceMetrics: {
+        parameters: {
+            query?: {
+                range?: "15m" | "1h" | "6h" | "24h" | "7d";
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+                /** @description Monitoring pack ID */
+                packId: components["parameters"]["packId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        packId: string;
+                        range: string;
+                        stepSeconds: number;
+                        /** @enum {string} */
+                        status: "pending" | "applied" | "failed" | "removing";
+                        charts: {
+                            key: string;
+                            title: string;
+                            /** @enum {string} */
+                            unit: "bytes" | "percent" | "count" | "perSecond";
+                            series: {
+                                label: string;
+                                points: components["schemas"]["MetricPoint"][];
+                            }[];
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     revokeAgent: {

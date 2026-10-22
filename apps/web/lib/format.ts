@@ -1,9 +1,6 @@
-export type Unit = 'percent' | 'bytesPerSecond';
+export type Unit = 'percent' | 'bytesPerSecond' | 'bytes' | 'count' | 'perSecond';
 
-/** Display text for a metric value; callers render null as "no data", never 0. */
-export function formatValue(value: number, unit: Unit): string {
-  if (unit === 'percent') return `${value.toFixed(1)}%`;
-  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+function scaled(value: number, units: string[]): string {
   let v = value;
   let i = 0;
   while (Math.abs(v) >= 1024 && i < units.length - 1) {
@@ -11,6 +8,25 @@ export function formatValue(value: number, unit: Unit): string {
     i++;
   }
   return `${i === 0 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
+const plain = (v: number) =>
+  Math.abs(v) >= 100 ? Math.round(v).toLocaleString('en-US') : String(Number(v.toFixed(2)));
+
+/** Display text for a metric value; callers render null as "no data", never 0. */
+export function formatValue(value: number, unit: Unit): string {
+  switch (unit) {
+    case 'percent':
+      return `${value.toFixed(1)}%`;
+    case 'bytesPerSecond':
+      return scaled(value, ['B/s', 'KB/s', 'MB/s', 'GB/s']);
+    case 'bytes':
+      return scaled(value, ['B', 'KB', 'MB', 'GB', 'TB']);
+    case 'count':
+      return plain(value);
+    case 'perSecond':
+      return `${plain(value)}/s`;
+  }
 }
 
 export function formatClock(epochSeconds: number, withDate = false): string {

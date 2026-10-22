@@ -1171,6 +1171,53 @@ paths:
           description: Telemetry storage unavailable
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
       x-implemented-in: M6
+  /api/v1/agents/{id}/services/{packId}/metrics:
+    parameters:
+      [
+        { $ref: '#/components/parameters/id' },
+        { $ref: '#/components/parameters/packId' },
+        { name: range, in: query, schema: { type: string, enum: [15m, 1h, 6h, 24h, 7d], default: 1h } },
+      ]
+    get:
+      operationId: getServiceMetrics
+      tags: [telemetry]
+      summary: Charts for one enabled monitoring pack
+      description: Fixed PromQL per pack, scoped to the agent. 404 when the pack is not enabled. Requires `telemetry.query`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packId, range, stepSeconds, status, charts]
+                properties:
+                  packId: { type: string }
+                  range: { type: string }
+                  stepSeconds: { type: integer }
+                  status: { type: string, enum: [pending, applied, failed, removing] }
+                  charts:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, title, unit, series]
+                      properties:
+                        key: { type: string }
+                        title: { type: string }
+                        unit: { type: string, enum: [bytes, percent, count, perSecond] }
+                        series:
+                          type: array
+                          items:
+                            type: object
+                            required: [label, points]
+                            properties:
+                              label: { type: string }
+                              points: { type: array, items: { $ref: '#/components/schemas/MetricPoint' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M6b
   /api/v1/agents/{id}/revoke:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:

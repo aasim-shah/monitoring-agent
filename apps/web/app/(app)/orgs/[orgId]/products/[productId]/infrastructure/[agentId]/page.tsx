@@ -4,13 +4,17 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { unwrap } from '@pcp/api-client';
+import type { Role } from '@pcp/shared-contracts';
 import { AgentStatusBadge } from '@/components/agents/agent-status-badge';
+import { ServicesSection } from '@/components/services/services-section';
 import { MetricChart, type Point } from '@/components/telemetry/metric-chart';
 import { StaleBanner } from '@/components/telemetry/stale-banner';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { QueryState } from '@/lib/page-guard';
+import { roleCan } from '@/lib/permissions';
+import { useOrganization } from '@/lib/queries';
 import { useApiQuery } from '@/lib/use-api-query';
 
 const RANGES = ['15m', '1h', '6h', '24h', '7d'] as const;
@@ -22,6 +26,8 @@ const pts = (p: Array<Array<number | null>>) => p as Point[];
 export default function HostMetricsPage() {
   const { orgId, productId, agentId } = useParams<{ orgId: string; productId: string; agentId: string }>();
   const [range, setRange] = useState<Range>('1h');
+  const org = useOrganization(orgId);
+  const role = (org.data?.role ?? 'viewer') as Role;
   const agent = useApiQuery(['agent', agentId], async () =>
     unwrap(await api.GET('/api/v1/agents/{id}', { params: { path: { id: agentId } } })),
   );
@@ -117,6 +123,14 @@ export default function HostMetricsPage() {
           </div>
         ) : null}
       </QueryState>
+      {agent.data ? (
+        <ServicesSection
+          agentId={agentId}
+          x25519PublicKey={agent.data.x25519PublicKey ?? null}
+          canManage={roleCan(role, 'pack.manage')}
+          range={range}
+        />
+      ) : null}
     </div>
   );
 }

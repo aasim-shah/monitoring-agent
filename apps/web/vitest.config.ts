@@ -9,5 +9,7 @@ export default defineConfig({
     include: ['{app,components,lib}/**/*.test.{ts,tsx}', 'middleware.test.ts'],
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
+    // jsdom dialog tests take ~1 s alone but several under parallel workers.
+    testTimeout: 15_000,
   },
 });
