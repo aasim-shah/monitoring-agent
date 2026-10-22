@@ -18,7 +18,10 @@ export async function startVictoria(): Promise<TestVictoria> {
   return {
     url,
     async importLines(lines) {
-      const res = await fetch(`${url}/api/v1/import/prometheus`, { method: 'POST', body: lines.join('\n') + '\n' });
+      const res = await fetch(`${url}/api/v1/import/prometheus`, {
+        method: 'POST',
+        body: lines.join('\n') + '\n',
+      });
       if (!res.ok) throw new Error(`import failed: ${res.status} ${await res.text()}`);
       await fetch(`${url}/internal/force_flush`);
     },
