@@ -121,7 +121,15 @@ async function run(): Promise<never> {
               status: 'failed' as const,
               error: `task type ${String(task.type)} is not supported by the private worker`,
             };
-      const body = capResult(outcome);
+      const capped = capResult(outcome) as typeof outcome & { truncated?: boolean };
+      // The control plane keeps only status/result/error: carry the flag inside the result.
+      const body = capped.truncated
+        ? {
+            status: capped.status,
+            error: capped.error,
+            result: { ...(capped.result ?? {}), truncated: true },
+          }
+        : capped;
       const posted = await call('POST', `/agent/v1/tasks/${String(task.id)}/result`, body).catch(
         (e: Error) => ({ status: 0, json: e.message }),
       );

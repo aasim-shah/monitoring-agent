@@ -46,12 +46,13 @@ export async function agentCsr(): Promise<string> {
 export async function enrollRequest(
   token: string,
   host: Partial<{ hostname: string; machineId: string }> = {},
+  agentType: 'host' | 'private_worker' = 'host',
 ) {
   return {
     protocolVersion: '1.0',
     enrollmentToken: token,
     agentVersion: '1.0.0',
-    agentType: 'host',
+    agentType,
     csrPem: await agentCsr(),
     x25519PublicKey: Buffer.alloc(32, 9).toString('base64'),
     host: { hostname: 'vps-1', machineId: 'machine-1', os: 'ubuntu-24.04', arch: 'amd64', ...host },
@@ -102,14 +103,15 @@ export async function enrolledAgent(
   owner: Owner,
   environmentId: string,
   host: Partial<{ hostname: string; machineId: string }> = {},
+  agentType: 'host' | 'private_worker' = 'host',
 ): Promise<EnrolledAgent> {
   const { createHash } = await import('node:crypto');
-  const e = await createEnrollment(t, owner, environmentId);
+  const e = await createEnrollment(t, owner, environmentId, { agentType });
   const res = await t.app.inject({
     method: 'POST',
     url: '/agent/v1/enroll',
     remoteAddress: uniqueIp(),
-    payload: await enrollRequest(e.token, host),
+    payload: await enrollRequest(e.token, host, agentType),
   });
   if (res.statusCode !== 201) throw new Error(`enroll failed ${res.statusCode} ${res.body}`);
   const body = res.json() as { agentId: string; certificatePem: string; taskSigningPublicKey: string };

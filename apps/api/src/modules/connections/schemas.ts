@@ -24,3 +24,11 @@ export const resourceScopesBody = z.object({
     )
     .max(500),
 });
+
+/** A template's time window; empty strings for templates without one. */
+export const templateRunBody = z
+  .object({
+    from: z.union([z.string().datetime(), z.literal('')]),
+    to: z.union([z.string().datetime(), z.literal('')]),
+  })
+  .strict();

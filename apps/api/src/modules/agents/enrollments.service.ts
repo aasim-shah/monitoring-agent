@@ -60,7 +60,14 @@ export class EnrollmentsService {
       token,
       expiresAt: enrollment.expiresAt,
       maxUses: enrollment.maxUses,
-      installCommand: `curl -fsSL ${this.config.appOrigin}/install.sh | sudo bash -s -- --token ${token} --control-url ${settings.config.controlUrl} --download-url ${this.config.appOrigin}/downloads`,
+      installCommand:
+        input.agentType === 'private_worker'
+          ? // Private connector worker (UC-07-01): a container next to the customer's databases.
+            `curl -fsSL ${this.config.appOrigin}/downloads/pcp-private-worker.tar.gz | docker load && ` +
+            `docker run -d --name pcp-private-worker --restart unless-stopped -v pcp-worker:/var/lib/pcp-worker ` +
+            `-v /etc/pcp-worker/secrets:/etc/pcp-worker/secrets:ro pcp-private-worker:0.1.0 ` +
+            `enroll-and-run --token ${token} --control-url ${settings.config.controlUrl}`
+          : `curl -fsSL ${this.config.appOrigin}/install.sh | sudo bash -s -- --token ${token} --control-url ${settings.config.controlUrl} --download-url ${this.config.appOrigin}/downloads`,
     };
   }
 

@@ -21,6 +21,18 @@ const enroll = async (payload: unknown, ip = uniqueIp()) =>
   t.app.inject({ method: 'POST', url: '/agent/v1/enroll', payload: payload as object, remoteAddress: ip });
 
 describe('agent enrollment (WB-03)', () => {
+  it('gives private workers a docker command that loads the image and keeps state in a volume (UC-07-01)', async () => {
+    const owner = await ownerWithOrg(t);
+    const { environmentId } = await environmentFor(t, owner);
+    const e = await createEnrollment(t, owner, environmentId, { agentType: 'private_worker' });
+    expect(e.installCommand).toContain(
+      'curl -fsSL http://localhost:8080/downloads/pcp-private-worker.tar.gz | docker load',
+    );
+    expect(e.installCommand).toContain('-v /etc/pcp-worker/secrets:/etc/pcp-worker/secrets:ro');
+    expect(e.installCommand).toContain(`enroll-and-run --token ${e.token} --control-url`);
+    expect(e.installCommand).not.toContain('install.sh');
+  });
+
   it('shows the token once and stores only its hash (TC-03-01)', async () => {
     const owner = await ownerWithOrg(t);
     const { environmentId } = await environmentFor(t, owner);

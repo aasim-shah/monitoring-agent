@@ -1,7 +1,14 @@
 import { ConnectorRegistry, type Connector } from '@pcp/connector-sdk';
+import { customHttpConnector } from '@pcp/connectors-custom-http';
+import { mongodbConnector, mysqlConnector, postgresConnector } from '@pcp/connectors-databases';
 
 /** Production connectors. Providers join this list as their milestones land (M7, M8, M13). */
-const PRODUCTION_CONNECTORS: Connector[] = [];
+const PRODUCTION_CONNECTORS: Connector[] = [
+  postgresConnector,
+  mysqlConnector,
+  mongodbConnector,
+  customHttpConnector,
+];
 
 /**
  * Builds the connector registry for an app. The test-only mock connector is a dev

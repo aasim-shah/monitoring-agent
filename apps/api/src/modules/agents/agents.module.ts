@@ -75,6 +75,6 @@ class RevocationShutdown implements OnApplicationShutdown {
     },
     RevocationShutdown,
   ],
-  exports: [AgentAuthGuard],
+  exports: [AgentAuthGuard, TasksService],
 })
 export class AgentsModule {}

@@ -876,6 +876,88 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
       x-implemented-in: M4
+  /api/v1/connections/{id}/health:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getConnectionHealth
+      tags: [connections]
+      summary: Connection health and last template result
+      description: >-
+        Latest health checks (private databases: connections, sizes, replication lag, slow queries) and the last
+        template result. Requires `connection.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [latest, history, lastTemplate]
+                properties:
+                  latest: { type: [object, 'null'], additionalProperties: true }
+                  history: { type: array, items: { type: object, additionalProperties: true } }
+                  lastTemplate: { type: [object, 'null'], additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M8
+  /api/v1/connections/{id}/write-override:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: acknowledgeWriteOverride
+      tags: [connections]
+      summary: Accept a write-capable database user
+      description: >-
+        UC-07-06: marks the private database connection as acknowledged, audits it, and revalidates through the worker.
+        Requires `connection.configure`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '202':
+          description: Revalidation queued
+          content:
+            application/json:
+              schema:
+                { type: object, required: [taskId], properties: { taskId: { type: string, format: uuid } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M8
+  /api/v1/connections/{id}/templates/{name}/run:
+    parameters:
+      [
+        { $ref: '#/components/parameters/id' },
+        { name: name, in: path, required: true, schema: { type: string } },
+      ]
+    post:
+      operationId: runConnectionTemplate
+      tags: [connections]
+      summary: Run a named read-only template
+      description: >-
+        Queues a named aggregate template (no free-form queries, BR-07-02) on the private worker. Results (≤ 1,000 rows)
+        appear in the connection health. Requires `connection.configure`.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [from, to]
+              properties:
+                from: { type: string, description: ISO date-time or empty }
+                to: { type: string, description: ISO date-time or empty }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                { type: object, required: [taskId], properties: { taskId: { type: string, format: uuid } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M8
   /api/v1/connections/{id}/sync-runs:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:

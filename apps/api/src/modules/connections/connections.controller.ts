@@ -4,7 +4,7 @@ import { parseBody } from '../../common/errors.js';
 import type { ApiRequest } from '../../common/request.js';
 import { requireTenant } from '../../common/tenant.js';
 import { ConnectionsService } from './connections.service.js';
-import { authorizeBody, createConnectionBody, resourceScopesBody } from './schemas.js';
+import { authorizeBody, createConnectionBody, resourceScopesBody, templateRunBody } from './schemas.js';
 
 interface ConnectionRow {
   id: string;
@@ -69,7 +69,16 @@ export class ConnectionsController {
   @TenantScope({ param: 'orgId' })
   @Get('organizations/:orgId/connections')
   async list(@Req() req: ApiRequest) {
-    return { connections: (await this.connections.list(requireTenant(req))).map(connectionView) };
+    const ctx = requireTenant(req);
+    const rows = await this.connections.list(ctx);
+    return {
+      connections: await Promise.all(
+        rows.map(async (c) => ({
+          ...connectionView(c),
+          ...(await this.connections.effectiveStatus(ctx, c)),
+        })),
+      ),
+    };
   }
 
   @RequirePermission('connection.view')
@@ -81,7 +90,37 @@ export class ConnectionsController {
       this.connections.get(ctx, id),
       this.connections.hasCredentials(ctx, id),
     ]);
-    return { ...connectionView(c), hasCredentials };
+    return { ...connectionView(c), ...(await this.connections.effectiveStatus(ctx, c)), hasCredentials };
+  }
+
+  /** Latest health checks and the last template result (private connections, WB-07). */
+  @RequirePermission('connection.view')
+  @TenantScope(CONNECTION)
+  @Get('connections/:id/health')
+  health(@Req() req: ApiRequest, @Param('id') id: string) {
+    return this.connections.health(requireTenant(req), id);
+  }
+
+  @RequirePermission('connection.configure')
+  @TenantScope(CONNECTION)
+  @Post('connections/:id/write-override')
+  @HttpCode(202)
+  async writeOverride(@Req() req: ApiRequest, @Param('id') id: string) {
+    return { taskId: await this.connections.acknowledgeWriteOverride(requireTenant(req), id) };
+  }
+
+  @RequirePermission('connection.configure')
+  @TenantScope(CONNECTION)
+  @Post('connections/:id/templates/:name/run')
+  @HttpCode(202)
+  async runTemplate(
+    @Req() req: ApiRequest,
+    @Param('id') id: string,
+    @Param('name') name: string,
+    @Body() body: unknown,
+  ) {
+    const params = parseBody(templateRunBody, body);
+    return { taskId: await this.connections.runTemplate(requireTenant(req), id, name, params) };
   }
 
   @RequirePermission('connection.configure')

@@ -8,6 +8,7 @@ import type { ConnectionStatus, TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 import { ApiException, notFound } from '../../common/errors.js';
 import { KEY_RING, PRISMA } from '../../tokens.js';
+import { PrivateOpsService } from './private-ops.service.js';
 import { AuditService } from '../auditing/audit.service.js';
 import { CONNECTOR_REGISTRY, CONNECTOR_RUNTIME, QUEUES } from './registry.provider.js';
 
@@ -51,6 +52,7 @@ export class ConnectionsService {
     @Inject(CONNECTOR_RUNTIME) private readonly runtime: ConnectorRuntime,
     @Inject(QUEUES) private readonly queues: Queues,
     private readonly audit: AuditService,
+    private readonly privateOps: PrivateOpsService,
   ) {}
 
   catalog() {
@@ -78,14 +80,18 @@ export class ConnectionsService {
         'validation_failed',
         `Invalid fields: ${(check.errors ?? ['config']).join(', ')}`,
       );
+    const isPrivate = input.executionLocation === 'private';
+    if (isPrivate) await this.privateOps.assertConfig(ctx, input.config);
 
-    return withTenant(this.prisma, ctx, async (tx) => {
+    const created = await withTenant(this.prisma, ctx, async (tx) => {
       const connection = await tx.connection.create({
         data: {
           organizationId: ctx.organizationId,
           provider: input.provider,
           displayName: input.displayName,
           executionLocation: input.executionLocation,
+          // Private connections never receive credentials here: they validate straight away.
+          ...(isPrivate ? { status: transition('draft', 'auth_completed') } : {}),
           config: input.config as Prisma.InputJsonValue,
           createdByUserId: ctx.actor.kind === 'user' ? ctx.actor.userId : null,
         },
@@ -95,10 +101,61 @@ export class ConnectionsService {
         action: 'connection.created',
         targetType: 'connection',
         targetId: connection.id,
-        metadata: { provider: input.provider, displayName: input.displayName },
+        metadata: {
+          provider: input.provider,
+          displayName: input.displayName,
+          executionLocation: input.executionLocation,
+          ...(input.config.allowInsecure === true ? { allowInsecure: true } : {}),
+        },
       });
       return connection;
     });
+    if (isPrivate) await this.privateOps.dispatch(ctx, created, 'validate');
+    return created;
+  }
+
+  /** UC-07-06: an admin accepts a database user that can write; audited, then revalidated. */
+  async acknowledgeWriteOverride(ctx: TenantContext, id: string): Promise<string> {
+    const current = await this.get(ctx, id);
+    if (current.executionLocation !== 'private')
+      throw new ApiException(400, 'not_private', 'Only private database connections');
+    if (TERMINAL.includes(current.status)) throw closed();
+    const updated = await withTenant(this.prisma, ctx, async (tx) => {
+      const c = await tx.connection.update({
+        where: { id },
+        data: { config: { ...(current.config as Record<string, unknown>), writeOverrideAcknowledged: true } },
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'connection.write_override',
+        targetType: 'connection',
+        targetId: id,
+        metadata: { provider: current.provider },
+      });
+      return c;
+    });
+    return this.privateOps.dispatch(ctx, updated, 'validate');
+  }
+
+  async runTemplate(
+    ctx: TenantContext,
+    id: string,
+    name: string,
+    params: { from: string; to: string },
+  ): Promise<string> {
+    const c = await this.get(ctx, id);
+    if (c.executionLocation !== 'private')
+      throw new ApiException(400, 'not_private', 'Templates run on a private worker');
+    if (!this.privateOps.templateNames(c.provider).includes(name))
+      throw new ApiException(400, 'unknown_template', `Unknown template ${name}`);
+    return this.privateOps.dispatch(ctx, c, 'template', { template: name, params });
+  }
+
+  health(ctx: TenantContext, id: string) {
+    return this.get(ctx, id).then(() => this.privateOps.health(ctx, id));
+  }
+
+  effectiveStatus(ctx: TenantContext, c: ConnectionWithScopes) {
+    return this.privateOps.effectiveStatus(ctx, c);
   }
 
   /** Connections the caller may see: all, or those scoped to one of their products. */
@@ -133,6 +190,12 @@ export class ConnectionsService {
   async authorize(ctx: TenantContext, id: string, credentials: Record<string, string>) {
     const current = await this.get(ctx, id);
     if (TERMINAL.includes(current.status)) throw closed();
+    if (current.executionLocation === 'private')
+      throw new ApiException(
+        400,
+        'credentials_local',
+        "Private connections read credentials from the worker's secret file (secretRef)",
+      );
     const connector = this.registry.get(current.provider);
     const fields = connector.credentialFields ?? [];
     const missing = fields.filter((f) => !credentials[f.name]).map((f) => `credentials.${f.name}`);
@@ -168,6 +231,15 @@ export class ConnectionsService {
   async request(ctx: TenantContext, id: string, kind: JobKind): Promise<string> {
     const c = await this.get(ctx, id);
     if (TERMINAL.includes(c.status)) throw closed();
+    if (c.executionLocation === 'private') {
+      if (kind !== 'connection-validate')
+        throw new ApiException(
+          400,
+          'unsupported_operation',
+          'Private connections support validate and health',
+        );
+      return this.privateOps.dispatch(ctx, c, 'validate');
+    }
     return this.queue(ctx, kind, id);
   }
 

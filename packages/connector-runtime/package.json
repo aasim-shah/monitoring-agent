@@ -23,7 +23,9 @@
     "@pcp/database": "workspace:*",
     "@pcp/secrets": "workspace:*",
     "@pcp/shared-contracts": "workspace:*",
-    "@pcp/tenant-security": "workspace:*"
+    "@pcp/tenant-security": "workspace:*",
+    "@pcp/connectors-databases": "workspace:*",
+    "@pcp/connectors-custom-http": "workspace:*"
   },
   "devDependencies": {
     "@pcp/connectors-mock": "workspace:*",

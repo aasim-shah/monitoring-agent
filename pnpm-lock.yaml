@@ -371,6 +371,12 @@ importers:
       '@pcp/connector-sdk':
         specifier: workspace:*
         version: link:../connector-sdk
+      '@pcp/connectors-custom-http':
+        specifier: workspace:*
+        version: link:../connectors/custom-http
+      '@pcp/connectors-databases':
+        specifier: workspace:*
+        version: link:../connectors/databases
       '@pcp/database':
         specifier: workspace:*
         version: link:../database

@@ -24,6 +24,23 @@ export interface NewTask {
 
 type TaskRow = Prisma.AgentTaskGetPayload<object>;
 
+export interface TaskResultBody {
+  status: 'succeeded' | 'failed';
+  result?: Record<string, unknown>;
+  error?: string;
+}
+
+/** Called after a result is stored, inside the same tenant context (e.g. private connector ops). */
+export type ResultHandler = (
+  ctx: TenantContext,
+  agent: AgentIdentity,
+  task: { id: string; type: string; payload: Record<string, unknown> },
+  body: TaskResultBody,
+) => Promise<void>;
+
+/** Called before a poll claims tasks: lets other modules queue work that is due for this agent. */
+export type PollHandler = (ctx: TenantContext, agent: AgentIdentity) => Promise<void>;
+
 /** The wire form the agent verifies; must match exactly what was signed. */
 function wireTask(row: TaskRow): AgentTask {
   return {
@@ -50,8 +67,19 @@ export class TasksService implements OnApplicationShutdown {
     private readonly notifier: TaskNotifier,
   ) {}
 
+  private readonly resultHandlers: ResultHandler[] = [];
+  private readonly pollHandlers: PollHandler[] = [];
+
   onApplicationShutdown() {
     this.notifier.close();
+  }
+
+  onResult(handler: ResultHandler): void {
+    this.resultHandlers.push(handler);
+  }
+
+  onPoll(handler: PollHandler): void {
+    this.pollHandlers.push(handler);
   }
 
   async create(ctx: TenantContext, agentId: string, input: NewTask): Promise<AgentTask> {
@@ -95,6 +123,7 @@ export class TasksService implements OnApplicationShutdown {
    * waits up to `waitSeconds` for a notification. Expired tasks are never delivered (BR-03-06).
    */
   async poll(ctx: TenantContext, agent: AgentIdentity, waitSeconds: number): Promise<AgentTask[]> {
+    for (const h of this.pollHandlers) await h(ctx, agent);
     const claimed = await this.claim(ctx, agent.id);
     if (claimed.length || waitSeconds <= 0) return claimed;
     await this.notifier.wait(agent.id, Math.min(waitSeconds, MAX_WAIT_SECONDS) * 1000);
@@ -130,9 +159,9 @@ export class TasksService implements OnApplicationShutdown {
     ctx: TenantContext,
     agent: AgentIdentity,
     taskId: string,
-    body: { status: 'succeeded' | 'failed'; result?: Record<string, unknown>; error?: string },
+    body: TaskResultBody,
   ): Promise<void> {
-    await withTenant(this.prisma, ctx, async (tx) => {
+    const task = await withTenant(this.prisma, ctx, async (tx) => {
       const task = await tx.agentTask.findFirst({
         where: { id: taskId, agentId: agent.id, status: 'delivered' },
       });
@@ -157,7 +186,15 @@ export class TasksService implements OnApplicationShutdown {
           receivedAt: this.now(),
         },
       });
+      return task;
     });
+    for (const h of this.resultHandlers)
+      await h(
+        ctx,
+        agent,
+        { id: task.id, type: task.type, payload: task.payload as Record<string, unknown> },
+        body,
+      );
   }
 
   list(ctx: TenantContext, agentId: string) {
