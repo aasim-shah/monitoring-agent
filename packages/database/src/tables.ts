@@ -7,6 +7,13 @@ export const TENANT_TABLES = [
   'environments',
   'teams',
   'audit_logs',
+  'connections',
+  'connection_secrets',
+  'connection_resource_scopes',
+  'connection_health',
+  'sync_runs',
+  'job_definitions',
+  'job_executions',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];

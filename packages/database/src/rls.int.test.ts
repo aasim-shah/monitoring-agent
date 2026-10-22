@@ -60,6 +60,37 @@ beforeAll(async () => {
         `INSERT INTO audit_logs (id, organization_id, actor_type, action, target_type) VALUES ($1, $2, 'system', 'seed', 'organization')`,
         [randomUUID(), org],
       );
+      const conn = randomUUID();
+      await c.query(
+        `INSERT INTO connections (id, organization_id, provider, display_name, execution_location, updated_at)
+         VALUES ($1, $2, 'mock', 'Mock', 'cloud', now())`,
+        [conn, org],
+      );
+      await c.query(
+        `INSERT INTO connection_secrets (connection_id, organization_id, ciphertext, key_version) VALUES ($1, $2, 'x', 1)`,
+        [conn, org],
+      );
+      await c.query(
+        `INSERT INTO connection_resource_scopes (id, organization_id, connection_id, external_id, resource_type, name, product_id)
+         VALUES ($1, $2, $3, 'r1', 'zone', 'Zone', $4)`,
+        [randomUUID(), org, conn, product],
+      );
+      await c.query(
+        `INSERT INTO connection_health (id, organization_id, connection_id, ok) VALUES ($1, $2, $3, true)`,
+        [randomUUID(), org, conn],
+      );
+      await c.query(
+        `INSERT INTO sync_runs (id, organization_id, connection_id, kind) VALUES ($1, $2, $3, 'validate')`,
+        [randomUUID(), org, conn],
+      );
+      await c.query(
+        `INSERT INTO job_definitions (id, organization_id, kind, entity_id, every_seconds) VALUES ($1, $2, 'connection-validate', $3, 900)`,
+        [randomUUID(), org, conn],
+      );
+      await c.query(
+        `INSERT INTO job_executions (id, organization_id, job_id, kind, status, attempts) VALUES ($1, $2, 'j', 'connection-validate', 'succeeded', 1)`,
+        [randomUUID(), org],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

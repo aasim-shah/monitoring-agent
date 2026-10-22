@@ -31,6 +31,52 @@ enum EmailTokenKind {
   @@map("email_token_kind")
 }
 
+enum ConnectionStatus {
+  draft
+  pending_auth
+  pending_validation
+  connected
+  degraded
+  disconnected
+  revoked
+
+  @@map("connection_status")
+}
+
+enum ExecutionLocation {
+  cloud
+  private
+
+  @@map("execution_location")
+}
+
+enum SyncKind {
+  validate
+  discover
+  sync
+
+  @@map("sync_kind")
+}
+
+enum RunStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+
+  @@map("run_status")
+}
+
+enum JobStatus {
+  running
+  succeeded
+  failed
+  dead_letter
+
+  @@map("job_status")
+}
+
 // ---------- Global identity (no tenant column, no RLS) ----------
 
 model User {
@@ -107,11 +153,14 @@ model Organization {
   settings  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  members     OrganizationMember[]
-  invitations Invitation[]
-  products    Product[]
-  teams       Team[]
-  auditLogs   AuditLog[]
+  members        OrganizationMember[]
+  invitations    Invitation[]
+  products       Product[]
+  teams          Team[]
+  auditLogs      AuditLog[]
+  connections    Connection[]
+  jobDefinitions JobDefinition[]
+  jobExecutions  JobExecution[]
 
   @@map("organizations")
 }
@@ -165,8 +214,9 @@ model Product {
   repositories   String[] @default([])
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  environments Environment[]
+  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  environments   Environment[]
+  resourceScopes ConnectionResourceScope[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -217,4 +267,140 @@ model AuditLog {
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+// ---------- Connections (master plan M4) ----------
+
+model Connection {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  provider          String
+  displayName       String            @map("display_name")
+  executionLocation ExecutionLocation @map("execution_location")
+  status            ConnectionStatus  @default(draft)
+  /// connection reason (reauthorization_required, rate_limited, permission_denied, provider_unavailable) or null
+  statusReason      String?           @map("status_reason")
+  /// Non-secret configuration only.
+  config            Json              @default("{}")
+  createdByUserId   String?           @map("created_by_user_id") @db.Uuid
+  lastValidatedAt   DateTime?         @map("last_validated_at") @db.Timestamptz(6)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  secret       ConnectionSecret?
+  scopes       ConnectionResourceScope[]
+  health       ConnectionHealth[]
+  syncRuns     SyncRun[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, provider])
+  @@map("connections")
+}
+
+/// Envelope-encrypted credentials (ADR 0004). Deleting the row crypto-shreds them.
+model ConnectionSecret {
+  connectionId   String    @id @map("connection_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  /// Serialized EncryptedSecret; AAD "<organizationId>:<connectionId>".
+  ciphertext     String
+  keyVersion     Int       @map("key_version")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  rotatedAt      DateTime? @map("rotated_at") @db.Timestamptz(6)
+
+  connection Connection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, connectionId])
+  @@map("connection_secrets")
+}
+
+model ConnectionResourceScope {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  connectionId   String   @map("connection_id") @db.Uuid
+  externalId     String   @map("external_id")
+  resourceType   String   @map("resource_type")
+  name           String
+  productId      String   @map("product_id") @db.Uuid
+  /// Validated in the service (an optional composite foreign key is not expressible in Prisma).
+  environmentId  String?  @map("environment_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  connection Connection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+  product    Product    @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([connectionId, externalId, productId])
+  @@index([organizationId, productId])
+  @@map("connection_resource_scopes")
+}
+
+model ConnectionHealth {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  connectionId   String   @map("connection_id") @db.Uuid
+  checkedAt      DateTime @default(now()) @map("checked_at") @db.Timestamptz(6)
+  ok             Boolean
+  reason         String?
+  detail         String?
+
+  connection Connection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([connectionId, checkedAt(sort: Desc)])
+  @@map("connection_health")
+}
+
+model SyncRun {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  connectionId   String    @map("connection_id") @db.Uuid
+  kind           SyncKind
+  status         RunStatus @default(queued)
+  jobId          String?   @map("job_id")
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(6)
+  errorCode      String?   @map("error_code")
+  /// Redacted before storage.
+  errorMessage   String?   @map("error_message")
+  items          Int?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  connection Connection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([connectionId, createdAt(sort: Desc)])
+  @@map("sync_runs")
+}
+
+// ---------- Jobs (master plan M4.4) ----------
+
+model JobDefinition {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  kind           String
+  entityId       String   @map("entity_id") @db.Uuid
+  everySeconds   Int      @map("every_seconds")
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, kind, entityId])
+  @@map("job_definitions")
+}
+
+model JobExecution {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  jobId          String    @map("job_id")
+  kind           String
+  status         JobStatus
+  attempts       Int
+  /// Redacted before storage.
+  error          String?
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, jobId])
+  @@map("job_executions")
 }
