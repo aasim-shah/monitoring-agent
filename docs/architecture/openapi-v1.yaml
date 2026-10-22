@@ -938,6 +938,30 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M5
+  /api/v1/environments/{environmentId}/agent-enrollments/{enrollmentId}/revoke:
+    parameters:
+      - { $ref: '#/components/parameters/environmentId' }
+      - { name: enrollmentId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: revokeAgentEnrollment
+      tags: [agents]
+      summary: Revoke an enrollment token
+      description: Stops the token from enrolling more hosts; enrolled agents keep working. Requires `agent.enroll`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                {
+                  type: object,
+                  required: [status],
+                  properties: { status: { type: string, enum: [revoked] } },
+                }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M5
   /api/v1/products/{productId}/agents:
     parameters: [{ $ref: '#/components/parameters/productId' }]
     get:
@@ -1050,12 +1074,24 @@ paths:
       operationId: revokeAgent
       tags: [agents]
       summary: Revoke agent
-      description: Revoke agent.
+      description: >-
+        Revokes the agent and all its certificates on every API process at once; expires queued and delivered tasks;
+        audited. Requires `agent.revoke`.
       security: [{ sessionCookie: [] }]
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                {
+                  type: object,
+                  required: [status],
+                  properties: { status: { type: string, enum: [revoked] } },
+                }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M5
   /api/v1/monitoring-packs:
     get:
       operationId: listMonitoringPacks
@@ -1298,11 +1334,28 @@ paths:
       operationId: agentRotate
       tags: [agent-protocol]
       summary: Rotate certificate
-      description: Rotate certificate.
+      description: New certificate for a CSR of a new host key; the calling certificate stays valid for 1 h.
       security: [{ agentMtls: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [csrPem], properties: { csrPem: { type: string } } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '201':
+          description: Rotated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [certificatePem, chainPem, notAfter]
+                properties:
+                  certificatePem: { type: string }
+                  chainPem: { type: string }
+                  notAfter: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M5
   /agent/v1/tasks:
     servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     get:

@@ -82,4 +82,21 @@ export class EnrollmentsService {
       }),
     );
   }
+
+  /** Stops a token from enrolling more hosts; agents already enrolled keep working. */
+  async revoke(ctx: TenantContext, environmentId: string, enrollmentId: string) {
+    return withTenant(this.prisma, ctx, async (tx) => {
+      const row = await tx.agentEnrollment.findFirst({ where: { id: enrollmentId, environmentId } });
+      if (!row) throw notFound();
+      if (!row.revokedAt) {
+        await tx.agentEnrollment.update({ where: { id: enrollmentId }, data: { revokedAt: this.now() } });
+        await this.audit.record(tx, ctx, {
+          action: 'agent_enrollment.revoked',
+          targetType: 'agent_enrollment',
+          targetId: enrollmentId,
+        });
+      }
+      return { status: 'revoked' as const };
+    });
+  }
 }

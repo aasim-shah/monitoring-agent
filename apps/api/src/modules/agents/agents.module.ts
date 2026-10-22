@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Injectable, Module, type OnApplicationShutdown } from '@nestjs/common';
 import type { PrismaClient } from '@pcp/database';
 import type { Redis } from 'ioredis';
 import type { KeyRing } from '@pcp/secrets';
@@ -15,11 +15,21 @@ import { EnrollmentsController } from './enrollments.controller.js';
 import { EnrollmentsService } from './enrollments.service.js';
 import { HeartbeatController } from './heartbeat.controller.js';
 import { agentSettingsProvider } from './settings.provider.js';
+import { RevocationBus } from './revocation.bus.js';
+import { RotateController } from './rotate.controller.js';
 import { TaskNotifier } from './task-notifier.js';
 import { TasksController } from './tasks.controller.js';
 import { TasksService } from './tasks.service.js';
 import { EnrollmentTokens } from './tokens.js';
 import { WhoamiController } from './whoami.controller.js';
+
+@Injectable()
+class RevocationShutdown implements OnApplicationShutdown {
+  constructor(private readonly bus: RevocationBus) {}
+  onApplicationShutdown() {
+    this.bus.close();
+  }
+}
 
 @Module({
   controllers: [
@@ -30,6 +40,7 @@ import { WhoamiController } from './whoami.controller.js';
     AgentsController,
     TasksController,
     AgentTasksController,
+    RotateController,
   ],
   providers: [
     agentSettingsProvider,
@@ -54,6 +65,13 @@ import { WhoamiController } from './whoami.controller.js';
       useFactory: (redis: Redis) => new TaskNotifier(redis, redis.duplicate()),
     },
     TasksService,
+    {
+      provide: RevocationBus,
+      inject: [REDIS, AgentIdentityCache],
+      useFactory: (redis: Redis, cache: AgentIdentityCache) =>
+        new RevocationBus(redis, redis.duplicate(), cache),
+    },
+    RevocationShutdown,
   ],
   exports: [AgentAuthGuard],
 })

@@ -4,6 +4,8 @@ import type { TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 import { notFound } from '../../common/errors.js';
 import { CLOCK, PRISMA } from '../../tokens.js';
+import { AuditService } from '../auditing/audit.service.js';
+import { RevocationBus } from './revocation.bus.js';
 import { agentStatus } from './status.js';
 
 const summaryInclude = { environment: { select: { name: true } } } satisfies Prisma.AgentInclude;
@@ -15,6 +17,8 @@ export class AgentsService {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     @Inject(CLOCK) private readonly now: () => Date,
+    private readonly audit: AuditService,
+    private readonly revocations: RevocationBus,
   ) {}
 
   private summary(a: AgentRow, duplicates: Set<string>) {
@@ -88,5 +92,37 @@ export class AgentsService {
         })),
       };
     });
+  }
+
+  /**
+   * Revocation (UC-03-06): the agent and every certificate stop authenticating at once on
+   * all API processes; undelivered and in-flight tasks are expired.
+   */
+  async revoke(ctx: TenantContext, agentId: string): Promise<{ status: 'revoked' }> {
+    const now = this.now();
+    const fingerprints = await withTenant(this.prisma, ctx, async (tx) => {
+      const agent = await tx.agent.findUnique({ where: { id: agentId }, include: { credentials: true } });
+      if (!agent) throw notFound();
+      if (agent.status === 'revoked') return [];
+      await tx.agent.update({ where: { id: agentId }, data: { status: 'revoked', revokedAt: now } });
+      await tx.agentCredential.updateMany({ where: { agentId, revokedAt: null }, data: { revokedAt: now } });
+      await tx.agentTask.updateMany({
+        where: { agentId, status: { in: ['queued', 'delivered'] } },
+        data: { status: 'expired' },
+      });
+      await tx.agentStreamSession.updateMany({
+        where: { agentId, status: 'open' },
+        data: { status: 'closed' },
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'agent.revoked',
+        targetType: 'agent',
+        targetId: agentId,
+        metadata: { hostname: agent.hostname },
+      });
+      return agent.credentials.map((c) => c.fingerprintSha256);
+    });
+    await this.revocations.publish(fingerprints);
+    return { status: 'revoked' };
   }
 }

@@ -54,7 +54,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M5.3 | mTLS edge and agent authentication | Done | [M5.3](M5.3-agent-auth.md) |
 | M5.4 | Heartbeats and fleet status | Done | [M5.4](M5.4-heartbeats.md) |
 | M5.5 | Tasks and streams | Done | [M5.5](M5.5-tasks.md) |
-| M5.6 | Rotation and revocation | Not started | — |
+| M5.6 | Rotation and revocation | Done | [M5.6](M5.6-rotation-revocation.md) |
 | M5.7 | Fleet UI | Not started | — |
 | M6.1 | Agent distribution build | Not started | — |
 | M6.2 | `pcp-agentctl` | Not started | — |

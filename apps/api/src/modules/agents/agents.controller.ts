@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Req } from '@nestjs/common';
+import { Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
 import { RequirePermission, TenantScope } from '../../common/decorators.js';
 import type { ApiRequest } from '../../common/request.js';
 import { requireTenant } from '../../common/tenant.js';
@@ -22,5 +22,13 @@ export class AgentsController {
   @Get('agents/:id')
   get(@Req() req: ApiRequest, @Param('id') id: string) {
     return this.agents.get(requireTenant(req), id);
+  }
+
+  @RequirePermission('agent.revoke')
+  @TenantScope(AGENT)
+  @Post('agents/:id/revoke')
+  @HttpCode(200)
+  revoke(@Req() req: ApiRequest, @Param('id') id: string) {
+    return this.agents.revoke(requireTenant(req), id);
   }
 }

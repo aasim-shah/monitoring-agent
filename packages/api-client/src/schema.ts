@@ -886,6 +886,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/environments/{environmentId}/agent-enrollments/{enrollmentId}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Environment ID */
+                environmentId: components["parameters"]["environmentId"];
+                enrollmentId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke an enrollment token
+         * @description Stops the token from enrolling more hosts; enrolled agents keep working. Requires `agent.enroll`.
+         */
+        post: operations["revokeAgentEnrollment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/{productId}/agents": {
         parameters: {
             query?: never;
@@ -992,7 +1016,7 @@ export interface paths {
         put?: never;
         /**
          * Revoke agent
-         * @description Revoke agent.
+         * @description Revokes the agent and all its certificates on every API process at once; expires queued and delivered tasks; audited. Requires `agent.revoke`.
          */
         post: operations["revokeAgent"];
         delete?: never;
@@ -1375,7 +1399,7 @@ export interface paths {
         put?: never;
         /**
          * Rotate certificate
-         * @description Rotate certificate.
+         * @description New certificate for a CSR of a new host key; the calling certificate stays valid for 1 h.
          */
         post: operations["agentRotate"];
         delete?: never;
@@ -4217,6 +4241,35 @@ export interface operations {
             };
         };
     };
+    revokeAgentEnrollment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Environment ID */
+                environmentId: components["parameters"]["environmentId"];
+                enrollmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "revoked";
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listAgents: {
         parameters: {
             query?: never;
@@ -4358,7 +4411,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            204: components["responses"]["NoContent"];
+            /** @description Revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "revoked";
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -4712,9 +4776,29 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    csrPem: string;
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Rotated */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        certificatePem: string;
+                        chainPem: string;
+                        /** Format: date-time */
+                        notAfter: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };
