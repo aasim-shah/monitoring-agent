@@ -39,7 +39,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M2.4 | Organizations, products, environments, RBAC guard | Done | [M2.4](M2.4-organizations-rbac.md) |
 | M2.5 | Audit log | Done | [M2.5](M2.5-audit-log.md) |
 | M2.6 | Members and invitations | Done | [M2.6](M2.6-members-invitations.md) |
-| M3.1 | Web foundation | In progress | [part 1](M3.1-web-foundation.md), [part 2](M3.1-auth-pages.md) |
+| M3.1 | Web foundation | Done | [part 1](M3.1-web-foundation.md), [part 2](M3.1-auth-pages.md), [part 3](M3.1-app-shell.md) |
 | M3.2 | Organization, product, environment, member, audit screens | Not started | — |
 | M3.3 | Typed API client | Done | [M3.3](M3.3-api-client.md) |
 | M4.1 | Envelope encryption | In progress | [M4.1 (with M2.3)](M2.3-identity-primitives.md) |

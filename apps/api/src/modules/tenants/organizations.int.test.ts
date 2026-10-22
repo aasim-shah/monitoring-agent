@@ -131,6 +131,26 @@ describe('products and environments', () => {
     expect(write.statusCode).toBe(404);
   });
 
+  it("lists products, limited to a product-scoped member's products", async () => {
+    const owner = await ownerWithOrg(t);
+    const a = await createProduct(t, owner, 'Alpha');
+    const b = await createProduct(t, owner, 'Beta');
+    const all = await get(`/api/v1/organizations/${owner.orgId}/products`, owner.cookie);
+    expect(all.statusCode).toBe(200);
+    expect(all.json().products.map((p: { name: string }) => p.name)).toEqual(['Alpha', 'Beta']);
+
+    const email = await signUpAndVerify(t);
+    const [u] = await sql<{ id: string }>(`SELECT id FROM users WHERE email = $1`, [email]);
+    await sql(
+      `INSERT INTO organization_members (id, organization_id, user_id, role, all_products, product_ids)
+       VALUES ($1, $2, $3, 'analyst', false, ARRAY[$4]::uuid[])`,
+      [randomUUID(), owner.orgId, u!.id, b],
+    );
+    const scoped = await get(`/api/v1/organizations/${owner.orgId}/products`, await login(t, email));
+    expect(scoped.json().products.map((p: { id: string }) => p.id)).toEqual([b]);
+    expect(a).not.toBe(b);
+  });
+
   it('returns 404 for malformed IDs', async () => {
     const owner = await ownerWithOrg(t);
     expect((await get('/api/v1/products/not-a-uuid', owner.cookie)).statusCode).toBe(404);

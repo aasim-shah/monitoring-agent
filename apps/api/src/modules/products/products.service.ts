@@ -36,6 +36,17 @@ export class ProductsService {
     }
   }
 
+  /** Products the caller may see: all, or only their scoped products. */
+  list(ctx: TenantContext) {
+    return withTenant(this.prisma, ctx, (tx) =>
+      tx.product.findMany({
+        where: ctx.productIds === 'all' ? {} : { id: { in: ctx.productIds } },
+        orderBy: { name: 'asc' },
+        include: { _count: { select: { environments: true } } },
+      }),
+    );
+  }
+
   get(ctx: TenantContext, productId: string) {
     return withTenant(this.prisma, ctx, (tx) =>
       tx.product.findUniqueOrThrow({

@@ -488,7 +488,11 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List products the caller may see
+         * @description List products the caller may see (product-scoped members see only their products).
+         */
+        get: operations["listProducts"];
         put?: never;
         /**
          * Create product
@@ -2639,6 +2643,28 @@ export interface components {
             entries: components["schemas"]["AuditEntry"][];
             nextBefore: string | null;
         };
+        ProductSummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description?: string | null;
+            domains: string[];
+            repositories: string[];
+            environmentCount: number;
+        };
+        ProductList: {
+            products: components["schemas"]["ProductSummary"][];
+        };
+        MemberList: {
+            members: components["schemas"]["Member"][];
+        };
+        ProductOverview: {
+            product: components["schemas"]["Product"];
+            environments: components["schemas"]["Environment"][];
+            counts: {
+                environments: number;
+            };
+        };
     };
     responses: {
         /** @description Success */
@@ -3259,7 +3285,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["MemberList"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
@@ -3345,6 +3373,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listProducts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductList"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -3506,7 +3559,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ProductOverview"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];

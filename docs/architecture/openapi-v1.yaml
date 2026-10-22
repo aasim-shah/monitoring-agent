@@ -430,6 +430,10 @@ paths:
       responses:
         '200':
           description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberList'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M2
@@ -525,6 +529,26 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateProductRequest'
+    get:
+      operationId: listProducts
+      tags:
+        - products
+      summary: List products the caller may see
+      description: List products the caller may see (product-scoped members see only their products).
+      security:
+        - sessionCookie: []
+      x-implemented-in: M3
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /api/v1/organizations/{orgId}/notification-channels:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     get:
@@ -616,6 +640,10 @@ paths:
       responses:
         '200':
           description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductOverview'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M2
@@ -2112,6 +2140,72 @@ components:
           type:
             - string
             - 'null'
+    ProductSummary:
+      type: object
+      required:
+        - id
+        - name
+        - domains
+        - repositories
+        - environmentCount
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - 'null'
+        domains:
+          type: array
+          items:
+            type: string
+        repositories:
+          type: array
+          items:
+            type: string
+        environmentCount:
+          type: integer
+    ProductList:
+      type: object
+      required:
+        - products
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSummary'
+    MemberList:
+      type: object
+      required:
+        - members
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Member'
+    ProductOverview:
+      type: object
+      required:
+        - product
+        - environments
+        - counts
+      properties:
+        product:
+          $ref: '#/components/schemas/Product'
+        environments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Environment'
+        counts:
+          type: object
+          required:
+            - environments
+          properties:
+            environments:
+              type: integer
   responses:
     Ok: { description: Success }
     Created: { description: Created }

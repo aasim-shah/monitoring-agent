@@ -12,6 +12,14 @@ export interface RouterLike {
  * 401 → sign in and come back; 403 mfa_required → MFA; anything else → the page renders it.
  * Returns null when it navigated away.
  */
+/** True for errors that move the user elsewhere instead of rendering on the page. */
+export function isNavigationalError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.status === 401 || (error.status === 403 && error.code === 'mfa_required'))
+  );
+}
+
 export function handleApiError(error: unknown, router: RouterLike, pathname: string): unknown {
   if (error instanceof ApiError) {
     if (error.status === 401) {

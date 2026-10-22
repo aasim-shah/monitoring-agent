@@ -32,6 +32,23 @@ export class ProductsController {
   }
 
   @RequirePermission('product.view')
+  @TenantScope({ param: 'orgId' })
+  @Get('organizations/:orgId/products')
+  async list(@Req() req: ApiRequest) {
+    const products = await this.products.list(requireTenant(req));
+    return {
+      products: products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        domains: p.domains,
+        repositories: p.repositories,
+        environmentCount: p._count.environments,
+      })),
+    };
+  }
+
+  @RequirePermission('product.view')
   @TenantScope({ param: 'productId' })
   @Get('products/:productId')
   async get(@Req() req: ApiRequest, @Param('productId') productId: string) {
