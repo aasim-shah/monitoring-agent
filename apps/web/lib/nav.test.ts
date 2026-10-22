@@ -51,6 +51,7 @@ describe('product navigation (spec §21)', () => {
       'Health Overview',
       'Agents',
       'Infrastructure',
+      'Databases',
       'Audit Log',
     ]);
   });

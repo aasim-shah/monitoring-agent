@@ -44,7 +44,11 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
     },
     { label: 'Websites & APIs', milestone: 'M13' },
     { label: 'Mobile Apps & SDKs', milestone: 'M13' },
-    { label: 'Databases', milestone: 'M8' },
+    {
+      label: 'Databases',
+      href: `/orgs/${orgId}/products/${productId}/databases`,
+      permission: 'connection.view',
+    },
     { label: 'Analytics & Ads', milestone: 'M13' },
     { label: 'Incidents & Alerts', milestone: 'M12' },
     { label: 'AI Assistant', milestone: 'M14' },

@@ -24,6 +24,7 @@ export class AgentsService {
   private summary(a: AgentRow, duplicates: Set<string>) {
     return {
       id: a.id,
+      agentType: a.agentType,
       hostname: a.hostname,
       os: a.os,
       arch: a.arch,

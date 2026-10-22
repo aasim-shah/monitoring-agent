@@ -3167,6 +3167,7 @@ components:
       required:
         [
           id,
+          agentType,
           hostname,
           os,
           arch,
@@ -3182,6 +3183,7 @@ components:
         ]
       properties:
         id: { type: string, format: uuid }
+        agentType: { type: string, enum: [host, private_worker] }
         hostname: { type: string }
         os: { type: string }
         arch: { type: string }

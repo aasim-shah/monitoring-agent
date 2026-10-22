@@ -3133,6 +3133,8 @@ export interface components {
         AgentSummary: {
             /** Format: uuid */
             id: string;
+            /** @enum {string} */
+            agentType: "host" | "private_worker";
             hostname: string;
             os: string;
             arch: string;

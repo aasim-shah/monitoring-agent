@@ -101,6 +101,7 @@ describe('fleet (WB-03 §8)', () => {
       (res.json().agents as Array<{ hostname: string }>).map((x) => [x.hostname, x]),
     );
     expect(byHost['api-1']).toMatchObject({
+      agentType: 'host',
       status: 'active',
       stale: false,
       duplicateMachineId: true,
