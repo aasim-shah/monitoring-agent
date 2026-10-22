@@ -17,6 +17,7 @@ import { CurrentUserGuard } from './modules/identity/current-user.guard.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
 import { MembersModule } from './modules/members/members.module.js';
+import { PacksModule } from './modules/packs/packs.module.js';
 import { ProductsModule } from './modules/products/products.module.js';
 import { TelemetryModule } from './modules/telemetry/telemetry.module.js';
 import { TenantsModule } from './modules/tenants/tenants.module.js';
@@ -59,6 +60,7 @@ export class AppModule {
         ConnectionsModule.register(env),
         AgentsModule,
         TelemetryModule,
+        PacksModule,
       ],
       controllers: [HealthController],
       providers: [

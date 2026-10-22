@@ -1080,7 +1080,7 @@ export interface paths {
         };
         /**
          * Monitoring pack catalog
-         * @description Monitoring pack catalog.
+         * @description Packs with their settings (JSON Schema) and the credential fields the dashboard seals to the agent.
          */
         get: operations["listMonitoringPacks"];
         put?: never;
@@ -1091,7 +1091,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/agents/{id}/pack-proposals": {
+    "/api/v1/agents/{id}/inventory": {
         parameters: {
             query?: never;
             header?: never;
@@ -1102,10 +1102,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Detected services and proposed packs
-         * @description Detected services and proposed packs.
+         * Detected services
+         * @description Latest discovery snapshot (services, listeners, exposed-service warnings) and the detected packs that are not enabled yet. Requires `agent.view`.
          */
-        get: operations["listPackProposals"];
+        get: operations["getAgentInventory"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1124,11 +1124,15 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Packs enabled on the agent
+         * @description Assignments with their status. Ciphertext is never returned. Requires `agent.view`.
+         */
+        get: operations["listAgentPacks"];
         put?: never;
         /**
-         * Enable pack (sealed credentials)
-         * @description Enable pack (sealed credentials).
+         * Enable or update a pack
+         * @description Creates or updates the assignment (status pending) and bumps the agent's policy version. `sealedCredentials` is sealed in the browser to the agent's `x25519PublicKey` (ECIES X25519 + HKDF-SHA256 + AES-256-GCM) and deleted once the agent acknowledges. Requires `pack.manage`; audited without credentials.
          */
         post: operations["enablePack"];
         delete?: never;
@@ -1154,7 +1158,7 @@ export interface paths {
         post?: never;
         /**
          * Disable pack
-         * @description Disable pack.
+         * @description Marks the assignment removing and bumps the policy version; the row is deleted when the agent acknowledges.
          */
         delete: operations["disablePack"];
         options?: never;
@@ -1428,6 +1432,66 @@ export interface paths {
          * @description Heartbeat (packages/agent-protocol Heartbeat) every 30 s. A sequence not above the last one seen is acknowledged with accepted false and not stored; clock skew over 5 min is recorded.
          */
         post: operations["agentHeartbeat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/v1/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discovery snapshot
+         * @description packages/agent-protocol Inventory, at start and every 5 minutes; replaces the previous snapshot.
+         */
+        post: operations["agentInventory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pack configuration
+         * @description Fetched when the heartbeat's policyVersion differs from the applied one. Includes `sealedCredentials` only until the agent acknowledges.
+         */
+        get: operations["agentConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/v1/config/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acknowledge configuration
+         * @description Settles assignments changed at or before `policyVersion`: applied or failed (with the collector's message), ciphertext deleted, removing rows deleted.
+         */
+        post: operations["agentConfigAck"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2992,6 +3056,8 @@ export interface components {
         AgentDetail: components["schemas"]["AgentSummary"] & {
             capabilities: string[];
             policyVersion: number;
+            /** @description base64; pack credentials are sealed to it */
+            x25519PublicKey: string | null;
             certificate: {
                 /** Format: date-time */
                 notAfter: string;
@@ -3003,6 +3069,59 @@ export interface components {
                 health: string;
                 queueDepth: number;
             }[];
+        };
+        MonitoringPack: {
+            id: string;
+            name: string;
+            description: string;
+            defaultEndpoint: string | null;
+            credentialFields: {
+                name: string;
+                label: string;
+                secret: boolean;
+                required: boolean;
+            }[];
+            /** @description JSON Schema of the pack settings */
+            settings: {
+                [key: string]: unknown;
+            };
+        };
+        PackAssignment: {
+            packId: string;
+            settings: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            status: "pending" | "applied" | "failed" | "removing";
+            statusMessage: string | null;
+            policyVersion: number;
+            /** Format: date-time */
+            appliedAt: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        Inventory: {
+            /** Format: date-time */
+            collectedAt: string;
+            services: {
+                pack: string;
+                name: string;
+                ports: components["schemas"]["ListenAddress"][];
+                processCount: number;
+                evidence: string[];
+            }[];
+            listeners: components["schemas"]["ListenAddress"][];
+            warnings: {
+                /** @enum {string} */
+                kind: "exposed_service";
+                pack: string;
+                address: string;
+                port: number;
+            }[];
+        };
+        ListenAddress: {
+            address: string;
+            port: number;
         };
         /** @description [epochSeconds, value]; value is null for a step without data (never shown as zero) */
         MetricPoint: (number | null)[];
@@ -4588,12 +4707,21 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        packs: components["schemas"]["MonitoringPack"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
         };
     };
-    listPackProposals: {
+    getAgentInventory: {
         parameters: {
             query?: never;
             header?: never;
@@ -4605,7 +4733,45 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        inventory: components["schemas"]["Inventory"] | null;
+                        suggestedPacks: string[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAgentPacks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        packs: components["schemas"]["PackAssignment"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -4620,11 +4786,47 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    packId: string;
+                    settings: {
+                        [key: string]: unknown;
+                    };
+                    /** @description base64 */
+                    sealedCredentials?: string;
+                };
+            };
+        };
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackAssignment"];
+                };
+            };
+            /** @description Enabled */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackAssignment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            /** @description The agent is revoked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     disablePack: {
@@ -4641,7 +4843,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Removing */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "removing";
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -4917,6 +5130,80 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    agentInventory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Inventory"];
+            };
+        };
+        responses: {
+            202: components["responses"]["Accepted"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    agentConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        policyVersion: number;
+                        packs: {
+                            packId: string;
+                            settings: {
+                                [key: string]: unknown;
+                            };
+                            sealedCredentials?: string;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    agentConfigAck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    policyVersion: number;
+                    results: {
+                        packId: string;
+                        /** @enum {string} */
+                        status: "applied" | "failed";
+                        message?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            204: components["responses"]["NoContent"];
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };

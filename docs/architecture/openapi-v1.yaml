@@ -1200,48 +1200,117 @@ paths:
       operationId: listMonitoringPacks
       tags: [packs]
       summary: Monitoring pack catalog
-      description: Monitoring pack catalog.
+      description: Packs with their settings (JSON Schema) and the credential fields the dashboard seals to the agent.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packs]
+                properties: { packs: { type: array, items: { $ref: '#/components/schemas/MonitoringPack' } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/v1/agents/{id}/pack-proposals:
+      x-implemented-in: M6b
+  /api/v1/agents/{id}/inventory:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
-      operationId: listPackProposals
+      operationId: getAgentInventory
       tags: [packs]
-      summary: Detected services and proposed packs
-      description: Detected services and proposed packs.
+      summary: Detected services
+      description: >-
+        Latest discovery snapshot (services, listeners, exposed-service warnings) and the detected packs that are
+        not enabled yet. Requires `agent.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [inventory, suggestedPacks]
+                properties:
+                  inventory:
+                    oneOf: [{ $ref: '#/components/schemas/Inventory' }, { type: 'null' }]
+                  suggestedPacks: { type: array, items: { type: string } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M6b
   /api/v1/agents/{id}/packs:
     parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listAgentPacks
+      tags: [packs]
+      summary: Packs enabled on the agent
+      description: Assignments with their status. Ciphertext is never returned. Requires `agent.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packs]
+                properties: { packs: { type: array, items: { $ref: '#/components/schemas/PackAssignment' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M6b
     post:
       operationId: enablePack
       tags: [packs]
-      summary: Enable pack (sealed credentials)
-      description: Enable pack (sealed credentials).
+      summary: Enable or update a pack
+      description: >-
+        Creates or updates the assignment (status pending) and bumps the agent's policy version.
+        `sealedCredentials` is sealed in the browser to the agent's `x25519PublicKey` (ECIES X25519 + HKDF-SHA256 +
+        AES-256-GCM) and deleted once the agent acknowledges. Requires `pack.manage`; audited without credentials.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [packId, settings]
+              properties:
+                packId: { type: string, maxLength: 64 }
+                settings: { type: object, additionalProperties: true }
+                sealedCredentials: { type: string, maxLength: 4096, description: base64 }
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '200':
+          description: Updated
+          content: { application/json: { schema: { $ref: '#/components/schemas/PackAssignment' } } }
+        '201':
+          description: Enabled
+          content: { application/json: { schema: { $ref: '#/components/schemas/PackAssignment' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: The agent is revoked }
+      x-implemented-in: M6b
   /api/v1/agents/{id}/packs/{packId}:
     parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/packId' }]
     delete:
       operationId: disablePack
       tags: [packs]
       summary: Disable pack
-      description: Disable pack.
+      description: Marks the assignment removing and bumps the policy version; the row is deleted when the agent acknowledges.
       security: [{ sessionCookie: [] }]
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Removing
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties: { status: { type: string, enum: [removing] } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M6b
   /api/v1/agents/{id}/packs/{packId}/inspection:
     parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/packId' }]
     patch:
@@ -1431,6 +1500,88 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
       x-implemented-in: M5
+  /agent/v1/inventory:
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
+    post:
+      operationId: agentInventory
+      tags: [agent-protocol]
+      summary: Discovery snapshot
+      description: packages/agent-protocol Inventory, at start and every 5 minutes; replaces the previous snapshot.
+      security: [{ agentMtls: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/Inventory' } } }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M6b
+  /agent/v1/config:
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
+    get:
+      operationId: agentConfig
+      tags: [agent-protocol]
+      summary: Pack configuration
+      description: >-
+        Fetched when the heartbeat's policyVersion differs from the applied one. Includes `sealedCredentials` only
+        until the agent acknowledges.
+      security: [{ agentMtls: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [policyVersion, packs]
+                properties:
+                  policyVersion: { type: integer }
+                  packs:
+                    type: array
+                    items:
+                      type: object
+                      required: [packId, settings]
+                      properties:
+                        packId: { type: string }
+                        settings: { type: object, additionalProperties: true }
+                        sealedCredentials: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M6b
+  /agent/v1/config/ack:
+    servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
+    post:
+      operationId: agentConfigAck
+      tags: [agent-protocol]
+      summary: Acknowledge configuration
+      description: >-
+        Settles assignments changed at or before `policyVersion`: applied or failed (with the collector's message),
+        ciphertext deleted, removing rows deleted.
+      security: [{ agentMtls: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [policyVersion, results]
+              properties:
+                policyVersion: { type: integer }
+                results:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [packId, status]
+                    properties:
+                      packId: { type: string }
+                      status: { type: string, enum: [applied, failed] }
+                      message: { type: string, maxLength: 2000 }
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M6b
   /agent/v1/rotate:
     servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
@@ -2918,10 +3069,12 @@ components:
       allOf:
         - $ref: '#/components/schemas/AgentSummary'
         - type: object
-          required: [capabilities, policyVersion, certificate, recentHeartbeats]
+          required: [capabilities, policyVersion, x25519PublicKey, certificate, recentHeartbeats]
           properties:
             capabilities: { type: array, items: { type: string } }
             policyVersion: { type: integer }
+            x25519PublicKey:
+              { type: [string, 'null'], description: base64; pack credentials are sealed to it }
             certificate:
               type: [object, 'null']
               required: [notAfter, fingerprintSha256]
@@ -2937,6 +3090,69 @@ components:
                   receivedAt: { type: string, format: date-time }
                   health: { type: string }
                   queueDepth: { type: integer }
+    MonitoringPack:
+      type: object
+      required: [id, name, description, defaultEndpoint, credentialFields, settings]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        defaultEndpoint: { type: [string, 'null'] }
+        credentialFields:
+          type: array
+          items:
+            type: object
+            required: [name, label, secret, required]
+            properties:
+              name: { type: string }
+              label: { type: string }
+              secret: { type: boolean }
+              required: { type: boolean }
+        settings: { type: object, additionalProperties: true, description: JSON Schema of the pack settings }
+    PackAssignment:
+      type: object
+      required: [packId, settings, status, statusMessage, policyVersion, appliedAt, updatedAt]
+      properties:
+        packId: { type: string }
+        settings: { type: object, additionalProperties: true }
+        status: { type: string, enum: [pending, applied, failed, removing] }
+        statusMessage: { type: [string, 'null'] }
+        policyVersion: { type: integer }
+        appliedAt: { type: [string, 'null'], format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Inventory:
+      type: object
+      required: [collectedAt, services, listeners, warnings]
+      properties:
+        collectedAt: { type: string, format: date-time }
+        services:
+          type: array
+          items:
+            type: object
+            required: [pack, name, ports, processCount, evidence]
+            properties:
+              pack: { type: string }
+              name: { type: string }
+              ports: { type: array, items: { $ref: '#/components/schemas/ListenAddress' } }
+              processCount: { type: integer }
+              evidence: { type: array, items: { type: string } }
+        listeners: { type: array, items: { $ref: '#/components/schemas/ListenAddress' } }
+        warnings:
+          type: array
+          items:
+            type: object
+            required: [kind, pack, address, port]
+            properties:
+              kind: { type: string, enum: [exposed_service] }
+              pack: { type: string }
+              address: { type: string }
+              port: { type: integer }
+    ListenAddress:
+      type: object
+      required: [address, port]
+      properties:
+        address: { type: string }
+        port: { type: integer }
     MetricPoint:
       type: array
       description: '[epochSeconds, value]; value is null for a step without data (never shown as zero)'

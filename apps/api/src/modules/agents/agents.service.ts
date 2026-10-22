@@ -75,6 +75,7 @@ export class AgentsService {
           ...summaryInclude,
           credentials: { where: { revokedAt: null }, orderBy: { createdAt: 'desc' }, take: 1 },
           heartbeats: { orderBy: { receivedAt: 'desc' }, take: 20 },
+          publicKeys: { where: { kind: 'x25519' } },
         },
       });
       if (!a) throw notFound();
@@ -84,6 +85,8 @@ export class AgentsService {
         ...this.summary(a, duplicates),
         capabilities: a.capabilities,
         policyVersion: a.policyVersion,
+        // Pack credentials are sealed to this key in the browser (D24).
+        x25519PublicKey: a.publicKeys[0]?.publicKey ?? null,
         certificate: cert ? { notAfter: cert.notAfter, fingerprintSha256: cert.fingerprintSha256 } : null,
         recentHeartbeats: a.heartbeats.map((h) => ({
           receivedAt: h.receivedAt,
