@@ -45,6 +45,46 @@ importers:
         specifier: 2.8.4
         version: 2.8.4
 
+  agents/private-connector-worker:
+    dependencies:
+      '@pcp/agent-protocol':
+        specifier: workspace:*
+        version: link:../../packages/agent-protocol
+      '@pcp/connector-sdk':
+        specifier: workspace:*
+        version: link:../../packages/connector-sdk
+      '@pcp/connectors-custom-http':
+        specifier: workspace:*
+        version: link:../../packages/connectors/custom-http
+      '@pcp/connectors-databases':
+        specifier: workspace:*
+        version: link:../../packages/connectors/databases
+      '@peculiar/x509':
+        specifier: 2.1.0
+        version: 2.1.0
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      undici:
+        specifier: 7.30.1
+        version: 7.30.1
+      yaml:
+        specifier: 2.8.4
+        version: 2.8.4
+    devDependencies:
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.12
+        version: 4.1.12(@types/node@22.20.5)(jsdom@26.1.0)(vite@7.3.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.8.4))
+
   apps/api:
     dependencies:
       '@fastify/cookie':

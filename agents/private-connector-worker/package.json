@@ -1,0 +1,32 @@
+{
+  "name": "@pcp/private-connector-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Private connector worker (M8.1): runs signed connector tasks inside the customer network with local secrets.",
+  "type": "module",
+  "bin": {
+    "pcp-private-worker": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@peculiar/x509": "2.1.0",
+    "@pcp/agent-protocol": "workspace:*",
+    "@pcp/connector-sdk": "workspace:*",
+    "@pcp/connectors-custom-http": "workspace:*",
+    "@pcp/connectors-databases": "workspace:*",
+    "reflect-metadata": "0.2.2",
+    "undici": "7.30.1",
+    "yaml": "2.8.4"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}
