@@ -371,6 +371,9 @@ importers:
       '@pcp/shared-contracts':
         specifier: workspace:*
         version: link:../shared-contracts
+      undici:
+        specifier: 7.30.1
+        version: 7.30.1
     devDependencies:
       '@types/node':
         specifier: 22.20.5

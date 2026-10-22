@@ -19,7 +19,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@pcp/shared-contracts": "workspace:*"
+    "@pcp/shared-contracts": "workspace:*",
+    "undici": "7.30.1"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
