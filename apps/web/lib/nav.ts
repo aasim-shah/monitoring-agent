@@ -37,7 +37,11 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
     { label: 'Integrations', milestone: 'M7' },
     { label: 'Agents', href: `/orgs/${orgId}/products/${productId}/agents`, permission: 'agent.view' },
     { label: 'Assets', milestone: 'M9' },
-    { label: 'Infrastructure', milestone: 'M6' },
+    {
+      label: 'Infrastructure',
+      href: `/orgs/${orgId}/products/${productId}/infrastructure`,
+      permission: 'telemetry.query',
+    },
     { label: 'Websites & APIs', milestone: 'M13' },
     { label: 'Mobile Apps & SDKs', milestone: 'M13' },
     { label: 'Databases', milestone: 'M8' },

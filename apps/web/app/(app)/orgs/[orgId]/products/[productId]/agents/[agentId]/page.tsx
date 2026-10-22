@@ -76,7 +76,13 @@ export default function AgentDetailPage() {
               </h1>
               <p className="text-sm text-muted-foreground">
                 {a.environmentName} · {a.os} · {a.arch} · agent {a.agentVersion} · last seen{' '}
-                {relativeTime(a.lastHeartbeatAt)}
+                {relativeTime(a.lastHeartbeatAt)} ·{' '}
+                <Link
+                  href={`/orgs/${orgId}/products/${productId}/infrastructure/${agentId}`}
+                  className="underline"
+                >
+                  metrics
+                </Link>
               </p>
             </div>
             {a.status !== 'revoked' ? (
