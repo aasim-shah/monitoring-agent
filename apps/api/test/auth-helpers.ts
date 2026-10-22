@@ -55,3 +55,35 @@ export async function enrollMfa(t: TestApp, cookie: string): Promise<string> {
 }
 
 export const headers = (cookie?: string) => (cookie ? { ...json, cookie } : json);
+
+export interface Owner {
+  email: string;
+  cookie: string;
+  orgId: string;
+}
+
+/** Signs up, creates an organization, and enrolls MFA (owners must). */
+export async function ownerWithOrg(t: TestApp, name = 'Example Company'): Promise<Owner> {
+  const email = await signUpAndVerify(t);
+  const cookie = await login(t, email);
+  const res = await t.app.inject({
+    method: 'POST',
+    url: '/api/v1/organizations',
+    headers: headers(cookie),
+    payload: { name, timezone: 'Europe/Berlin' },
+  });
+  if (res.statusCode !== 201) throw new Error(`create org failed ${res.statusCode} ${res.body}`);
+  await enrollMfa(t, cookie);
+  return { email, cookie, orgId: (res.json() as { id: string }).id };
+}
+
+export async function createProduct(t: TestApp, owner: Owner, name = 'FireMaps'): Promise<string> {
+  const res = await t.app.inject({
+    method: 'POST',
+    url: `/api/v1/organizations/${owner.orgId}/products`,
+    headers: headers(owner.cookie),
+    payload: { name, domains: ['firemaps.example.com'], repositories: ['example/firemaps-api'] },
+  });
+  if (res.statusCode !== 201) throw new Error(`create product failed ${res.statusCode} ${res.body}`);
+  return (res.json() as { id: string }).id;
+}

@@ -7,7 +7,7 @@ import {
   type ExceptionFilter,
 } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { ZodType } from 'zod';
+import type { z, ZodTypeAny } from 'zod';
 
 /** API error with a stable machine-readable code (`{ code, message, requestId }`). */
 export class ApiException extends HttpException {
@@ -60,7 +60,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
 }
 
 /** Validates a request body; 400 `validation_failed` names the failing fields, never their values. */
-export function parseBody<T>(schema: ZodType<T>, body: unknown): T {
+export function parseBody<S extends ZodTypeAny>(schema: S, body: unknown): z.output<S> {
   const result = schema.safeParse(body ?? {});
   if (!result.success) {
     const fields = [...new Set(result.error.issues.map((i) => i.path.join('.') || 'body'))].join(', ');
