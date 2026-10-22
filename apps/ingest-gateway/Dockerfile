@@ -4,6 +4,8 @@ WORKDIR /src
 COPY go.work ./
 COPY packages/go-platform packages/go-platform
 COPY packages/agent-protocol/go packages/agent-protocol/go
+# Every go.work module must exist for the workspace to load.
+COPY agents/host-agent-go agents/host-agent-go
 COPY apps/opamp-server apps/opamp-server
 COPY apps/ingest-gateway apps/ingest-gateway
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/service ./apps/ingest-gateway

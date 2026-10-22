@@ -10,3 +10,5 @@ coverage/
 .DS_Store
 .superpowers/
 *.tsbuildinfo
+tests/agent-e2e/.tmp-*
+.pki/

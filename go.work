@@ -1,6 +1,7 @@
 go 1.23
 
 use (
+	./agents/host-agent-go
 	./apps/ingest-gateway
 	./apps/opamp-server
 	./packages/agent-protocol/go
