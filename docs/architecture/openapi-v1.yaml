@@ -2637,6 +2637,50 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M13a
+  /api/v1/website-monitors/{id}/metrics:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getWebsiteMonitorMetrics
+      tags: [websites]
+      summary: Response time and uptime charts
+      description: Fixed queries over the monitor's probe samples. Requires `telemetry.query`.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: range, in: query, schema: { type: string, enum: ['15m', '1h', '6h', '24h', '7d'] } }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [range, charts]
+                properties:
+                  range: { type: string }
+                  charts:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, title, unit, series]
+                      properties:
+                        key: { type: string }
+                        title: { type: string }
+                        unit: { type: string, enum: [ms, percent] }
+                        series:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              label: { type: string }
+                              points:
+                                {
+                                  type: array,
+                                  items: { type: array, items: { type: number, nullable: true } },
+                                }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M13a
   /api/v1/website-monitors/{id}/verify:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:

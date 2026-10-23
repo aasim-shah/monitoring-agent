@@ -1,4 +1,4 @@
-export type Unit = 'percent' | 'bytesPerSecond' | 'bytes' | 'count' | 'perSecond';
+export type Unit = 'percent' | 'bytesPerSecond' | 'bytes' | 'count' | 'perSecond' | 'ms';
 
 function scaled(value: number, units: string[]): string {
   let v = value;
@@ -26,6 +26,8 @@ export function formatValue(value: number, unit: Unit): string {
       return plain(value);
     case 'perSecond':
       return `${plain(value)}/s`;
+    case 'ms':
+      return value >= 1000 ? `${Number((value / 1000).toFixed(2))} s` : `${Math.round(value)} ms`;
   }
 }
 

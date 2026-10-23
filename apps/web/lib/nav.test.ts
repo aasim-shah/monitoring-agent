@@ -57,11 +57,16 @@ describe('product navigation (spec §21)', () => {
       'Agents',
       'Assets',
       'Infrastructure',
+      'Websites & APIs',
       'Databases',
       'Incidents & Alerts',
       'AI Assistant',
       'Audit Log',
     ]);
+    expect(items.find((i) => i.label === 'Websites & APIs')).toEqual({
+      label: 'Websites & APIs',
+      href: '/orgs/o/products/p/websites',
+    });
     expect(items.find((i) => i.label === 'AI Assistant')).toEqual({
       label: 'AI Assistant',
       href: '/orgs/o/products/p/ai',

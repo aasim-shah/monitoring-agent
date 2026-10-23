@@ -43,7 +43,11 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
       href: `/orgs/${orgId}/products/${productId}/infrastructure`,
       permission: 'telemetry.query',
     },
-    { label: 'Websites & APIs', milestone: 'M13' },
+    {
+      label: 'Websites & APIs',
+      href: `/orgs/${orgId}/products/${productId}/websites`,
+      permission: 'telemetry.query',
+    },
     { label: 'Mobile Apps & SDKs', milestone: 'M13' },
     {
       label: 'Databases',

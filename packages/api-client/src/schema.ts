@@ -2409,6 +2409,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/website-monitors/{id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Response time and uptime charts
+         * @description Fixed queries over the monitor's probe samples. Requires `telemetry.query`.
+         */
+        get: operations["getWebsiteMonitorMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/website-monitors/{id}/verify": {
         parameters: {
             query?: never;
@@ -7042,6 +7065,46 @@ export interface operations {
         requestBody?: never;
         responses: {
             204: components["responses"]["NoContent"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getWebsiteMonitorMetrics: {
+        parameters: {
+            query?: {
+                range?: "15m" | "1h" | "6h" | "24h" | "7d";
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        range: string;
+                        charts: {
+                            key: string;
+                            title: string;
+                            /** @enum {string} */
+                            unit: "ms" | "percent";
+                            series: {
+                                label?: string;
+                                points?: (number | null)[][];
+                            }[];
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

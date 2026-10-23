@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { formatValue } from './format';
 
 describe('formatValue', () => {
+  it('formats milliseconds', () => {
+    expect(formatValue(249.6, 'ms')).toBe('250 ms');
+    expect(formatValue(1840, 'ms')).toBe('1.84 s');
+  });
+
   it('formats every chart unit', () => {
     expect(formatValue(12.345, 'percent')).toBe('12.3%');
     expect(formatValue(2048, 'bytesPerSecond')).toBe('2.0 KB/s');
