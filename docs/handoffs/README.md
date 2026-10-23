@@ -23,6 +23,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M9 Discovery, graph, topology | Done | Branch `feat/m9-discovery-graph`; deployed; [execution log](M9-execution-log.md) |
 | M11 Logs (live tail, log-derived metrics) | Done | Branch `feat/m11-logs`; deployed; [execution log](M11-execution-log.md) |
 | M12 Alerts, incidents, notifications | Done | Branch `feat/m12-alerts`; deployed; [execution log](M12-execution-log.md) |
+| M14 AI assistant | Done | Branch `feat/m14-ai`; deployed; [execution log](M14-execution-log.md) |
 | M7, M10–M19 | Not started | M10 partly delivered in M6b |
 
 ## Maintenance
@@ -104,10 +105,10 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M13.5 | Website monitoring | Not started | — |
 | M13.6 | KPI definitions and freshness | Not started | — |
 | M13.7 | Analytics, ads, website, mobile screens | Not started | — |
-| M14.1 | LLM provider layer | Not started | — |
-| M14.2 | Tool registry | Not started | — |
-| M14.3 | Orchestration loop and validation | Not started | — |
-| M14.4 | Chat UI | Not started | — |
+| M14.1 | LLM provider layer | Done | [M14-schema](M14-schema.md), [M14-providers](M14-providers.md) |
+| M14.2 | Tool registry | Done | [M14-ai-api](M14-ai-api.md) |
+| M14.3 | Orchestration loop and validation | Done | [M14-investigation-loop](M14-investigation-loop.md) |
+| M14.4 | Chat UI | Done | [M14-ai-ui](M14-ai-ui.md) |
 | M15.1 | Templates and schedules | Not started | — |
 | M15.2 | Report generator | Not started | — |
 | M15.3 | Delivery | Not started | — |

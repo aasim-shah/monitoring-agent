@@ -161,10 +161,10 @@ AI Assistant (conversation list per product, chat with streaming answer, evidenc
 
 ## 11. Task checklist
 
-- [ ] M14.1 LLM provider layer
-- [ ] M14.2 Tool registry
-- [ ] M14.3 Orchestration loop and validation
-- [ ] M14.4 Chat UI
+- [x] M14.1 LLM provider layer ([M14-schema](../handoffs/M14-schema.md), [M14-providers](../handoffs/M14-providers.md))
+- [x] M14.2 Tool registry ([M14-ai-api](../handoffs/M14-ai-api.md))
+- [x] M14.3 Orchestration loop and validation ([M14-investigation-loop](../handoffs/M14-investigation-loop.md))
+- [x] M14.4 Chat UI ([M14-ai-ui](../handoffs/M14-ai-ui.md))
 - [ ] M15.1 Scheduled investigations (shared scheduler)
 
 ## 12. Acceptance criteria
