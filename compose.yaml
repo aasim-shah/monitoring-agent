@@ -99,6 +99,15 @@ services:
       VM_QUERY_URL: http://victoriametrics:8428
       ALERT_RULES_DIR: /var/lib/pcp/alert-rules
       VMALERT_URL: http://vmalert:8880
+      # AI assistant (M14): platform providers; unset means AI endpoints answer 409.
+      AI_PROVIDER: ${AI_PROVIDER:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_FALLBACK_PROVIDER: ${AI_FALLBACK_PROVIDER:-}
+      AI_FALLBACK_MODEL: ${AI_FALLBACK_MODEL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      PCP_AI_FAKE: ${PCP_AI_FAKE:-}
       AGENT_CA_CERT: ${AGENT_CA_CERT:-}
       AGENT_CA_KEY: ${AGENT_CA_KEY:-}
       AGENT_CA_CHAIN: ${AGENT_CA_CHAIN:-}

@@ -32,3 +32,9 @@ test('the worker can send notifications', () => {
 test('vmalert is capped on a shared VPS', () => {
   assert.ok(vps.services.vmalert?.deploy?.resources?.limits?.memory);
 });
+
+test('the api receives the AI provider settings from the environment (M14)', () => {
+  const env = base.services.api.environment;
+  for (const k of ['AI_PROVIDER', 'AI_MODEL', 'AI_FALLBACK_PROVIDER', 'AI_FALLBACK_MODEL', 'GEMINI_API_KEY', 'GROQ_API_KEY'])
+    assert.ok(k in env, k);
+});
