@@ -2994,11 +2994,15 @@ export interface components {
                     name: string;
                     label: string;
                     secret: boolean;
+                    /** @description Default true; false for alternative forms */
+                    required?: boolean;
                 }[];
                 configSchema: {
                     [key: string]: unknown;
                 };
             }[];
+            /** @description The platform's public IP, for provider allowlists (e.g. MongoDB Atlas network access) */
+            egressIp?: string | null;
         };
         CreateConnectionRequest: {
             provider: string;

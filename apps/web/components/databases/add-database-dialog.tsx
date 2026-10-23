@@ -14,6 +14,7 @@ import {
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { errorMessage } from '@/lib/api';
+import { ownCaHost, readConnectionString, type ConnectionTarget } from '@/lib/connection-string';
 
 type Engine = 'postgres' | 'mysql' | 'mongodb';
 
@@ -43,12 +44,23 @@ GRANT SELECT, PROCESS, REPLICATION CLIENT ON *.* TO 'pcp_monitor'@'%';`,
   },
 };
 
-export interface NewDatabase {
-  provider: Engine;
-  displayName: string;
-  executionLocation: 'private';
-  config: Record<string, unknown>;
-}
+export type NewDatabase =
+  | {
+      mode: 'private';
+      provider: Engine;
+      displayName: string;
+      executionLocation: 'private';
+      config: Record<string, unknown>;
+    }
+  | {
+      mode: 'managed';
+      provider: Engine;
+      displayName: string;
+      executionLocation: 'cloud';
+      config: Record<string, unknown>;
+      /** Sent only to the credentials endpoint (encrypted at rest), never in config. */
+      connectionString: string;
+    };
 
 const slug = (s: string) =>
   s
@@ -66,12 +78,18 @@ const selectClass = 'h-9 w-full rounded-md border border-border bg-background px
  */
 export function AddDatabaseDialog({
   workers,
+  egressIp,
   onSubmit,
 }: {
   workers: Array<{ id: string; hostname: string; status: string }>;
+  /** The platform's public IP, for provider allowlists (Atlas network access). */
+  egressIp?: string | null;
   onSubmit: (input: NewDatabase) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'managed' | 'private'>(workers.length ? 'private' : 'managed');
+  const [uri, setUri] = useState('');
+  const [verify, setVerify] = useState<boolean | null>(null);
   const [engine, setEngine] = useState<Engine>('postgres');
   const [name, setName] = useState('');
   const [workerId, setWorkerId] = useState('');
@@ -85,9 +103,18 @@ export function AddDatabaseDialog({
   const [pending, setPending] = useState(false);
 
   const ref = secretRef ?? `${engine}-${slug(name) || 'db'}`;
-  const spec = ENGINES[engine];
+  let target: ConnectionTarget | null = null;
+  try {
+    target = uri.trim() ? readConnectionString(uri) : null;
+  } catch {
+    target = null;
+  }
+  const spec = ENGINES[mode === 'managed' && target ? target.engine : engine];
+  const verifyCert = verify ?? !(target && ownCaHost(target.host));
 
   const reset = () => {
+    setUri('');
+    setVerify(null);
     setName('');
     setHost('');
     setDatabase('');
@@ -97,7 +124,44 @@ export function AddDatabaseDialog({
     setError(null);
   };
 
+  const submitManaged = async () => {
+    if (!name.trim()) return setError('Name is required');
+    let t: ConnectionTarget;
+    try {
+      t = readConnectionString(uri);
+    } catch (e) {
+      return setError((e as Error).message);
+    }
+    if (t.engine === 'mongodb' && !t.database)
+      return setError('Add the database name to the connection string (…/dbname)');
+    setError(null);
+    setPending(true);
+    try {
+      await onSubmit({
+        mode: 'managed',
+        provider: t.engine,
+        displayName: name.trim(),
+        executionLocation: 'cloud',
+        config: {
+          host: t.host,
+          port: t.port,
+          ...(t.database ? { database: t.database } : {}),
+          tls: true,
+          tlsVerify: verifyCert,
+        },
+        connectionString: uri.trim(),
+      });
+      setOpen(false);
+      reset();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setPending(false);
+    }
+  };
+
   const submit = async () => {
+    if (mode === 'managed') return submitManaged();
     const p = Number(port);
     if (!name.trim() || !host.trim()) return setError('Name and host are required');
     if (!Number.isInteger(p) || p < 1 || p > 65535) return setError('Port must be 1-65535');
@@ -108,6 +172,7 @@ export function AddDatabaseDialog({
     setPending(true);
     try {
       await onSubmit({
+        mode: 'private',
         provider: engine,
         displayName: name.trim(),
         executionLocation: 'private',
@@ -144,10 +209,93 @@ export function AddDatabaseDialog({
       <DialogContent aria-describedby="add-db-description" className="max-h-[90vh] overflow-y-auto">
         <DialogTitle>Add database</DialogTitle>
         <DialogDescription id="add-db-description">
-          The private worker connects from inside your network with a read-only user. Its password stays on
-          that server.
+          Use a read-only database user. Managed databases are checked from the platform over TLS; private
+          ones through a worker inside your network.
         </DialogDescription>
-        {workers.length === 0 ? (
+        <div role="radiogroup" aria-label="Where the database runs" className="flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="db-mode"
+              checked={mode === 'managed'}
+              onChange={() => setMode('managed')}
+            />
+            Managed (Atlas, Supabase, RDS…)
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="db-mode"
+              checked={mode === 'private'}
+              onChange={() => setMode('private')}
+            />
+            Private network (worker)
+          </label>
+        </div>
+        {mode === 'managed' ? (
+          <div className="space-y-4">
+            {error ? <Alert>{error}</Alert> : null}
+            <Field id="db-name" label="Name">
+              <Input
+                id="db-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Supabase prod"
+              />
+            </Field>
+            <Field
+              id="db-uri"
+              label="Connection string"
+              hint={
+                target
+                  ? `${ENGINES[target.engine].label} · ${target.host}${target.srv ? '' : `:${target.port}`}${target.database ? ` · ${target.database}` : ''}`
+                  : 'postgres://…, mysql://…, mongodb+srv://… (stored encrypted; never shown again)'
+              }
+            >
+              <Input
+                id="db-uri"
+                type="password"
+                autoComplete="off"
+                value={uri}
+                onChange={(e) => setUri(e.target.value)}
+                placeholder="mongodb+srv://monitor:…@cluster0.xxxx.mongodb.net/mydb"
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={verifyCert}
+                onChange={(e) => setVerify(e.target.checked)}
+                aria-label="Verify server certificate"
+              />
+              Verify server certificate
+            </label>
+            {target && ownCaHost(target.host) ? (
+              <p className="text-xs text-muted-foreground">
+                Supabase signs with its own certificate authority: the connection is encrypted but the
+                certificate is not checked against public roots.
+              </p>
+            ) : null}
+            {target?.engine === 'mongodb' && egressIp ? (
+              <Alert tone="info">
+                In Atlas → Network Access, allow {egressIp} (the platform&apos;s address).
+              </Alert>
+            ) : egressIp ? (
+              <p className="text-xs text-muted-foreground">
+                If your provider restricts network access, allow {egressIp}.
+              </p>
+            ) : null}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Create a read-only user</p>
+              <pre className="overflow-x-auto rounded-md border border-border bg-muted p-3 font-mono text-xs">
+                {spec.setup(target?.database ?? '')}
+              </pre>
+            </div>
+            <Button className="w-full" disabled={pending} onClick={submit}>
+              {pending ? 'Saving…' : 'Save and validate'}
+            </Button>
+          </div>
+        ) : workers.length === 0 ? (
           <Alert tone="info">Add a private worker first (above); it runs next to your databases.</Alert>
         ) : (
           <div className="space-y-4">
