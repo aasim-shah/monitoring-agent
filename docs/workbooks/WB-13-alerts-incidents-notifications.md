@@ -167,10 +167,10 @@ Incidents & Alerts → Incident list (severity, status, product, age), Incident 
 
 ## 11. Task checklist
 
-- [ ] M12.1 Alert rules and compiler
-- [ ] M12.2 Alert receiver and incident engine
-- [ ] M12.3 Notifications
-- [ ] M12.4 Incident UI
+- [x] M12.1 Alert rules and compiler ([M12-schema](../handoffs/M12-schema.md), [M12-rule-compiler](../handoffs/M12-rule-compiler.md))
+- [x] M12.2 Alert receiver and incident engine ([M12-incident-engine](../handoffs/M12-incident-engine.md), [M12-alerting-api](../handoffs/M12-alerting-api.md))
+- [x] M12.3 Notifications ([M12-notifications-worker](../handoffs/M12-notifications-worker.md), [webhook signature](../integrations/webhook-signature.md))
+- [x] M12.4 Incident UI ([M12-incidents-ui](../handoffs/M12-incidents-ui.md))
 
 ## 12. Acceptance criteria
 

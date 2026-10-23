@@ -22,6 +22,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M8b Managed databases (Atlas, Supabase) | Done | Deployed; [M8b-managed-databases](M8b-managed-databases.md) |
 | M9 Discovery, graph, topology | Done | Branch `feat/m9-discovery-graph`; deployed; [execution log](M9-execution-log.md) |
 | M11 Logs (live tail, log-derived metrics) | Done | Branch `feat/m11-logs`; deployed; [execution log](M11-execution-log.md) |
+| M12 Alerts, incidents, notifications | Done | Branch `feat/m12-alerts`; deployed; [execution log](M12-execution-log.md) |
 | M7, M10–M19 | Not started | M10 partly delivered in M6b |
 
 ## Maintenance
@@ -92,10 +93,10 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M10.8 | Service dashboards | Not started | — |
 | M11.1 | Live tail | Done | [M11-agent-tail](M11-agent-tail.md), [M11-live-tail-api](M11-live-tail-api.md), [M11-logs-ui](M11-logs-ui.md) |
 | M11.2 | Log-derived metrics | Done | [M11-log-metrics](M11-log-metrics.md) |
-| M12.1 | Alert rules and compiler | Not started | — |
-| M12.2 | Alert receiver and incident engine | Not started | — |
-| M12.3 | Notifications | Not started | — |
-| M12.4 | Incident UI | Not started | — |
+| M12.1 | Alert rules and compiler | Done | [M12-schema](M12-schema.md), [M12-rule-compiler](M12-rule-compiler.md), [M12-compose](M12-compose.md) |
+| M12.2 | Alert receiver and incident engine | Done | [M12-incident-engine](M12-incident-engine.md), [M12-alerting-api](M12-alerting-api.md) |
+| M12.3 | Notifications | Done | [M12-notifications-worker](M12-notifications-worker.md) |
+| M12.4 | Incident UI | Done | [M12-incidents-ui](M12-incidents-ui.md) |
 | M13.1 | Google OAuth framework | Not started | — |
 | M13.2 | GA4 connector | Not started | — |
 | M13.3 | Firebase, Play, Search Console, BigQuery exports | Not started | — |
