@@ -23,6 +23,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M9 Discovery, graph, topology | Done | Branch `feat/m9-discovery-graph`; deployed; [execution log](M9-execution-log.md) |
 | M11 Logs (live tail, log-derived metrics) | Done | Branch `feat/m11-logs`; deployed; [execution log](M11-execution-log.md) |
 | M12 Alerts, incidents, notifications | Done | Branch `feat/m12-alerts`; deployed; [execution log](M12-execution-log.md) |
+| M13a Website monitoring | Done | Branch `feat/m13a-websites`; deployed; [execution log](M13a-execution-log.md). M13b (Google sources, KPIs) not started |
 | M14 AI assistant | Done | Branch `feat/m14-ai`; deployed; [execution log](M14-execution-log.md) |
 | M7, M10–M19 | Not started | M10 partly delivered in M6b |
 
@@ -102,7 +103,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M13.2 | GA4 connector | Not started | — |
 | M13.3 | Firebase, Play, Search Console, BigQuery exports | Not started | — |
 | M13.4 | Google Ads connector (gated on developer token) | Not started | — |
-| M13.5 | Website monitoring | Not started | — |
+| M13.5 | Website monitoring | Done | [M13a-schema](M13a-schema.md), [M13a-probe](M13a-probe.md), [M13a-worker-alerts](M13a-worker-alerts.md), [M13a-api](M13a-api.md), [M13a-web](M13a-web.md) |
 | M13.6 | KPI definitions and freshness | Not started | — |
 | M13.7 | Analytics, ads, website, mobile screens | Not started | — |
 | M14.1 | LLM provider layer | Done | [M14-schema](M14-schema.md), [M14-providers](M14-providers.md) |
