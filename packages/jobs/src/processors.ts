@@ -42,7 +42,7 @@ export function startProcessors(deps: ProcessorDeps): Processors {
   const process = (kind: JobKind) => async (job: Job<ConnectionJobPayload>) => {
     const { organizationId, connectionId } = job.data;
     const ctx = systemContext(organizationId, job);
-    if (kind === 'alert-tick' || kind === 'notification-deliver' || kind === 'website-probe') {
+    if (kind !== 'connection-validate' && kind !== 'connection-discover' && kind !== 'connection-health') {
       const handler = deps.handlers?.[kind];
       return handler ? handler(ctx, connectionId, job) : { skipped: 'no handler' };
     }
