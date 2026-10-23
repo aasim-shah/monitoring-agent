@@ -12,6 +12,9 @@ import { withTenant } from '@pcp/tenant-security';
 import { decryptCredentials } from './secrets.js';
 
 const OPERATION_TIMEOUT_MS = 30_000;
+/** Managed (cloud) connections with a health check are checked every 5 minutes. */
+export const HEALTH_EVERY_SECONDS = 300;
+const MAX_DETAIL_BYTES = 256 * 1024;
 
 /** The connection does not exist for this caller (other tenant or out of product scope). */
 export class NotFoundError extends Error {
@@ -162,7 +165,84 @@ export class ConnectorRuntime {
           detail: outcome.message ?? null,
         },
       });
+      // A connected cloud connection with a health check gets a schedule (the worker's reconciler picks it up).
+      if (outcome.status === 'connected' && c.executionLocation === 'cloud' && connector.health)
+        await tx.jobDefinition.upsert({
+          where: {
+            organizationId_kind_entityId: {
+              organizationId: c.organizationId,
+              kind: 'connection-health',
+              entityId: c.id,
+            },
+          },
+          create: {
+            organizationId: c.organizationId,
+            kind: 'connection-health',
+            entityId: c.id,
+            everySeconds: HEALTH_EVERY_SECONDS,
+          },
+          update: { enabled: true, everySeconds: HEALTH_EVERY_SECONDS },
+        });
     });
     return outcome;
+  }
+
+  /**
+   * Runs the connector's health check and records it (WB-07 UC-07-04): `data` is stored as
+   * JSON; a failure degrades a connected connection and a later success recovers it, except
+   * when a person must act first (permission_denied, reauthorization_required).
+   */
+  async health(
+    ctx: TenantContext,
+    connectionId: string,
+  ): Promise<{ ok: boolean; reason?: string; data?: Record<string, unknown> }> {
+    const c = await this.load(ctx, connectionId);
+    if (c.status === 'disconnected' || c.status === 'revoked') return { ok: false, reason: c.status };
+    const connector = this.registry.get(c.provider);
+    if (!connector.health) throw new ConnectorError('invalid_config', `${c.provider} has no health check`);
+    let result: { ok: boolean; reason?: string; message?: string; data?: Record<string, unknown> };
+    try {
+      const h = await this.execute(ctx, c, (e) => connector.health!(e));
+      result = {
+        ok: h.ok,
+        data: h.data,
+        ...(h.ok ? {} : { reason: 'provider_unavailable', message: h.detail }),
+      };
+    } catch (err) {
+      const e = err as ConnectorError;
+      result = { ok: false, reason: e.reason, message: e.message };
+    }
+    const detail = JSON.stringify(
+      result.ok ? (result.data ?? {}) : { error: result.message ?? result.reason },
+    );
+    await withTenant(this.prisma, ctx, async (tx) => {
+      await tx.connectionHealth.create({
+        data: {
+          organizationId: c.organizationId,
+          connectionId: c.id,
+          checkedAt: this.now(),
+          ok: result.ok,
+          reason: result.ok ? null : (result.reason ?? null),
+          detail: Buffer.byteLength(detail) > MAX_DETAIL_BYTES ? JSON.stringify({ truncated: true }) : detail,
+        },
+      });
+      const sticky = ['permission_denied', 'reauthorization_required'];
+      const next =
+        !result.ok && c.status === 'connected'
+          ? { status: transition(c.status, 'degraded'), statusReason: result.reason ?? null }
+          : result.ok && c.status === 'degraded' && !sticky.includes(c.statusReason ?? '')
+            ? { status: transition(c.status, 'recovered'), statusReason: null }
+            : null;
+      if (next)
+        await tx.connection.updateMany({
+          where: { id: c.id, status: { notIn: ['disconnected', 'revoked'] } },
+          data: next,
+        });
+    });
+    return {
+      ok: result.ok,
+      ...(result.reason ? { reason: result.reason } : {}),
+      ...(result.data ? { data: result.data } : {}),
+    };
   }
 }

@@ -3000,7 +3000,11 @@ components:
                     name: { type: string }
                     label: { type: string }
                     secret: { type: boolean }
+                    required: { type: boolean, description: Default true; false for alternative forms }
               configSchema: { type: object, additionalProperties: true }
+        egressIp:
+          type: [string, 'null']
+          description: The platform's public IP, for provider allowlists (e.g. MongoDB Atlas network access)
     CreateConnectionRequest:
       type: object
       required: [provider, displayName, executionLocation]

@@ -5,6 +5,7 @@ import {
   type ExecutionContext,
   type ReadOnlyTemplate,
 } from '@pcp/connector-sdk';
+import { isIP } from 'node:net';
 import mysql from 'mysql2/promise';
 import {
   CONNECT_TIMEOUT_MS,
@@ -15,6 +16,7 @@ import {
   dbCredentials,
   fillIdentifiers,
   parseDbConfig,
+  targetAddress,
 } from './common.js';
 import { DB_CONFIG_SCHEMA } from './postgres.js';
 
@@ -47,16 +49,21 @@ const SYSTEM_SCHEMAS = /\bON\s+`?(information_schema|performance_schema|sys)`?\.
 
 async function withConnection<T>(ctx: ExecutionContext, fn: (c: mysql.Connection) => Promise<T>): Promise<T> {
   const cfg = parseDbConfig(ctx.config, 3306);
-  const { username, password } = await dbCredentials(ctx);
+  const { username, password, connection } = await dbCredentials(ctx);
+  const host = connection?.host ?? cfg.host;
+  const port = connection?.port ?? cfg.port;
   let conn: mysql.Connection;
   try {
+    const address = await targetAddress(ctx, cfg, host, port);
     conn = await mysql.createConnection({
-      host: cfg.host,
-      port: cfg.port,
+      host: address,
+      port,
       user: username,
       password,
-      database: cfg.database,
-      ssl: cfg.tls ? { rejectUnauthorized: cfg.tlsVerify } : undefined,
+      database: connection?.database ?? cfg.database,
+      ssl: cfg.tls
+        ? { rejectUnauthorized: cfg.tlsVerify, ...(isIP(host) ? {} : { servername: host }) }
+        : undefined,
       connectTimeout: CONNECT_TIMEOUT_MS,
       dateStrings: false,
     });
@@ -79,10 +86,12 @@ export function createMysqlConnector(templates: ReadOnlyTemplate[] = MYSQL_TEMPL
     type: 'mysql',
     version: '1.0.0',
     displayName: 'MySQL',
-    executionLocations: ['private'],
+    executionLocations: ['private', 'cloud'],
+    // A pasted connection string (managed databases) or username/password.
     credentialFields: [
-      { name: 'username', label: 'Username', secret: false },
-      { name: 'password', label: 'Password', secret: true },
+      { name: 'connectionString', label: 'Connection string', secret: true, required: false },
+      { name: 'username', label: 'Username', secret: false, required: false },
+      { name: 'password', label: 'Password', secret: true, required: false },
     ],
     templates,
     capabilities: () => ['config_validation', 'validate', 'health'],

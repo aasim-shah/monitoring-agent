@@ -21,6 +21,8 @@ const schema = z
     REDIS_URL: z.string().min(1),
     SMTP_URL: z.string().min(1).optional(),
     MAIL_FROM: z.string().min(3).default('Product Control Plane <no-reply@localhost>'),
+    /** The platform's public egress IP, shown to customers who allowlist it (e.g. MongoDB Atlas). */
+    PLATFORM_EGRESS_IP: z.string().ip().optional(),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     GOOGLE_REDIRECT_URI: z.string().url().optional(),
@@ -77,6 +79,8 @@ export interface AppConfig {
   databaseUrl: string;
   redisUrl: string;
   smtpUrl?: string;
+  /** Shown to customers who allowlist the platform (managed databases). */
+  platformEgressIp?: string;
   mailFrom: string;
   google?: GoogleConfig;
   agents?: AgentConfig;
@@ -103,6 +107,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     databaseUrl: c.DATABASE_URL,
     redisUrl: c.REDIS_URL,
     smtpUrl: c.SMTP_URL,
+    platformEgressIp: c.PLATFORM_EGRESS_IP,
     mailFrom: c.MAIL_FROM,
     google: c.GOOGLE_CLIENT_ID
       ? {

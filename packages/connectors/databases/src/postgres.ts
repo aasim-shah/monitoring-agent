@@ -5,6 +5,7 @@ import {
   type ExecutionContext,
   type ReadOnlyTemplate,
 } from '@pcp/connector-sdk';
+import { isIP } from 'node:net';
 import pg from 'pg';
 import {
   CONNECT_TIMEOUT_MS,
@@ -16,6 +17,7 @@ import {
   fillIdentifiers,
   jsonSafe,
   parseDbConfig,
+  targetAddress,
 } from './common.js';
 
 export const POSTGRES_TEMPLATES: ReadOnlyTemplate[] = [
@@ -42,18 +44,22 @@ const ENGINE = 'postgresql';
 /** Opens a read-only session with a 5 s statement timeout (BR-07-03, BR-07-04). */
 async function connect(ctx: ExecutionContext): Promise<pg.Client> {
   const cfg = parseDbConfig(ctx.config, 5432);
-  const { username, password } = await dbCredentials(ctx);
+  const { username, password, connection } = await dbCredentials(ctx);
+  const host = connection?.host ?? cfg.host;
+  const port = connection?.port ?? cfg.port;
+  const address = await targetAddress(ctx, cfg, host, port);
   const client = new pg.Client({
-    host: cfg.host,
-    port: cfg.port,
-    database: cfg.database ?? 'postgres',
+    host: address,
+    port,
+    database: connection?.database ?? cfg.database ?? 'postgres',
     user: username,
     password,
-    ssl: cfg.tls ? { rejectUnauthorized: cfg.tlsVerify } : false,
+    // TLS follows config, never sslmode in a pasted string; SNI and verification use the hostname.
+    ssl: cfg.tls ? { rejectUnauthorized: cfg.tlsVerify, ...(isIP(host) ? {} : { servername: host }) } : false,
     connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
     statement_timeout: STATEMENT_TIMEOUT_MS,
     query_timeout: STATEMENT_TIMEOUT_MS + 1000,
-    application_name: 'pcp-private-worker',
+    application_name: 'pcp-monitor',
   });
   client.on('error', () => {});
   try {
@@ -94,10 +100,12 @@ export function createPostgresConnector(templates: ReadOnlyTemplate[] = POSTGRES
     type: 'postgres',
     version: '1.0.0',
     displayName: 'PostgreSQL',
-    executionLocations: ['private'],
+    executionLocations: ['private', 'cloud'],
+    // A pasted connection string (managed databases) or username/password.
     credentialFields: [
-      { name: 'username', label: 'Username', secret: false },
-      { name: 'password', label: 'Password', secret: true },
+      { name: 'connectionString', label: 'Connection string', secret: true, required: false },
+      { name: 'username', label: 'Username', secret: false, required: false },
+      { name: 'password', label: 'Password', secret: true, required: false },
     ],
     templates,
     capabilities: () => ['config_validation', 'validate', 'health'],

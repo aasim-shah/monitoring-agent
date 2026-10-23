@@ -63,18 +63,35 @@ export default function DatabasesPage() {
       refetchInterval: (q) => (q.state.data?.some((r) => r.status === 'pending_validation') ? 3000 : 30_000),
     },
   );
+  const catalog = useApiQuery(['connector-catalog'], async () =>
+    unwrap(await api.GET('/api/v1/connectors/catalog')),
+  );
   const workers: WorkerSummary[] = (agents.data?.agents ?? [])
     .filter((a) => a.agentType === 'private_worker')
     .map((a) => ({ id: a.id, hostname: a.hostname, status: a.status, stale: a.stale }));
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['db-connections', orgId, productId] });
 
   const addDatabase = async (input: NewDatabase) => {
+    const { mode: _mode, ...body } = input;
     const created = unwrap(
       await api.POST('/api/v1/organizations/{orgId}/connections', {
         params: { path: { orgId } },
-        body: input,
+        body: {
+          provider: body.provider,
+          displayName: body.displayName,
+          executionLocation: body.executionLocation,
+          config: body.config,
+        },
       }),
     );
+    if (input.mode === 'managed')
+      // The connection string goes to the credentials endpoint only (encrypted at rest); validation starts there.
+      unwrap(
+        await api.POST('/api/v1/connections/{id}/authorize', {
+          params: { path: { id: created.id } },
+          body: { credentials: { connectionString: input.connectionString } },
+        }),
+      );
     // Scope it to this product so product-scoped members see it here.
     unwrap(
       await api.POST('/api/v1/connections/{id}/resource-scopes', {
@@ -100,12 +117,16 @@ export default function DatabasesPage() {
         <div>
           <h1 className="text-xl font-semibold">Databases</h1>
           <p className="text-sm text-muted-foreground">
-            PostgreSQL, MySQL, and MongoDB health through a private worker, with a read-only user. No
-            free-form queries.
+            PostgreSQL, MySQL, and MongoDB health with a read-only user: managed databases (Atlas, Supabase,
+            RDS) directly over TLS, private ones through a worker. No free-form queries.
           </p>
         </div>
         {roleCan(role, 'connection.configure') ? (
-          <AddDatabaseDialog workers={workers.filter((w) => w.status !== 'revoked')} onSubmit={addDatabase} />
+          <AddDatabaseDialog
+            workers={workers.filter((w) => w.status !== 'revoked')}
+            egressIp={catalog.data?.egressIp ?? null}
+            onSubmit={addDatabase}
+          />
         ) : null}
       </div>
       <WorkerPanel

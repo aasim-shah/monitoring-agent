@@ -1,4 +1,10 @@
-import { ConnectorError, type ExecutionContext, type TemplateResult } from '@pcp/connector-sdk';
+import { isIP } from 'node:net';
+import {
+  ConnectorError,
+  assertPublicDestination,
+  type ExecutionContext,
+  type TemplateResult,
+} from '@pcp/connector-sdk';
 
 /** BR-07-04: at most 1,000 rows and 5 s per statement. */
 export const MAX_ROWS = 1000;
@@ -48,10 +54,94 @@ export function parseDbConfig(config: Record<string, unknown>, defaultPort: numb
   };
 }
 
-export async function dbCredentials(ctx: ExecutionContext): Promise<{ username: string; password: string }> {
+export interface DbCredentials {
+  username: string;
+  password: string;
+  /** Present when the admin pasted a full connection string (managed databases). */
+  connection?: ParsedConnection;
+}
+
+/** Credentials from the secret file (private) or the encrypted store (managed): a connection string or username/password. */
+export async function dbCredentials(ctx: ExecutionContext): Promise<DbCredentials> {
   const c = await ctx.credentials();
-  if (!c.username) throw invalid('the secret file has no username');
+  if (c.connectionString) {
+    const connection = parseConnectionString(c.connectionString);
+    return { username: connection.username, password: connection.password, connection };
+  }
+  if (!c.username) throw invalid('the credentials have no username');
   return { username: c.username, password: c.password ?? '' };
+}
+
+export interface ParsedConnection {
+  engine: 'postgres' | 'mysql' | 'mongodb';
+  host: string;
+  port: number;
+  database?: string;
+  username: string;
+  password: string;
+  /** mongodb+srv: hosts come from DNS SRV records. */
+  srv: boolean;
+  /** The original URI (MongoDB keeps its options, e.g. replicaSet, authSource). */
+  uri?: string;
+}
+
+const DEFAULT_PORT = { postgres: 5432, mysql: 3306, mongodb: 27017 } as const;
+
+/** postgres(ql)://, mysql://, mongodb(+srv)://. The password never goes into config. */
+export function parseConnectionString(uri: string): ParsedConnection {
+  const scheme = /^([a-z+]+):\/\//i.exec(uri.trim())?.[1]?.toLowerCase();
+  const engine =
+    scheme === 'postgres' || scheme === 'postgresql'
+      ? 'postgres'
+      : scheme === 'mysql'
+        ? 'mysql'
+        : scheme === 'mongodb' || scheme === 'mongodb+srv'
+          ? 'mongodb'
+          : undefined;
+  if (!engine)
+    throw invalid('the connection string must start with postgres://, mysql://, or mongodb(+srv)://');
+  const m = /^[a-z+]+:\/\/(?:([^:@/]*)(?::([^@]*))?@)?([^/?#]+)(?:\/([^?#]*))?/i.exec(uri.trim());
+  if (!m) throw invalid('the connection string is not a valid URI');
+  const decode = (v: string | undefined) => {
+    try {
+      return decodeURIComponent(v ?? '');
+    } catch {
+      return v ?? '';
+    }
+  };
+  const first = m[3]!.split(',')[0]!;
+  const bracketed = /^\[([^\]]+)\](?::(\d+))?$/.exec(first);
+  const [host, port] = bracketed
+    ? [bracketed[1]!, bracketed[2]]
+    : [first.replace(/:\d+$/, ''), /:(\d+)$/.exec(first)?.[1]];
+  return {
+    engine,
+    host,
+    port: port ? Number(port) : DEFAULT_PORT[engine],
+    ...(m[4] ? { database: decode(m[4]) } : {}),
+    username: decode(m[1]),
+    password: decode(m[2]),
+    srv: scheme === 'mongodb+srv',
+    ...(engine === 'mongodb' ? { uri: uri.trim() } : {}),
+  };
+}
+
+/**
+ * Managed databases are reached from the control plane over the internet: TLS is
+ * mandatory and the host must resolve to public addresses only (BR-07-06), so a
+ * connection cannot be aimed at the platform's own private services. Returns the
+ * vetted address to connect to (pinned: no second lookup).
+ */
+export async function targetAddress(
+  ctx: ExecutionContext,
+  cfg: DbConfig,
+  host: string,
+  port: number,
+): Promise<string> {
+  if (ctx.executionLocation !== 'cloud') return host;
+  if (!cfg.tls) throw invalid('managed databases are reached over the internet: TLS is required');
+  const url = new URL(`https://${isIP(host) === 6 ? `[${host}]` : host}:${port}/`);
+  return (await assertPublicDestination(url, { allowPrivate: false })).address;
 }
 
 /** Fills `{{name}}` with quoted identifiers from config; a missing identifier is a config error. */

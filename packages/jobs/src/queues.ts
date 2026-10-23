@@ -2,7 +2,7 @@ import { Queue, type JobsOptions } from 'bullmq';
 import { Redis } from 'ioredis';
 import { jobId } from './job-id.js';
 
-export const JOB_KINDS = ['connection-validate', 'connection-discover'] as const;
+export const JOB_KINDS = ['connection-validate', 'connection-discover', 'connection-health'] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 /** Only identifiers: workers rebuild tenant context from these server-set values. Never secrets. */

@@ -111,6 +111,9 @@ importers:
       '@pcp/connector-sdk':
         specifier: workspace:*
         version: link:../../packages/connector-sdk
+      '@pcp/connectors-databases':
+        specifier: workspace:*
+        version: link:../../packages/connectors/databases
       '@pcp/database':
         specifier: workspace:*
         version: link:../../packages/database

@@ -92,6 +92,8 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      # Shown to customers who allowlist the platform (managed databases).
+      PLATFORM_EGRESS_IP: ${PLATFORM_EGRESS_IP:-}
       AGENT_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN must be set (see .env.example)}
       VM_QUERY_URL: http://victoriametrics:8428
@@ -123,7 +125,8 @@ services:
       SCHEDULER_DATABASE_URL: postgres://pcp_scheduler:${PCP_SCHEDULER_PASSWORD:?PCP_SCHEDULER_PASSWORD must be set (see .env.example)}@postgres:5432/pcp
       REDIS_URL: *redis-url
       MASTER_KEY: ${MASTER_KEY:?MASTER_KEY must be set (see .env.example)}
-    networks: [internal]
+    # egress: managed databases and provider APIs are on the internet; internal has no route out.
+    networks: [internal, egress]
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -262,6 +265,8 @@ networks:
         - subnet: ${EDGE_SUBNET:-172.30.0.0/24}
   internal:
     internal: true
+  # Outbound internet for the worker only (connectors); nothing listens on it.
+  egress: {}
 
 volumes:
   caddy-data: {}

@@ -53,6 +53,8 @@ export interface CredentialField {
   name: string;
   label: string;
   secret: boolean;
+  /** Default true; optional fields allow alternative forms (e.g. a connection string or username/password). */
+  required?: boolean;
 }
 
 export interface SyncPage {
