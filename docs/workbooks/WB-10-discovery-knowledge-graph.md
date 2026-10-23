@@ -176,10 +176,10 @@ Assets → Inventory (filter by type, lifecycle, source, environment), Discovery
 
 ## 11. Task checklist
 
-- [ ] M9.1 Observation pipeline
-- [ ] M9.2 Correlation rules
-- [ ] M9.3 Graph API and traversal
-- [ ] M9.4 Topology, inventory, review UI
+- [x] M9.1 Observation pipeline ([M9-discovery-engine](../handoffs/M9-discovery-engine.md), [M9-data-model](../handoffs/M9-data-model.md))
+- [x] M9.2 Correlation rules — host-to-service, dns-to-host, db-on-host, name-similarity ([M9-sources-rules](../handoffs/M9-sources-rules.md)); provider rules with M7/M13
+- [x] M9.3 Graph API and traversal ([M9-graph-api](../handoffs/M9-graph-api.md))
+- [x] M9.4 Topology, inventory, review UI ([M9-assets-ui](../handoffs/M9-assets-ui.md))
 
 ## 12. Acceptance criteria
 
