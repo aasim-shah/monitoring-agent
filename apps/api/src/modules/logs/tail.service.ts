@@ -9,6 +9,7 @@ import { ApiException, notFound } from '../../common/errors.js';
 import { CLOCK, PRISMA, REDIS } from '../../tokens.js';
 import { TasksService } from '../agents/tasks.service.js';
 import { logSources, type LogSource } from './sources.js';
+import { SseWriter } from './sse-writer.js';
 import { StreamRelay } from './stream-relay.js';
 import { MAX_TAILS_PER_AGENT, MAX_TAILS_PER_TENANT, TailLimits } from './tail-limits.js';
 
@@ -19,8 +20,6 @@ const HEARTBEAT_MS = 15_000;
 type StreamMessage =
   | { type?: undefined; sequence: number; lines: string[]; final: boolean }
   | { type: 'result'; status: 'succeeded' | 'failed'; error?: string };
-
-const sse = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 
 /** Live log tail (spec §11.8, WB-12): signed task, stream session, SSE relay, nothing stored. */
 @Injectable()
@@ -90,17 +89,16 @@ export class TailService implements OnModuleInit, OnApplicationShutdown {
         `At most ${MAX_TAILS_PER_TENANT} live tails per organization`,
       );
 
-    const raw = reply.raw;
+    const out = new SseWriter(reply.raw);
     let finished = false;
     const timers: { heartbeat?: NodeJS.Timeout; expiry?: NodeJS.Timeout } = {};
     let unlisten: (() => Promise<void>) | undefined;
-    const finish = async (last?: string) => {
+    const finish = async (last?: { event: string; data: unknown }) => {
       if (finished) return;
       finished = true;
       clearInterval(timers.heartbeat);
       clearTimeout(timers.expiry);
-      if (last && !raw.writableEnded) raw.write(last);
-      if (!raw.writableEnded) raw.end();
+      out.close(last);
       await unlisten?.();
       await this.tasks.closeStream(ctx, sessionId).catch(() => {});
       await this.limits.release(ctx.organizationId, agentId, sessionId).catch(() => {});
@@ -111,12 +109,14 @@ export class TailService implements OnModuleInit, OnApplicationShutdown {
         const m = JSON.parse(message) as StreamMessage;
         if (m.type === 'result') {
           void finish(
-            m.status === 'failed' ? sse('error', { message: m.error ?? 'Log tail failed' }) : sse('end', {}),
+            m.status === 'failed'
+              ? { event: 'error', data: { message: m.error ?? 'Log tail failed' } }
+              : { event: 'end', data: {} },
           );
           return;
         }
-        if (m.lines.length) raw.write(sse('lines', { sequence: m.sequence, lines: m.lines }));
-        if (m.final) void finish(sse('end', {}));
+        if (m.lines.length) out.event('lines', { sequence: m.sequence, lines: m.lines });
+        if (m.final) void finish({ event: 'end', data: {} });
       });
       await this.tasks.create(ctx, agentId, {
         type: 'log_tail',
@@ -134,17 +134,23 @@ export class TailService implements OnModuleInit, OnApplicationShutdown {
     }
 
     reply.hijack();
-    raw.writeHead(200, {
-      'content-type': 'text/event-stream; charset=utf-8',
-      'cache-control': 'no-cache, no-transform',
-      connection: 'keep-alive',
-      // nginx and other proxies must not buffer the stream.
-      'x-accel-buffering': 'no',
-    });
-    raw.write(sse('ready', { sessionId, source: sourceId }));
-    timers.heartbeat = setInterval(() => raw.write(': heartbeat\n\n'), HEARTBEAT_MS);
-    raw.on('close', () => void finish());
+    // `ready` goes first; anything the agent already sent was queued behind it.
+    out.open(
+      {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache, no-transform',
+        connection: 'keep-alive',
+        // nginx and other proxies must not buffer the stream.
+        'x-accel-buffering': 'no',
+      },
+      () => void finish(),
+      { event: 'ready', data: { sessionId, source: sourceId } },
+    );
+    timers.heartbeat = setInterval(() => out.comment('heartbeat'), HEARTBEAT_MS);
     // The session expires with the task; end the stream then even if the agent never ran it.
-    timers.expiry = setTimeout(() => void finish(sse('end', { reason: 'expired' })), TAIL_TTL_SECONDS * 1000);
+    timers.expiry = setTimeout(
+      () => void finish({ event: 'end', data: { reason: 'expired' } }),
+      TAIL_TTL_SECONDS * 1000,
+    );
   }
 }
