@@ -1,4 +1,4 @@
-import { connect as tlsConnect } from 'node:tls';
+import { checkServerIdentity, connect as tlsConnect, type PeerCertificate } from 'node:tls';
 import { assertPublicDestination, type DestinationOptions } from '@pcp/connector-sdk';
 import { Agent, request } from 'undici';
 
@@ -24,6 +24,8 @@ export interface ProbeResult {
   error?: string;
   /** A Cloudflare (or similar) challenge page answered instead of the site. */
   challenge?: boolean;
+  /** The HTTPS certificate belongs to another name (its subject); no expiry is reported. */
+  wrongCertificate?: string;
 }
 
 const MAX_BODY = 64 * 1024;
@@ -42,9 +44,30 @@ function pinned(address: string, family: 4 | 6, timeoutMs: number, ca?: string) 
   });
 }
 
+/** Plain-language TLS failures; the raw Node.js message is kept for anything else. */
+const TLS_ERRORS: Record<string, string> = {
+  DEPTH_ZERO_SELF_SIGNED_CERT: 'TLS certificate is not trusted (self-signed)',
+  SELF_SIGNED_CERT_IN_CHAIN: 'TLS certificate is not trusted (self-signed chain)',
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'TLS certificate is not trusted (incomplete chain)',
+  UNABLE_TO_GET_ISSUER_CERT_LOCALLY: 'TLS certificate is not trusted (unknown issuer)',
+  CERT_HAS_EXPIRED: 'TLS certificate has expired',
+};
+
+const subject = (cert: PeerCertificate) => {
+  const cn = cert.subject?.CN;
+  return (Array.isArray(cn) ? cn[0] : cn) ?? 'another name';
+};
+
+interface CertificateRead {
+  expiresAt: Date;
+  issuer: string;
+  /** Set when the certificate does not cover the URL's host: its subject name. */
+  issuedTo?: string;
+}
+
 /** Certificate expiry and issuer through the vetted address (read even when the HTTP request fails). */
 function readCertificate(url: URL, address: string, timeoutMs: number) {
-  return new Promise<{ expiresAt: Date; issuer: string } | null>((resolve) => {
+  return new Promise<CertificateRead | null>((resolve) => {
     const socket = tlsConnect({
       host: address,
       port: Number(url.port || 443),
@@ -52,7 +75,7 @@ function readCertificate(url: URL, address: string, timeoutMs: number) {
       rejectUnauthorized: false,
       timeout: timeoutMs,
     });
-    const done = (v: { expiresAt: Date; issuer: string } | null) => {
+    const done = (v: CertificateRead | null) => {
       socket.destroy();
       resolve(v);
     };
@@ -61,7 +84,12 @@ function readCertificate(url: URL, address: string, timeoutMs: number) {
       if (!cert?.valid_to) return done(null);
       const issuer = cert.issuer as Record<string, string | string[]> | undefined;
       const name = issuer?.O ?? issuer?.CN ?? '';
-      done({ expiresAt: new Date(cert.valid_to), issuer: Array.isArray(name) ? name.join(', ') : name });
+      const mismatch = checkServerIdentity(url.hostname, cert);
+      done({
+        expiresAt: new Date(cert.valid_to),
+        issuer: Array.isArray(name) ? name.join(', ') : name,
+        ...(mismatch ? { issuedTo: subject(cert) } : {}),
+      });
     });
     socket.once('error', () => done(null));
     socket.once('timeout', () => done(null));
@@ -93,7 +121,16 @@ export async function probe(rawUrl: string, opts: ProbeOptions): Promise<ProbeRe
   try {
     for (;;) {
       const { address, family } = await assertPublicDestination(url, opts.destination);
-      if (url.protocol === 'https:' && !tls) tls = await readCertificate(url, address, timeoutMs);
+      if (url.protocol === 'https:' && !tls) {
+        const cert = await readCertificate(url, address, timeoutMs);
+        // Another host's certificate: its expiry is not this site's, so none is reported.
+        if (cert?.issuedTo)
+          return result({
+            error: `TLS certificate is not valid for ${url.hostname} (issued to ${cert.issuedTo})`,
+            wrongCertificate: cert.issuedTo,
+          });
+        tls = cert ? { expiresAt: cert.expiresAt, issuer: cert.issuer } : null;
+      }
       const dispatcher = pinned(address, family, timeoutMs, opts.ca);
       try {
         const res = await request(url, {
@@ -145,7 +182,8 @@ export async function probe(rawUrl: string, opts: ProbeOptions): Promise<ProbeRe
     }
   } catch (err) {
     if (deadline.aborted) return result({ error: `timed out after ${timeoutMs} ms` });
-    const e = err as Error & { cause?: Error; code?: string };
-    return result({ error: (e.cause?.message ?? e.message ?? String(err)).slice(0, 300) });
+    const e = err as Error & { cause?: Error & { code?: string }; code?: string };
+    const known = TLS_ERRORS[e.cause?.code ?? e.code ?? ''];
+    return result({ error: known ?? (e.cause?.message ?? e.message ?? String(err)).slice(0, 300) });
   }
 }
