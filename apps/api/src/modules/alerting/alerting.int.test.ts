@@ -154,6 +154,8 @@ describe('alert rules (WB-13 UC-13-01)', () => {
         'host_disk_full',
         'host_memory_high',
         'log_error_spike',
+        'website_down',
+        'website_tls_expiring',
       ].sort(),
     );
     const [tick] = await sql<{ every_seconds: number; enabled: boolean }>(
