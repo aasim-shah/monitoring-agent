@@ -82,7 +82,7 @@ export function MonitorList({
         ...c,
         [id]: r.verified
           ? 'Verified. The first check runs within a minute.'
-          : `Not found yet on ${r.checkedNames.join(', ')}. DNS changes can take a few minutes.`,
+          : `Not found yet on ${r.checkedNames.join(', ')}. We ask the domain's nameservers directly; a record added in the last minute may need another check.`,
       }));
     } catch (e) {
       setChecks((c) => ({ ...c, [id]: errorMessage(e) }));
