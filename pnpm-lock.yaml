@@ -105,6 +105,9 @@ importers:
       '@pcp/agent-protocol':
         specifier: workspace:*
         version: link:../../packages/agent-protocol
+      '@pcp/alerting':
+        specifier: workspace:*
+        version: link:../../packages/alerting
       '@pcp/connector-runtime':
         specifier: workspace:*
         version: link:../../packages/connector-runtime

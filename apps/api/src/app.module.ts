@@ -10,6 +10,7 @@ import type { AppConfig } from './config.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AgentAuthGuard } from './modules/agents/agent-auth.guard.js';
 import { AgentsModule } from './modules/agents/agents.module.js';
+import { AlertingModule } from './modules/alerting/alerting.module.js';
 import { AssetsModule } from './modules/assets/assets.module.js';
 import { AuditingModule } from './modules/auditing/auditing.module.js';
 import { ConnectionsModule } from './modules/connections/connections.module.js';
@@ -65,6 +66,7 @@ export class AppModule {
         TelemetryModule,
         PacksModule,
         LogsModule,
+        AlertingModule,
         AssetDiscoveryModule,
         AssetsModule,
       ],

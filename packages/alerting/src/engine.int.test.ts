@@ -5,6 +5,7 @@ import { createPrismaClient, type PrismaClient } from '@pcp/database';
 import { startPostgres, type TestDatabase } from '@pcp/database/testing';
 import type { TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
+import { createDeliveries } from './deliveries.js';
 import { acknowledge, escalate, ingest, resolveManually, type NormalizedAlert } from './engine.js';
 
 let db: TestDatabase;
@@ -265,5 +266,45 @@ describe('acknowledge, manual resolve, escalation (UC-13-06/07/08)', () => {
     expect(due).toEqual([{ incidentId: critId, event: 'escalated' }]);
     expect(await inOrg(orgA, (tx) => escalate(tx, min(40)))).toEqual([]);
     expect(a.opened).toHaveLength(2);
+  });
+});
+
+describe('createDeliveries (UC-13-05/07)', () => {
+  it('fans out to active channels, escalations only to escalation channels when any are marked', async () => {
+    const org = randomUUID();
+    await sql(`INSERT INTO organizations (id, name) VALUES ($1, 'Fan')`, [org]);
+    const product = randomUUID();
+    await sql(`INSERT INTO products (id, organization_id, name) VALUES ($1, $2, 'P')`, [product, org]);
+    const [mail, pager, broken] = [randomUUID(), randomUUID(), randomUUID()];
+    await sql(
+      `INSERT INTO notification_channels (id, organization_id, name, kind, escalation, status, updated_at)
+       VALUES ($1, $4, 'Mail', 'email', false, 'active', now()),
+              ($2, $4, 'Pager', 'webhook', true, 'active', now()),
+              ($3, $4, 'Old', 'slack', false, 'broken', now())`,
+      [mail, pager, broken, org],
+    );
+    const r = await rule(org, product, 'Fan', 'critical');
+    const { opened } = await inOrg(org, (tx) => ingest(tx, org, [firing(r, T0)], T0));
+    const id = opened[0]!;
+    const ids = await inOrg(org, (tx) =>
+      createDeliveries(tx, org, [
+        { incidentId: id, event: 'opened' },
+        { incidentId: id, event: 'escalated' },
+      ]),
+    );
+    expect(ids).toHaveLength(3);
+    const key = (x: { event: string; channel_id: string }) => `${x.event}/${x.channel_id}`;
+    const rows = (
+      await sql(`SELECT channel_id, event FROM notification_deliveries WHERE incident_id = $1`, [id])
+    ).map(key);
+    expect(rows.sort()).toEqual(
+      [
+        { channel_id: mail, event: 'opened' },
+        { channel_id: pager, event: 'opened' },
+        { channel_id: pager, event: 'escalated' },
+      ]
+        .map(key)
+        .sort(),
+    );
   });
 });

@@ -15,6 +15,6 @@ const systemResolver: DnsResolver = async (hostname) => {
 @Module({
   controllers: [DiscoveryController],
   providers: [{ provide: DNS_RESOLVER, useValue: systemResolver }, DiscoveryService],
-  exports: [DiscoveryService],
+  exports: [DiscoveryService, DNS_RESOLVER],
 })
 export class DiscoveryModule {}

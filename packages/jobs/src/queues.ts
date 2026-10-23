@@ -2,10 +2,20 @@ import { Queue, type JobsOptions } from 'bullmq';
 import { Redis } from 'ioredis';
 import { jobId } from './job-id.js';
 
-export const JOB_KINDS = ['connection-validate', 'connection-discover', 'connection-health'] as const;
+export const JOB_KINDS = [
+  'connection-validate',
+  'connection-discover',
+  'connection-health',
+  // M12: per-organization alert tick (entity = organization) and one notification delivery (entity = delivery).
+  'alert-tick',
+  'notification-deliver',
+] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
-/** Only identifiers: workers rebuild tenant context from these server-set values. Never secrets. */
+/**
+ * Only identifiers: workers rebuild tenant context from these server-set values. Never secrets.
+ * `connectionId` is the job's entity: a connection, or for M12 kinds an organization or delivery.
+ */
 export interface ConnectionJobPayload {
   organizationId: string;
   connectionId: string;

@@ -122,6 +122,12 @@ export class TenantGuard implements CanActivate {
           ELSE pcp_resolve_asset_alias_org(${id}::uuid, ${userId}::uuid) END::text AS org`;
       return row?.org ? { organizationId: row.org } : null;
     }
+    if (resource === 'alert_rule' || resource === 'incident' || resource === 'notification_channel') {
+      const [row] = await this.prisma.$queryRaw<{ org: string; product: string | null }[]>`
+        SELECT organization_id::text AS org, product_id::text AS product
+        FROM pcp_resolve_alerting_object(${resource}, ${id}::uuid, ${userId}::uuid)`;
+      return row ? { organizationId: row.org, productId: row.product ?? undefined } : null;
+    }
     if (resource === 'product') {
       const [row] = await this.prisma.$queryRaw<{ org: string | null }[]>`
         SELECT pcp_resolve_product_org(${id}::uuid, ${userId}::uuid)::text AS org`;

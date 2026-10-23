@@ -517,13 +517,13 @@ export interface paths {
         };
         /**
          * List notification channels
-         * @description List notification channels.
+         * @description Channels never include secrets (Slack URLs, webhook URLs, signing secrets). Requires `org.view`.
          */
         get: operations["listNotificationChannels"];
         put?: never;
         /**
          * Create notification channel
-         * @description Create notification channel.
+         * @description Email (1–10 recipients), Slack (incoming webhook URL), or a generic webhook. URLs must be https and resolve to public addresses. A webhook's signing secret is returned once. Requires `org.settings.manage`.
          */
         post: operations["createNotificationChannel"];
         delete?: never;
@@ -546,13 +546,40 @@ export interface paths {
         put?: never;
         /**
          * Send test notification
-         * @description Send test notification.
+         * @description Queues a test delivery. Requires `org.settings.manage`.
          */
         post: operations["testNotificationChannel"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notification-channels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete notification channel
+         * @description Requires `org.settings.manage`.
+         */
+        delete: operations["deleteNotificationChannel"];
+        options?: never;
+        head?: never;
+        /**
+         * Update notification channel
+         * @description Name, email recipients, escalation flag. Requires `org.settings.manage`.
+         */
+        patch: operations["updateNotificationChannel"];
         trace?: never;
     };
     "/api/v1/products/{productId}": {
@@ -1835,7 +1862,7 @@ export interface paths {
         put?: never;
         /**
          * vmalert notifications
-         * @description vmalert notifications.
+         * @description Alertmanager v2 alert list from vmalert. The tenant comes from the compiler's tenant_id label and must own rule_id; other alerts are dropped. Never routed by Caddy.
          */
         post: operations["receiveAlerts"];
         delete?: never;
@@ -2340,7 +2367,7 @@ export interface paths {
         };
         /**
          * Incidents
-         * @description Incidents.
+         * @description Up to 100, newest first. `status` = active (default; open + acknowledged), open, acknowledged, resolved, all. Requires `incident.view`.
          */
         get: operations["listIncidents"];
         put?: never;
@@ -2363,7 +2390,7 @@ export interface paths {
         };
         /**
          * Incident detail
-         * @description Incident detail.
+         * @description Timeline, correlated assets (blast radius), recent changes, and links to source pages. Requires `incident.view`.
          */
         get: operations["getIncident"];
         put?: never;
@@ -2388,7 +2415,7 @@ export interface paths {
         put?: never;
         /**
          * Acknowledge
-         * @description Acknowledge.
+         * @description Stops escalation; only an open incident. Requires `incident.manage`.
          */
         post: operations["acknowledgeIncident"];
         delete?: never;
@@ -2411,7 +2438,7 @@ export interface paths {
         put?: never;
         /**
          * Resolve
-         * @description Resolve.
+         * @description Manual resolution with an optional note. Requires `incident.manage`.
          */
         post: operations["resolveIncident"];
         delete?: never;
@@ -2438,7 +2465,7 @@ export interface paths {
         head?: never;
         /**
          * Postmortem metadata
-         * @description Postmortem metadata.
+         * @description Summary, cause category, follow-ups (UC-13-11). Requires `incident.manage`.
          */
         patch: operations["updateIncidentPostmortem"];
         trace?: never;
@@ -2455,15 +2482,38 @@ export interface paths {
         };
         /**
          * Alert rules
-         * @description Alert rules.
+         * @description The product's rules and the available templates. Requires `incident.view`.
          */
         get: operations["listAlertRules"];
         put?: never;
         /**
          * Create alert rule
-         * @description Create alert rule.
+         * @description From a template with validated parameters; users never write PromQL. Requires `incident.manage`.
          */
         post: operations["createAlertRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/alert-rules/recommended": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add recommended rules
+         * @description Adds the recommended rules the product does not have yet (idempotent). Requires `incident.manage`.
+         */
+        post: operations["addRecommendedAlertRules"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2485,14 +2535,14 @@ export interface paths {
         post?: never;
         /**
          * Delete alert rule
-         * @description Delete alert rule.
+         * @description Requires `incident.manage`.
          */
         delete: operations["deleteAlertRule"];
         options?: never;
         head?: never;
         /**
          * Update alert rule
-         * @description Update alert rule.
+         * @description Name, params, severity, enabled. Requires `incident.manage`.
          */
         patch: operations["updateAlertRule"];
         trace?: never;
@@ -2892,6 +2942,129 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AlertTemplate: {
+            id: string;
+            label: string;
+            description: string;
+            /** @enum {string} */
+            kind: "metric" | "heartbeat" | "connection";
+            /** @enum {string} */
+            defaultSeverity: "critical" | "warning" | "info";
+            params: {
+                name: string;
+                label: string;
+                unit: string;
+                min: number;
+                max: number;
+                default: number;
+            }[];
+        };
+        AlertRule: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            productId: string | null;
+            name: string;
+            template: string;
+            params: {
+                [key: string]: number;
+            };
+            /** @enum {string} */
+            severity: "critical" | "warning" | "info";
+            enabled: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        AlertRuleList: {
+            rules: components["schemas"]["AlertRule"][];
+            templates: components["schemas"]["AlertTemplate"][];
+        };
+        Incident: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            productId: string | null;
+            /** Format: uuid */
+            ruleId: string;
+            title: string;
+            /** @enum {string} */
+            severity: "critical" | "warning" | "info";
+            /** @enum {string} */
+            status: "open" | "acknowledged" | "resolved";
+            summary: string;
+            labels: {
+                [key: string]: string;
+            };
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            lastFiredAt?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string | null;
+            /** Format: uuid */
+            acknowledgedByUserId?: string | null;
+            /** Format: date-time */
+            resolvedAt?: string | null;
+            resolutionNote?: string | null;
+            /** Format: date-time */
+            escalatedAt?: string | null;
+            postmortem?: {
+                summary?: string;
+                causeCategory?: string;
+                followUps?: string[];
+            } | null;
+        };
+        IncidentDetail: {
+            incident: components["schemas"]["Incident"];
+            events: {
+                /** @enum {string} */
+                kind: "fired" | "refired" | "reopened" | "acknowledged" | "resolved" | "notified" | "suppressed" | "escalated" | "note";
+                detail?: Record<string, never>;
+                /** Format: date-time */
+                at: string;
+            }[];
+            correlation: {
+                host?: {
+                    id?: string;
+                    name?: string;
+                } | null;
+                assets: {
+                    /** Format: uuid */
+                    assetId: string;
+                    name: string;
+                    assetType: string;
+                    /** @enum {string} */
+                    impact: "confirmed" | "potential" | "unknown";
+                    distance: number;
+                }[];
+                counts: {
+                    [key: string]: number;
+                };
+            };
+            changes: Record<string, never>[];
+            sourceLinks: {
+                label: string;
+                href: string;
+            }[];
+        };
+        NotificationChannel: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            kind: "email" | "slack" | "webhook";
+            recipients?: string[] | null;
+            /** @description Host of the Slack or webhook URL (the URL itself is never returned). */
+            target?: string | null;
+            escalation: boolean;
+            /** @enum {string} */
+            status: "active" | "broken";
+            consecutiveFailures: number;
+            /** Format: date-time */
+            createdAt?: string;
+        };
         Error: {
             code: string;
             message: string;
@@ -4166,7 +4339,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        channels: components["schemas"]["NotificationChannel"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -4181,9 +4364,32 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "email" | "slack" | "webhook";
+                    name: string;
+                    recipients?: string[];
+                    /** Format: uri */
+                    url?: string;
+                    escalation?: boolean;
+                };
+            };
+        };
         responses: {
-            201: components["responses"]["Created"];
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannel"] & {
+                        signingSecret?: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -4200,7 +4406,68 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Success */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        deliveryId: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: components["responses"]["NoContent"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateNotificationChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    recipients?: string[];
+                    escalation?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationChannel"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5868,9 +6135,24 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>[];
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        accepted?: number;
+                        dropped?: number;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
         };
     };
@@ -6496,7 +6778,9 @@ export interface operations {
     };
     listIncidents: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: "active" | "open" | "acknowledged" | "resolved" | "all";
+            };
             header?: never;
             path: {
                 /** @description Resource ID */
@@ -6506,7 +6790,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        incidents: components["schemas"]["Incident"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -6523,7 +6817,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetail"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -6540,9 +6842,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetail"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     resolveIncident: {
@@ -6555,11 +6866,26 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string;
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetail"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     updateIncidentPostmortem: {
@@ -6572,9 +6898,26 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    summary: string;
+                    /** @enum {string} */
+                    causeCategory: "capacity" | "deployment" | "configuration" | "dependency" | "infrastructure" | "code" | "other";
+                    followUps?: string[];
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentDetail"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -6591,7 +6934,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleList"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -6606,9 +6957,56 @@ export interface operations {
             };
             cookie?: never;
         };
+        requestBody: {
+            content: {
+                "application/json": {
+                    template?: string;
+                    name?: string;
+                    params?: {
+                        [key: string]: number;
+                    };
+                    /** @enum {string} */
+                    severity?: "critical" | "warning" | "info";
+                    enabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addRecommendedAlertRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
         requestBody?: never;
         responses: {
-            201: components["responses"]["Created"];
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleList"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -6640,9 +7038,31 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    template?: string;
+                    name?: string;
+                    params?: {
+                        [key: string]: number;
+                    };
+                    /** @enum {string} */
+                    severity?: "critical" | "warning" | "info";
+                    enabled?: boolean;
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

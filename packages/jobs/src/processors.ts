@@ -12,6 +12,8 @@ export interface ProcessorDeps {
   runtime: ConnectorRuntime;
   concurrency?: number;
   now?: () => Date;
+  /** Handlers for kinds that are not connection jobs (alert-tick, notification-deliver). */
+  handlers?: Partial<Record<JobKind, (ctx: TenantContext, entityId: string, job: Job) => Promise<unknown>>>;
 }
 
 export interface Processors {
@@ -27,7 +29,7 @@ const systemContext = (organizationId: string, job: Job): TenantContext => ({
   requestId: job.data.requestId,
 });
 
-const SYNC_KIND: Record<Exclude<JobKind, 'connection-health'>, 'validate' | 'discover'> = {
+const SYNC_KIND: Record<'connection-validate' | 'connection-discover', 'validate' | 'discover'> = {
   'connection-validate': 'validate',
   'connection-discover': 'discover',
 };
@@ -40,6 +42,10 @@ export function startProcessors(deps: ProcessorDeps): Processors {
   const process = (kind: JobKind) => async (job: Job<ConnectionJobPayload>) => {
     const { organizationId, connectionId } = job.data;
     const ctx = systemContext(organizationId, job);
+    if (kind === 'alert-tick' || kind === 'notification-deliver') {
+      const handler = deps.handlers?.[kind];
+      return handler ? handler(ctx, connectionId, job) : { skipped: 'no handler' };
+    }
     // Health checks are recorded in connection_health by the runtime, not as sync runs.
     if (kind === 'connection-health') {
       try {

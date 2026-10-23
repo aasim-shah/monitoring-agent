@@ -570,34 +570,123 @@ paths:
       operationId: listNotificationChannels
       tags: [notifications]
       summary: List notification channels
-      description: List notification channels.
+      description: Channels never include secrets (Slack URLs, webhook URLs, signing secrets). Requires `org.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                {
+                  type: object,
+                  required: [channels],
+                  properties:
+                    {
+                      channels: { type: array, items: { $ref: '#/components/schemas/NotificationChannel' } },
+                    },
+                }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
     post:
       operationId: createNotificationChannel
       tags: [notifications]
       summary: Create notification channel
-      description: Create notification channel.
+      description: >-
+        Email (1–10 recipients), Slack (incoming webhook URL), or a generic webhook. URLs must be https and resolve to
+        public addresses. A webhook's signing secret is returned once. Requires `org.settings.manage`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, name]
+              properties:
+                kind: { type: string, enum: [email, slack, webhook] }
+                name: { type: string, maxLength: 80 }
+                recipients: { type: array, items: { type: string, format: email }, maxItems: 10 }
+                url: { type: string, format: uri }
+                escalation: { type: boolean }
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                {
+                  allOf:
+                    [
+                      { $ref: '#/components/schemas/NotificationChannel' },
+                      { type: object, properties: { signingSecret: { type: string } } },
+                    ],
+                }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
   /api/v1/notification-channels/{id}/test:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: testNotificationChannel
       tags: [notifications]
       summary: Send test notification
-      description: Send test notification.
+      description: Queues a test delivery. Requires `org.settings.manage`.
       security: [{ sessionCookie: [] }]
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Success
+          content:
+            application/json:
+              schema:
+                {
+                  type: object,
+                  required: [deliveryId],
+                  properties: { deliveryId: { type: string, format: uuid } },
+                }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
+  /api/v1/notification-channels/{id}:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    patch:
+      operationId: updateNotificationChannel
+      tags: [notifications]
+      summary: Update notification channel
+      description: Name, email recipients, escalation flag. Requires `org.settings.manage`.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                recipients: { type: array, items: { type: string, format: email } }
+                escalation: { type: boolean }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationChannel' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
+    delete:
+      operationId: deleteNotificationChannel
+      tags: [notifications]
+      summary: Delete notification channel
+      description: Requires `org.settings.manage`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
   /api/v1/products/{productId}:
     parameters: [{ $ref: '#/components/parameters/productId' }]
     get:
@@ -1936,11 +2025,24 @@ paths:
       operationId: receiveAlerts
       tags: [internal]
       summary: vmalert notifications
-      description: vmalert notifications.
+      description: >-
+        Alertmanager v2 alert list from vmalert. The tenant comes from the compiler's tenant_id label and must own
+        rule_id; other alerts are dropped. Never routed by Caddy.
       security: [{ internalToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: array, items: { type: object } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                { type: object, properties: { accepted: { type: integer }, dropped: { type: integer } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M12
   /internal/agents/{id}/effective-config:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
@@ -2451,104 +2553,221 @@ paths:
       operationId: listIncidents
       tags: [incidents]
       summary: Incidents
-      description: Incidents.
+      description: Up to 100, newest first. `status` = active (default; open + acknowledged), open, acknowledged, resolved, all. Requires `incident.view`.
       security: [{ sessionCookie: [] }]
+      parameters:
+        - {
+            name: status,
+            in: query,
+            schema: { type: string, enum: [active, open, acknowledged, resolved, all] },
+          }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                {
+                  type: object,
+                  required: [incidents],
+                  properties:
+                    { incidents: { type: array, items: { $ref: '#/components/schemas/Incident' } } },
+                }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
   /api/v1/incidents/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getIncident
       tags: [incidents]
       summary: Incident detail
-      description: Incident detail.
+      description: Timeline, correlated assets (blast radius), recent changes, and links to source pages. Requires `incident.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentDetail' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
   /api/v1/incidents/{id}/acknowledge:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: acknowledgeIncident
       tags: [incidents]
       summary: Acknowledge
-      description: Acknowledge.
+      description: Stops escalation; only an open incident. Requires `incident.manage`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentDetail' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M12
   /api/v1/incidents/{id}/resolve:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: resolveIncident
       tags: [incidents]
       summary: Resolve
-      description: Resolve.
+      description: Manual resolution with an optional note. Requires `incident.manage`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { note: { type: string, maxLength: 2000 } } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentDetail' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M12
   /api/v1/incidents/{id}/postmortem:
     parameters: [{ $ref: '#/components/parameters/id' }]
     patch:
       operationId: updateIncidentPostmortem
       tags: [incidents]
       summary: Postmortem metadata
-      description: Postmortem metadata.
+      description: Summary, cause category, follow-ups (UC-13-11). Requires `incident.manage`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [summary, causeCategory]
+              properties:
+                summary: { type: string, maxLength: 4000 }
+                causeCategory:
+                  {
+                    type: string,
+                    enum: [capacity, deployment, configuration, dependency, infrastructure, code, other],
+                  }
+                followUps: { type: array, items: { type: string }, maxItems: 20 }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncidentDetail' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
   /api/v1/products/{id}/alert-rules:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listAlertRules
       tags: [incidents]
       summary: Alert rules
-      description: Alert rules.
+      description: The product's rules and the available templates. Requires `incident.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertRuleList' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
     post:
       operationId: createAlertRule
       tags: [incidents]
       summary: Create alert rule
-      description: Create alert rule.
+      description: From a template with validated parameters; users never write PromQL. Requires `incident.manage`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                template: { type: string }
+                name: { type: string, maxLength: 120 }
+                params: { type: object, additionalProperties: { type: number } }
+                severity: { type: string, enum: [critical, warning, info] }
+                enabled: { type: boolean }
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertRule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
+  /api/v1/products/{id}/alert-rules/recommended:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: addRecommendedAlertRules
+      tags: [incidents]
+      summary: Add recommended rules
+      description: Adds the recommended rules the product does not have yet (idempotent). Requires `incident.manage`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertRuleList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
   /api/v1/alert-rules/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     patch:
       operationId: updateAlertRule
       tags: [incidents]
       summary: Update alert rule
-      description: Update alert rule.
+      description: Name, params, severity, enabled. Requires `incident.manage`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                template: { type: string }
+                name: { type: string, maxLength: 120 }
+                params: { type: object, additionalProperties: { type: number } }
+                severity: { type: string, enum: [critical, warning, info] }
+                enabled: { type: boolean }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertRule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
     delete:
       operationId: deleteAlertRule
       tags: [incidents]
       summary: Delete alert rule
-      description: Delete alert rule.
+      description: Requires `incident.manage`.
       security: [{ sessionCookie: [] }]
       responses:
         '204': { $ref: '#/components/responses/NoContent' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M12
   /api/v1/products/{id}/ai/conversations:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
@@ -2833,6 +3052,136 @@ components:
         schema: { type: string },
       }
   schemas:
+    AlertTemplate:
+      type: object
+      required: [id, label, description, kind, params, defaultSeverity]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        description: { type: string }
+        kind: { type: string, enum: [metric, heartbeat, connection] }
+        defaultSeverity: { type: string, enum: [critical, warning, info] }
+        params:
+          type: array
+          items:
+            type: object
+            required: [name, label, unit, min, max, default]
+            properties:
+              name: { type: string }
+              label: { type: string }
+              unit: { type: string }
+              min: { type: number }
+              max: { type: number }
+              default: { type: number }
+    AlertRule:
+      type: object
+      required: [id, productId, name, template, params, severity, enabled]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid, nullable: true }
+        name: { type: string }
+        template: { type: string }
+        params: { type: object, additionalProperties: { type: number } }
+        severity: { type: string, enum: [critical, warning, info] }
+        enabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AlertRuleList:
+      type: object
+      required: [rules, templates]
+      properties:
+        rules: { type: array, items: { $ref: '#/components/schemas/AlertRule' } }
+        templates: { type: array, items: { $ref: '#/components/schemas/AlertTemplate' } }
+    Incident:
+      type: object
+      required: [id, productId, ruleId, title, severity, status, summary, labels, startedAt]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid, nullable: true }
+        ruleId: { type: string, format: uuid }
+        title: { type: string }
+        severity: { type: string, enum: [critical, warning, info] }
+        status: { type: string, enum: [open, acknowledged, resolved] }
+        summary: { type: string }
+        labels: { type: object, additionalProperties: { type: string } }
+        startedAt: { type: string, format: date-time }
+        lastFiredAt: { type: string, format: date-time }
+        acknowledgedAt: { type: string, format: date-time, nullable: true }
+        acknowledgedByUserId: { type: string, format: uuid, nullable: true }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        resolutionNote: { type: string, nullable: true }
+        escalatedAt: { type: string, format: date-time, nullable: true }
+        postmortem:
+          type: object
+          nullable: true
+          properties:
+            summary: { type: string }
+            causeCategory: { type: string }
+            followUps: { type: array, items: { type: string } }
+    IncidentDetail:
+      type: object
+      required: [incident, events, correlation, changes, sourceLinks]
+      properties:
+        incident: { $ref: '#/components/schemas/Incident' }
+        events:
+          type: array
+          items:
+            type: object
+            required: [kind, at]
+            properties:
+              kind:
+                {
+                  type: string,
+                  enum:
+                    [fired, refired, reopened, acknowledged, resolved, notified, suppressed, escalated, note],
+                }
+              detail: { type: object }
+              at: { type: string, format: date-time }
+        correlation:
+          type: object
+          required: [assets, counts]
+          properties:
+            host:
+              type: object
+              nullable: true
+              properties: { id: { type: string }, name: { type: string } }
+            assets:
+              type: array
+              items:
+                type: object
+                required: [assetId, name, assetType, impact, distance]
+                properties:
+                  assetId: { type: string, format: uuid }
+                  name: { type: string }
+                  assetType: { type: string }
+                  impact: { type: string, enum: [confirmed, potential, unknown] }
+                  distance: { type: integer }
+            counts: { type: object, additionalProperties: { type: integer } }
+        changes: { type: array, items: { type: object } }
+        sourceLinks:
+          type: array
+          items:
+            type: object
+            required: [label, href]
+            properties: { label: { type: string }, href: { type: string } }
+    NotificationChannel:
+      type: object
+      required: [id, name, kind, escalation, status, consecutiveFailures]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { type: string, enum: [email, slack, webhook] }
+        recipients: { type: array, items: { type: string }, nullable: true }
+        target:
+          {
+            type: string,
+            nullable: true,
+            description: Host of the Slack or webhook URL (the URL itself is never returned).,
+          }
+        escalation: { type: boolean }
+        status: { type: string, enum: [active, broken] }
+        consecutiveFailures: { type: integer }
+        createdAt: { type: string, format: date-time }
     Error:
       type: object
       required: [code, message]

@@ -36,6 +36,9 @@ const schema = z
     AGENT_PROXY_ADDRESSES: z.string().optional(),
     INTERNAL_TOKEN: z.string().min(24).optional(),
     VM_QUERY_URL: z.string().url().optional(),
+    /** Where tenant vmalert rule files are written (a volume vmalert reads), and vmalert's URL. */
+    ALERT_RULES_DIR: z.string().min(1).optional(),
+    VMALERT_URL: z.string().url().optional(),
   })
   .refine(
     (c) =>
@@ -88,6 +91,8 @@ export interface AppConfig {
   internalToken?: string;
   /** VictoriaMetrics base URL for reads (private network only, BR-04-05). */
   vmQueryUrl?: string;
+  alertRulesDir?: string;
+  vmalertUrl?: string;
 }
 
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
@@ -118,6 +123,8 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
       : undefined,
     internalToken: c.INTERNAL_TOKEN,
     vmQueryUrl: c.VM_QUERY_URL?.replace(/\/+$/, ''),
+    alertRulesDir: c.ALERT_RULES_DIR,
+    vmalertUrl: c.VMALERT_URL?.replace(/\/+$/, ''),
     agents: c.AGENT_CA_CERT
       ? {
           caCertPem: fromBase64(c.AGENT_CA_CERT),
