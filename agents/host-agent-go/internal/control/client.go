@@ -169,6 +169,20 @@ func (c *Client) PostInventory(ctx context.Context, inv proto.Inventory) error {
 	return c.do(ctx, http.MethodPost, "/agent/v1/inventory", inv, nil)
 }
 
+// PostChunk sends redacted log lines for a stream session; a 404 means the viewer closed it.
+func (c *Client) PostChunk(ctx context.Context, sessionID string, sequence int64, lines []string, final bool) error {
+	if lines == nil {
+		lines = []string{}
+	}
+	return c.do(ctx, http.MethodPost, "/agent/v1/streams/"+sessionID+"/chunks", proto.StreamChunk{
+		SessionId: sessionID,
+		Sequence:  sequence,
+		Lines:     lines,
+		Final:     final,
+		SentAt:    c.now().UTC().Format(time.RFC3339),
+	}, nil)
+}
+
 // Whoami confirms the current certificate is accepted.
 func (c *Client) Whoami(ctx context.Context) (string, error) {
 	var out struct {

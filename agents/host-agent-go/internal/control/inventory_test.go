@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -66,5 +67,33 @@ func TestConfigFetchAndAck(t *testing.T) {
 	}
 	if ack.PolicyVersion != 4 || len(ack.Results) != 1 || ack.Results[0].Message != "bad" {
 		t.Errorf("ack = %+v", ack)
+	}
+}
+
+func TestPostChunkReportsAClosedSession(t *testing.T) {
+	var got proto.StreamChunk
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/agent/v1/streams/11111111-1111-4111-8111-111111111111/chunks" {
+			_ = json.NewDecoder(r.Body).Decode(&got)
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write([]byte(`{"accepted":true}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"code":"not_found","message":"Not found"}`))
+	}))
+	defer srv.Close()
+	c := New(srv.URL, srv.Client())
+	ctx := context.Background()
+	if err := c.PostChunk(ctx, "11111111-1111-4111-8111-111111111111", 3, []string{"a"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if got.Sequence != 3 || got.Lines[0] != "a" || got.Final || got.SentAt == "" {
+		t.Errorf("chunk = %+v", got)
+	}
+	err := c.PostChunk(ctx, "22222222-2222-4222-8222-222222222222", 0, []string{}, true)
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusNotFound {
+		t.Errorf("closed session err = %v", err)
 	}
 }

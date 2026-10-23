@@ -24,6 +24,7 @@ import (
 	"pcp.local/hostagent/internal/collector"
 	"pcp.local/hostagent/internal/control"
 	"pcp.local/hostagent/internal/discovery"
+	"pcp.local/hostagent/internal/logs"
 	"pcp.local/hostagent/internal/packs"
 )
 
@@ -209,6 +210,7 @@ func run(args []string) error {
 		}
 	}()
 	go reportInventory(ctx, &client)
+	tails := make(chan struct{}, 2)
 	for ctx.Err() == nil {
 		c := client.Load()
 		if rotated, err := rotateIfDue(ctx, c, id, st, *dir); err != nil {
@@ -231,6 +233,19 @@ func run(args []string) error {
 			log.Printf("dropped %d task(s) with a bad signature or past expiry", rejected)
 		}
 		for _, t := range tasks {
+			if t.Type == "log_tail" {
+				// Live tails run beside the loop (at most 2 at once); the loop keeps polling.
+				select {
+				case tails <- struct{}{}:
+					go func(t proto.AgentTask) {
+						defer func() { <-tails }()
+						runLogTail(ctx, &client, *dir, t)
+					}(t)
+				default:
+					_ = c.PostResult(ctx, t.Id, control.TaskResult{Status: "failed", Error: "too many live tails on this host"})
+				}
+				continue
+			}
 			res := handle(t, st, started)
 			if err := c.PostResult(ctx, t.Id, res); err != nil {
 				log.Printf("result for %s: %v", t.Id, err)
@@ -297,6 +312,34 @@ func applyPacks(ctx context.Context, client *atomic.Pointer[control.Client], a *
 		for _, r := range ack.Results {
 			log.Printf("pack %s: %s %s", r.PackId, r.Status, r.Message)
 		}
+	}
+}
+
+// runLogTail streams a redacted log source to the viewer until it closes, the task's
+// runtime ends, or the agent stops (WB-12 UC-12-01).
+func runLogTail(ctx context.Context, client *atomic.Pointer[control.Client], dir string, t proto.AgentTask) {
+	store, _ := packs.LoadStore(dir)
+	sessionID, _ := t.Payload["sessionId"].(string)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(t.MaxRuntimeSeconds)*time.Second)
+	defer cancel()
+	post := func(seq int64, lines []string, final bool) error {
+		err := client.Load().PostChunk(ctx, sessionID, seq, lines, final)
+		var apiErr *control.APIError
+		if errors.As(err, &apiErr) && apiErr.Status == 404 {
+			return logs.ErrSessionClosed
+		}
+		return err
+	}
+	result, err := logs.RunTask(ctx, t.Payload, store.Packs, post, logs.Options{})
+	res := control.TaskResult{Status: "succeeded", Result: result}
+	if err != nil {
+		res = control.TaskResult{Status: "failed", Error: err.Error()}
+	}
+	// The tail's own context may be over; report with a fresh one.
+	rctx, rcancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer rcancel()
+	if err := client.Load().PostResult(rctx, t.Id, res); err != nil {
+		log.Printf("result for log tail %s: %v", t.Id, err)
 	}
 }
 

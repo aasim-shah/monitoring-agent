@@ -74,6 +74,11 @@ say "verified $TARBALL"
 if ! id pcp-agent >/dev/null 2>&1; then
   useradd --system --no-create-home --home-dir "$STATE_DIR" --shell /usr/sbin/nologin pcp-agent
 fi
+# Read access to service logs for the live log viewer (files under /var/log are group adm on
+# Debian/Ubuntu; the journal is systemd-journal). Read only; no other privilege.
+for g in adm systemd-journal; do
+  if getent group "$g" >/dev/null 2>&1; then usermod -aG "$g" pcp-agent; fi
+done
 install -d -m 0750 -o root -g pcp-agent "$CONF_DIR"
 install -d -m 0700 -o pcp-agent -g pcp-agent "$STATE_DIR"
 install -m 0755 "$WORK/pcp-agentctl" "$BIN_DIR/pcp-agentctl"
