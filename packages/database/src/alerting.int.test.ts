@@ -84,4 +84,26 @@ describe('alerting cross-tenant functions', () => {
     );
     await insert(); // a resolved incident no longer blocks a new one
   });
+
+  it('pcp_resolve_alerting_object answers members only, with the product', async () => {
+    const user = randomUUID();
+    await run(db.superuserUrl, `INSERT INTO users (id, email) VALUES ($1, $2)`, [
+      user,
+      `${user}@example.com`,
+    ]);
+    await run(
+      db.superuserUrl,
+      `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'viewer')`,
+      [randomUUID(), orgA, user],
+    );
+    const q = (kind: string, id: string, u: string) =>
+      run(db.appUrl, `SELECT organization_id, product_id FROM pcp_resolve_alerting_object($1, $2, $3)`, [
+        kind,
+        id,
+        u,
+      ]);
+    expect(await q('alert_rule', ruleA, user)).toEqual([{ organization_id: orgA, product_id: productA }]);
+    expect(await q('alert_rule', ruleA, randomUUID())).toEqual([]);
+    expect(await q('incident', ruleA, user)).toEqual([]);
+  });
 });

@@ -207,3 +207,25 @@ GRANT EXECUTE ON FUNCTION pcp_alerting_orgs() TO pcp_scheduler;
 ALTER FUNCTION pcp_resolve_alert_rule_org(uuid) OWNER TO pcp_rls_definer;
 REVOKE ALL ON FUNCTION pcp_resolve_alert_rule_org(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION pcp_resolve_alert_rule_org(uuid) TO pcp_app;
+
+-- Organization (and product) of an alert rule, incident, or notification channel, only when
+-- p_user is a member of that organization (TenantGuard).
+CREATE FUNCTION pcp_resolve_alerting_object(p_kind text, p_id uuid, p_user uuid)
+  RETURNS TABLE (organization_id uuid, product_id uuid)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = public, pg_temp
+  AS $$
+    SELECT x.organization_id, x.product_id FROM (
+      SELECT r.organization_id, r.product_id FROM alert_rules r WHERE p_kind = 'alert_rule' AND r.id = p_id
+      UNION ALL
+      SELECT i.organization_id, i.product_id FROM alert_incidents i WHERE p_kind = 'incident' AND i.id = p_id
+      UNION ALL
+      SELECT c.organization_id, NULL::uuid FROM notification_channels c
+      WHERE p_kind = 'notification_channel' AND c.id = p_id
+    ) x
+    JOIN organization_members m ON m.organization_id = x.organization_id AND m.user_id = p_user
+  $$;
+
+ALTER FUNCTION pcp_resolve_alerting_object(text, uuid, uuid) OWNER TO pcp_rls_definer;
+REVOKE ALL ON FUNCTION pcp_resolve_alerting_object(text, uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pcp_resolve_alerting_object(text, uuid, uuid) TO pcp_app;
