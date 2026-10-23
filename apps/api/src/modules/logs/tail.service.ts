@@ -6,12 +6,23 @@ import { withTenant } from '@pcp/tenant-security';
 import type { FastifyReply } from 'fastify';
 import type { Redis } from 'ioredis';
 import { ApiException, notFound } from '../../common/errors.js';
-import { CLOCK, PRISMA, REDIS } from '../../tokens.js';
+import type { AppConfig } from '../../config.js';
+import { APP_CONFIG, CLOCK, PRISMA, REDIS } from '../../tokens.js';
+import { AGENT_SETTINGS, type AgentSettings } from '../agents/settings.provider.js';
 import { TasksService } from '../agents/tasks.service.js';
+import { MINIMUM_TAIL_AGENT_VERSION, supportsLiveTail } from './agent-version.js';
 import { logSources, type LogSource } from './sources.js';
 import { SseWriter } from './sse-writer.js';
 import { StreamRelay } from './stream-relay.js';
 import { MAX_TAILS_PER_AGENT, MAX_TAILS_PER_TENANT, TailLimits } from './tail-limits.js';
+
+export interface LogSourceList {
+  sources: LogSource[];
+  upgradeRequired: boolean;
+  minimumAgentVersion?: string;
+  agentVersion?: string;
+  upgradeCommand?: string;
+}
 
 export const TAIL_TTL_SECONDS = 15 * 60;
 const HEARTBEAT_MS = 15_000;
@@ -31,6 +42,8 @@ export class TailService implements OnModuleInit, OnApplicationShutdown {
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     @Inject(REDIS) private readonly redis: Redis,
     @Inject(CLOCK) private readonly now: () => Date,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+    @Inject(AGENT_SETTINGS) private readonly settings: AgentSettings | null,
     private readonly tasks: TasksService,
   ) {
     this.relay = new StreamRelay(redis.duplicate());
@@ -50,16 +63,40 @@ export class TailService implements OnModuleInit, OnApplicationShutdown {
     this.relay.close();
   }
 
-  async sources(ctx: TenantContext, agentId: string): Promise<LogSource[]> {
-    const packs = await withTenant(this.prisma, ctx, async (tx) => {
-      const agent = await tx.agent.findUnique({ where: { id: agentId }, select: { id: true } });
+  /**
+   * What may be tailed on this agent. Private connector workers have no logs; agents older than
+   * 0.2.0 cannot run log_tail tasks, so the viewer gets the in-place upgrade command instead.
+   */
+  async sources(ctx: TenantContext, agentId: string): Promise<LogSourceList> {
+    const { agent, packs } = await withTenant(this.prisma, ctx, async (tx) => {
+      const agent = await tx.agent.findUnique({
+        where: { id: agentId },
+        select: { agentType: true, agentVersion: true },
+      });
       if (!agent) throw notFound();
-      return tx.agentPackAssignment.findMany({
+      const packs = await tx.agentPackAssignment.findMany({
         where: { agentId, status: 'applied' },
         select: { packId: true },
       });
+      return { agent, packs };
     });
-    return logSources(packs.map((p) => p.packId));
+    if (agent.agentType !== 'host') return { sources: [], upgradeRequired: false };
+    if (!supportsLiveTail(agent.agentVersion))
+      return {
+        sources: logSources(packs.map((p) => p.packId)),
+        upgradeRequired: true,
+        minimumAgentVersion: MINIMUM_TAIL_AGENT_VERSION,
+        agentVersion: agent.agentVersion,
+        upgradeCommand: this.upgradeCommand(),
+      };
+    return { sources: logSources(packs.map((p) => p.packId)), upgradeRequired: false };
+  }
+
+  /** Re-running the installer without a token upgrades the binaries and keeps the enrollment. */
+  private upgradeCommand(): string | undefined {
+    if (!this.settings) return undefined;
+    const origin = this.config.appOrigin;
+    return `curl -fsSL ${origin}/install.sh | sudo bash -s -- --control-url ${this.settings.config.controlUrl} --download-url ${origin}/downloads`;
   }
 
   /**
@@ -69,7 +106,13 @@ export class TailService implements OnModuleInit, OnApplicationShutdown {
    */
   async stream(ctx: TenantContext, agentId: string, sourceId: string, reply: FastifyReply): Promise<void> {
     const allowed = await this.sources(ctx, agentId);
-    if (!allowed.some((s) => s.id === sourceId))
+    if (allowed.upgradeRequired)
+      throw new ApiException(
+        409,
+        'agent_upgrade_required',
+        `Live logs need agent ${MINIMUM_TAIL_AGENT_VERSION} or later; this server runs ${allowed.agentVersion}. Re-run the install command to upgrade.`,
+      );
+    if (!allowed.sources.some((s) => s.id === sourceId))
       throw new ApiException(400, 'unknown_source', 'This log source is not enabled on this agent');
 
     const sessionId = randomUUID();

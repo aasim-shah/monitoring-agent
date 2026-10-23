@@ -1470,7 +1470,7 @@ paths:
       operationId: listLogSources
       tags: [logs]
       summary: Log sources the agent allows
-      description: The applied packs' log sources plus the system journal; only these IDs can be tailed. Requires `agent.view`.
+      description: The applied packs' log sources plus the system journal; only these IDs can be tailed. Private connector workers have none. Requires `agent.view`.
       security: [{ sessionCookie: [] }]
       responses:
         '200':
@@ -1479,7 +1479,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [sources]
+                required: [sources, upgradeRequired]
                 properties:
                   sources:
                     type: array
@@ -1489,6 +1489,14 @@ paths:
                       properties:
                         id: { type: string, example: redis.server }
                         label: { type: string }
+                  upgradeRequired:
+                    type: boolean
+                    description: The agent is older than minimumAgentVersion and cannot tail; show upgradeCommand.
+                  minimumAgentVersion: { type: string, example: 0.2.0 }
+                  agentVersion: { type: string }
+                  upgradeCommand:
+                    type: string
+                    description: Re-runs the installer without a token (upgrades in place, keeps the enrollment).
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M11
@@ -1519,6 +1527,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
       x-implemented-in: M11
   /api/v1/agents/{id}/inspections:

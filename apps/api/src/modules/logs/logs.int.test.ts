@@ -164,6 +164,42 @@ describe('log sources (WB-12 allowlist)', () => {
       'host.journal',
     ]);
     expect(res.json().sources[0]).toEqual({ id: 'redis.server', label: 'Redis server log' });
+    expect(res.json().upgradeRequired).toBe(false);
+  });
+});
+
+describe('agents too old or of the wrong kind for live tail', () => {
+  it('asks for an agent upgrade with the in-place upgrade command, and refuses the tail with 409', async () => {
+    const s = await setup();
+    const agent = await agentWithPacks(s, { redis: 'applied' });
+    await sql(`UPDATE agents SET agent_version = '0.1.0' WHERE id = $1`, [agent.agentId]);
+    const res = await t.app.inject({
+      method: 'GET',
+      url: `/api/v1/agents/${agent.agentId}/log-sources`,
+      headers: cookieOnly(s.owner.cookie),
+    });
+    expect(res.json()).toMatchObject({ upgradeRequired: true, minimumAgentVersion: '0.2.0' });
+    const cmd = res.json().upgradeCommand as string;
+    expect(cmd).toContain('/install.sh | sudo bash -s -- --control-url ');
+    expect(cmd).toContain('--download-url ');
+    expect(cmd).not.toContain('--token');
+    const tail = await openTail(s.owner.cookie, agent.agentId, 'host.journal');
+    expect(tail.res.status).toBe(409);
+    expect(await tail.body()).toContain('agent_upgrade_required');
+    expect((await poll(agent)).json().tasks).toEqual([]);
+  });
+
+  it('reports no sources for a private connector worker', async () => {
+    const s = await setup();
+    const worker = await enrolledAgent(t, s.owner, s.environmentId, {}, 'private_worker');
+    const res = await t.app.inject({
+      method: 'GET',
+      url: `/api/v1/agents/${worker.agentId}/log-sources`,
+      headers: cookieOnly(s.owner.cookie),
+    });
+    expect(res.json()).toMatchObject({ sources: [], upgradeRequired: false });
+    const tail = await openTail(s.owner.cookie, worker.agentId, 'host.journal');
+    expect(tail.res.status).toBe(400);
   });
 });
 

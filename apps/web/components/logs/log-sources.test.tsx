@@ -28,4 +28,31 @@ describe('LogSources', () => {
     const { container } = render(<LogSources sources={sources} canTail={false} onOpen={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('asks for an agent upgrade instead of offering sources an old agent cannot tail', () => {
+    render(
+      <LogSources
+        sources={sources}
+        canTail
+        onOpen={vi.fn()}
+        upgrade={{
+          agentVersion: '0.1.0',
+          minimumAgentVersion: '0.2.0',
+          command:
+            'curl -fsSL https://x/install.sh | sudo bash -s -- --control-url https://a --download-url https://x/downloads',
+        }}
+      />,
+    );
+    expect(
+      screen.getByText(/Live logs need agent 0.2.0 or later; this server runs 0.1.0/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/install\.sh \| sudo bash/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy command' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'System journal' })).toBeNull();
+  });
+
+  it('says so when the agent has no log sources', () => {
+    render(<LogSources sources={[]} canTail onOpen={vi.fn()} />);
+    expect(screen.getByText(/No log sources on this agent/)).toBeInTheDocument();
+  });
 });

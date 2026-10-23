@@ -14,7 +14,7 @@ export class LogsController {
   @TenantScope(AGENT)
   @Get('agents/:id/log-sources')
   async sources(@Req() req: ApiRequest, @Param('id') id: string) {
-    return { sources: await this.tail.sources(requireTenant(req), id) };
+    return this.tail.sources(requireTenant(req), id);
   }
 
   /** Server-sent events: `ready`, `lines`, then `end` or `error` (WB-12 UC-12-01). */

@@ -1323,7 +1323,7 @@ export interface paths {
         };
         /**
          * Log sources the agent allows
-         * @description The applied packs' log sources plus the system journal; only these IDs can be tailed. Requires `agent.view`.
+         * @description The applied packs' log sources plus the system journal; only these IDs can be tailed. Private connector workers have none. Requires `agent.view`.
          */
         get: operations["listLogSources"];
         put?: never;
@@ -5320,6 +5320,13 @@ export interface operations {
                             id: string;
                             label: string;
                         }[];
+                        /** @description The agent is older than minimumAgentVersion and cannot tail; show upgradeCommand. */
+                        upgradeRequired: boolean;
+                        /** @example 0.2.0 */
+                        minimumAgentVersion?: string;
+                        agentVersion?: string;
+                        /** @description Re-runs the installer without a token (upgrades in place, keeps the enrollment). */
+                        upgradeCommand?: string;
                     };
                 };
             };
@@ -5354,6 +5361,7 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
         };
     };

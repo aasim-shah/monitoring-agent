@@ -35,7 +35,20 @@ export function LogsSection({ agentId, canTail }: { agentId: string; canTail: bo
         Logs
       </h2>
       <QueryState query={sources} label="Loading log sources">
-        <LogSources sources={sources.data?.sources ?? []} canTail={canTail} onOpen={setOpen} />
+        <LogSources
+          sources={sources.data?.sources ?? []}
+          canTail={canTail}
+          onOpen={setOpen}
+          upgrade={
+            sources.data?.upgradeRequired && sources.data.upgradeCommand
+              ? {
+                  agentVersion: sources.data.agentVersion ?? 'unknown',
+                  minimumAgentVersion: sources.data.minimumAgentVersion ?? '',
+                  command: sources.data.upgradeCommand,
+                }
+              : undefined
+          }
+        />
       </QueryState>
       {open ? (
         <LogViewer key={open.id} source={open} connect={connect} onClose={() => setOpen(null)} />
