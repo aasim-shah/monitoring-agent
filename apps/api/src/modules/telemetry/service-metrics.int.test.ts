@@ -35,6 +35,9 @@ function series(labels: Record<string, string>, memory: number) {
       `redis_keyspace_misses_total{${l}} ${10 * n} ${ts}`,
       `process_memory_usage_bytes{${l},process_pid="11",process_executable_name="node"} 1000 ${ts}`,
       `process_memory_usage_bytes{${l},process_pid="12",process_executable_name="node"} 2000 ${ts}`,
+      // Two error lines a minute in the Redis log, counted by the collector (M11.2).
+      `log_lines_total{${l},service="redis",level="error"} ${2 * n} ${ts}`,
+      `log_lines_total{${l},service="redis",level="info"} ${50 * n} ${ts}`,
     ];
   });
 }
@@ -78,18 +81,37 @@ describe('service charts (WB-11, fixed PromQL per pack)', () => {
     );
   });
 
+  it('charts log errors per minute for every pack that has log files', () => {
+    for (const pack of ['redis', 'postgresql', 'mysql', 'mongodb', 'kafka', 'nginx']) {
+      const chart = SERVICE_CHARTS[pack]!.find((c) => c.key === 'logErrors');
+      expect(chart, pack).toBeDefined();
+      expect(chart!.promql).toContain(`service="${pack}",level="error"`);
+    }
+    expect(SERVICE_CHARTS.nodejs!.some((c) => c.key === 'logErrors')).toBe(false);
+  });
+
   it('returns the Redis charts from the agent own tenant only', async () => {
     const res = await get(`/api/v1/agents/${agent.agentId}/services/redis/metrics?range=1h`);
     expect(res.statusCode, res.body).toBe(200);
     const body = res.json();
     const chart = (key: string) => body.charts.find((c: { key: string }) => c.key === key);
-    expect(body.charts.map((c: { key: string }) => c.key)).toEqual(['memory', 'ops', 'clients', 'hitRatio']);
+    expect(body.charts.map((c: { key: string }) => c.key)).toEqual([
+      'memory',
+      'ops',
+      'clients',
+      'hitRatio',
+      'logErrors',
+    ]);
     const memory = values(chart('memory').series[0].points);
     expect(memory.length).toBeGreaterThan(5);
     expect(memory.every((v) => v === 5_000_000)).toBe(true);
     expect(chart('memory').unit).toBe('bytes');
     expect(values(chart('ops').series[0].points).every((v) => Math.abs(v - 10) < 0.01)).toBe(true);
     expect(values(chart('hitRatio').series[0].points).every((v) => Math.abs(v - 90) < 0.01)).toBe(true);
+    const errors = values(chart('logErrors').series[0].points);
+    expect(errors.length).toBeGreaterThan(5);
+    expect(errors.every((v) => Math.abs(v - 2) < 0.01)).toBe(true);
+    expect(chart('logErrors').title).toBe('Log errors per minute');
   });
 
   it('labels one series per Node.js process', async () => {

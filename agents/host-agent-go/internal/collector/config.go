@@ -18,6 +18,9 @@ type Input struct {
 	ServerName string
 	StorageDir string // remote_write WAL lives under it
 	Packs      []PackConfig
+	// LogFiles returns a pack's log file paths (globs allowed); their lines are counted
+	// into log.lines and log.pattern. Nil means no log-derived metrics.
+	LogFiles func(packID string) []string
 }
 
 // Config returns the collector configuration as JSON (a subset of YAML, so the
@@ -51,20 +54,42 @@ func Config(in Input) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	logIDs := addLogReceivers(receivers, in.Packs, in.LogFiles)
+	metricsReceivers := append([]string{"host_metrics"}, packIDs...)
+	metricsProcessors := []string{"memory_limiter", "filter/allowlist", "resource_detection", "batch"}
+	processors := map[string]any{
+		"memory_limiter": map[string]any{"check_interval": "1s", "limit_mib": 100, "spike_limit_mib": 20},
+		"resource_detection": map[string]any{
+			"detectors": []string{"system"},
+			"system":    map[string]any{"hostname_sources": []string{"os"}},
+		},
+		"batch": map[string]any{"timeout": "10s"},
+	}
+	pipelines := map[string]any{}
+	if len(logIDs) > 0 {
+		prefixes = append(prefixes, "log")
+		metricsReceivers = append(metricsReceivers, "count")
+		// Counts are delta sums; remote_write accepts cumulative ones only.
+		metricsProcessors = []string{"memory_limiter", "filter/allowlist", "deltatocumulative", "resource_detection", "batch"}
+		processors["deltatocumulative"] = map[string]any{}
+		pipelines["logs"] = map[string]any{
+			"receivers":  logIDs,
+			"processors": []string{"memory_limiter"},
+			"exporters":  []string{"count"},
+		}
+	}
+	processors["filter/allowlist"] = allowlist(prefixes)
+	pipelines["metrics"] = map[string]any{
+		"receivers":  metricsReceivers,
+		"processors": metricsProcessors,
+		"exporters":  []string{"prometheus_remote_write"},
+	}
 	cfg := map[string]any{
 		"extensions": map[string]any{
 			"health_check": map[string]any{"endpoint": "127.0.0.1:13133"},
 		},
-		"receivers": receivers,
-		"processors": map[string]any{
-			"memory_limiter": map[string]any{"check_interval": "1s", "limit_mib": 100, "spike_limit_mib": 20},
-			"resource_detection": map[string]any{
-				"detectors": []string{"system"},
-				"system":    map[string]any{"hostname_sources": []string{"os"}},
-			},
-			"filter/allowlist": allowlist(prefixes),
-			"batch":            map[string]any{"timeout": "10s"},
-		},
+		"receivers":  receivers,
+		"processors": processors,
 		"exporters": map[string]any{
 			// The gateway adds agent, product, environment, and tenant labels (BR-04-02).
 			"prometheus_remote_write": map[string]any{
@@ -82,14 +107,11 @@ func Config(in Input) ([]byte, error) {
 		"service": map[string]any{
 			"extensions": []string{"health_check"},
 			"telemetry":  map[string]any{"metrics": map[string]any{"level": "none"}},
-			"pipelines": map[string]any{
-				"metrics": map[string]any{
-					"receivers":  append([]string{"host_metrics"}, packIDs...),
-					"processors": []string{"memory_limiter", "filter/allowlist", "resource_detection", "batch"},
-					"exporters":  []string{"prometheus_remote_write"},
-				},
-			},
+			"pipelines":  pipelines,
 		},
+	}
+	if len(logIDs) > 0 {
+		cfg["connectors"] = map[string]any{"count": countConnector()}
 	}
 	return json.MarshalIndent(cfg, "", "  ")
 }

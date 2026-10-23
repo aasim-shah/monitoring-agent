@@ -20,6 +20,20 @@ const byDatabase = (l: Record<string, string>) => l.db_namespace || 'all databas
 const byProcess = (l: Record<string, string>) =>
   `${l.process_executable_name || 'process'} (pid ${l.process_pid ?? '?'})`;
 
+/**
+ * Error lines per minute from the pack's log files (M11.2 count connector). 0 while lines are
+ * counted but none are errors; a gap when nothing is counted (no zeros without data).
+ */
+const logErrors = (pack: string): ChartTemplate => {
+  const lines = `{__name__=~"log_lines(_total)?",service="${pack}"`;
+  return {
+    key: 'logErrors',
+    title: 'Log errors per minute',
+    unit: 'count',
+    promql: `(sum(rate(${lines},level="error"}[5m])) * 60) or (sum(rate(${lines}}[5m])) * 0)`,
+  };
+};
+
 export const SERVICE_CHARTS: Record<string, ChartTemplate[]> = {
   redis: [
     { key: 'memory', title: 'Memory used', unit: 'bytes', promql: 'sum(redis_memory_used_bytes)' },
@@ -38,6 +52,7 @@ export const SERVICE_CHARTS: Record<string, ChartTemplate[]> = {
       promql:
         '100 * sum(rate(redis_keyspace_hits_total[5m])) / (sum(rate(redis_keyspace_hits_total[5m])) + sum(rate(redis_keyspace_misses_total[5m])))',
     },
+    logErrors('redis'),
   ],
   postgresql: [
     { key: 'connections', title: 'Connections', unit: 'count', promql: 'sum(postgresql_backends)' },
@@ -54,6 +69,7 @@ export const SERVICE_CHARTS: Record<string, ChartTemplate[]> = {
       promql: 'sum by (db_namespace) (postgresql_db_size_bytes)',
       label: byDatabase,
     },
+    logErrors('postgresql'),
   ],
   mysql: [
     {
@@ -68,6 +84,7 @@ export const SERVICE_CHARTS: Record<string, ChartTemplate[]> = {
       unit: 'perSecond',
       promql: 'sum(rate(mysql_operations_total[5m]))',
     },
+    logErrors('mysql'),
   ],
   mongodb: [
     {
@@ -82,6 +99,7 @@ export const SERVICE_CHARTS: Record<string, ChartTemplate[]> = {
       unit: 'perSecond',
       promql: 'sum(rate(mongodb_operation_count_total[5m]))',
     },
+    logErrors('mongodb'),
   ],
   nginx: [
     {
@@ -96,6 +114,7 @@ export const SERVICE_CHARTS: Record<string, ChartTemplate[]> = {
       unit: 'count',
       promql: 'sum(nginx_connections_current{state="active"})',
     },
+    logErrors('nginx'),
   ],
   kafka: [
     {
@@ -106,6 +125,7 @@ export const SERVICE_CHARTS: Record<string, ChartTemplate[]> = {
       label: (l) => l.group || 'all groups',
     },
     { key: 'partitions', title: 'Partitions', unit: 'count', promql: 'sum(kafka_topic_partitions)' },
+    logErrors('kafka'),
   ],
   nodejs: [
     {

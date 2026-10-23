@@ -397,6 +397,7 @@ func collectorInput(dir string, st *control.State) collector.Input {
 		CAFile:     st.CAFile,
 		ServerName: serverName,
 		StorageDir: dir,
+		LogFiles:   logs.FilePaths,
 	}
 }
 

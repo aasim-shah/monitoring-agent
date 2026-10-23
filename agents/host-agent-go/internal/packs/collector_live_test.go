@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"pcp.local/hostagent/internal/control"
+	"pcp.local/hostagent/internal/logs"
 )
 
 // TestRealCollectorAcceptsEveryPack validates each pack's receiver configuration with the
@@ -17,6 +18,8 @@ func TestRealCollectorAcceptsEveryPack(t *testing.T) {
 	}
 	f := newFixture(t, nil)
 	f.a.Validate = Validator(bin)
+	// With log files: filelog receivers, the count connector, and the logs pipeline (M11.2).
+	f.a.Base.LogFiles = logs.FilePaths
 	creds := "x"
 	ack := f.a.Apply(control.AgentConfig{PolicyVersion: 2, Packs: []control.PackAssignment{
 		{PackId: "redis", Settings: map[string]any{"endpoint": "127.0.0.1:6379"}},
