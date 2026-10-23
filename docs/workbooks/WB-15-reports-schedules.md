@@ -134,9 +134,9 @@ Reports & Schedules → Schedules (create/edit with timezone preview "next run a
 
 ## 11. Task checklist
 
-- [ ] M15.1 Templates and schedules
-- [ ] M15.2 Report generator
-- [ ] M15.3 Delivery
+- [x] M15.1 Templates and schedules ([M15-schema](../handoffs/M15-schema.md), [M15-reports-package](../handoffs/M15-reports-package.md))
+- [x] M15.2 Report generator ([M15-reports-package](../handoffs/M15-reports-package.md), [M15-worker](../handoffs/M15-worker.md))
+- [x] M15.3 Delivery ([M15-worker](../handoffs/M15-worker.md), [M15-api](../handoffs/M15-api.md), [M15-web](../handoffs/M15-web.md))
 
 ## 12. Acceptance criteria
 
