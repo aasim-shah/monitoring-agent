@@ -195,4 +195,28 @@ describe('IncidentDetail (Scenario B steps 3 and 6)', () => {
       followUps: ['Rotate logs', 'Alert at 80 %'],
     });
   });
+
+  it('offers "Ask AI" only when a link is given (AI on and ai.use)', () => {
+    const { rerender } = render(
+      <IncidentDetail
+        data={detail()}
+        canManage
+        onAcknowledge={vi.fn()}
+        onResolve={vi.fn()}
+        onPostmortem={vi.fn()}
+        askAiHref="/ai?q=x"
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Ask AI' })).toHaveAttribute('href', '/ai?q=x');
+    rerender(
+      <IncidentDetail
+        data={detail()}
+        canManage
+        onAcknowledge={vi.fn()}
+        onResolve={vi.fn()}
+        onPostmortem={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('link', { name: 'Ask AI' })).toBeNull();
+  });
 });

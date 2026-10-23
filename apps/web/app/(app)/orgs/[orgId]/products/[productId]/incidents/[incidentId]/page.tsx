@@ -27,6 +27,10 @@ export default function IncidentPage() {
     async () => unwrap(await api.GET('/api/v1/incidents/{id}', { params: { path: { id: incidentId } } })),
     { refetchInterval: 30_000 },
   );
+  const ai = useApiQuery(['ai-settings', orgId], async () =>
+    unwrap(await api.GET('/api/v1/organizations/{orgId}/settings/ai', { params: { path: { orgId } } })),
+  );
+  const canAsk = roleCan(role, 'ai.use') && ai.data && !ai.data.disabled && ai.data.available;
   const refresh = (data: unknown) => {
     queryClient.setQueryData(key, data);
   };
@@ -44,6 +48,13 @@ export default function IncidentPage() {
           <IncidentDetail
             data={detail.data as unknown as IncidentDetailData}
             canManage={roleCan(role, 'incident.manage')}
+            askAiHref={
+              canAsk
+                ? `/orgs/${orgId}/products/${productId}/ai?q=${encodeURIComponent(
+                    `What is going on with the incident "${(detail.data as { incident: { title: string } }).incident.title}"? Check related metrics, errors, and impact.`,
+                  )}`
+                : undefined
+            }
             onAcknowledge={async () =>
               refresh(unwrap(await api.POST('/api/v1/incidents/{id}/acknowledge', path)))
             }

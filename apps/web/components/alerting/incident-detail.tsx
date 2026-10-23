@@ -96,8 +96,11 @@ export function IncidentDetail({
   onAcknowledge,
   onResolve,
   onPostmortem,
+  askAiHref,
 }: {
   data: IncidentDetailData;
+  /** Set when AI is on and the member has `ai.use`. */
+  askAiHref?: string;
   canManage: boolean;
   onAcknowledge: () => Promise<void>;
   onResolve: (note: string) => Promise<void>;
@@ -131,6 +134,14 @@ export function IncidentDetail({
         <SeverityBadge severity={incident.severity} />
         <StatusBadge status={incident.status} />
         <h1 className="text-xl font-semibold">{incident.title}</h1>
+        {askAiHref ? (
+          <Link
+            className="ml-auto rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+            href={askAiHref}
+          >
+            Ask AI
+          </Link>
+        ) : null}
       </div>
       <p className="text-sm text-muted-foreground">Started {when(incident.startedAt)}</p>
       {error ? <Alert>{error}</Alert> : null}

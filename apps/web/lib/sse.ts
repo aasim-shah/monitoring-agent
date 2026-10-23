@@ -28,6 +28,9 @@ export interface EventStreamHandlers {
   onError(message: string): void;
   onClose(): void;
   fetch?: typeof fetch;
+  /** POST with a JSON body (the AI assistant); GET by default. */
+  method?: 'GET' | 'POST';
+  body?: unknown;
 }
 
 /**
@@ -41,7 +44,12 @@ export function openEventStream(url: string, handlers: EventStreamHandlers): () 
   void (async () => {
     try {
       const res = await doFetch(url, {
-        headers: { accept: 'text/event-stream' },
+        method: handlers.method ?? 'GET',
+        headers: {
+          accept: 'text/event-stream',
+          ...(handlers.body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(handlers.body === undefined ? {} : { body: JSON.stringify(handlers.body) }),
         credentials: 'same-origin',
         signal: ctrl.signal,
       });

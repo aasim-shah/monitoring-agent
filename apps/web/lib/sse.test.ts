@@ -56,4 +56,23 @@ describe('openEventStream', () => {
     });
     expect(onError).toHaveBeenCalledWith('At most 2 live tails per agent');
   });
+
+  it('can POST a JSON body (AI questions)', async () => {
+    const seen: RequestInit[] = [];
+    await new Promise<void>((resolve) => {
+      openEventStream('/x', {
+        method: 'POST',
+        body: { content: 'Why?' },
+        fetch: async (_url, init) => {
+          seen.push(init!);
+          return new Response(streamOf('event: done\ndata: {}\n\n'));
+        },
+        onEvent: () => {},
+        onError: () => {},
+        onClose: resolve,
+      });
+    });
+    expect(seen[0]).toMatchObject({ method: 'POST', body: '{"content":"Why?"}' });
+    expect((seen[0]!.headers as Record<string, string>)['content-type']).toBe('application/json');
+  });
 });

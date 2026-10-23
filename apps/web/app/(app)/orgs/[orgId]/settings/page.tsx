@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { z } from 'zod';
 import { ApiError, unwrap } from '@pcp/api-client';
 import type { Role } from '@pcp/shared-contracts';
+import { AiSettingsCard } from '@/components/ai/ai-settings-card';
 import { SimpleForm } from '@/components/auth/simple-form';
 import { Loading } from '@/components/states/loading';
 import { NotFoundState } from '@/components/states/not-found-state';
@@ -14,6 +15,7 @@ import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { roleCan } from '@/lib/permissions';
 import { useOrganization } from '@/lib/queries';
+import { useApiQuery } from '@/lib/use-api-query';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Enter a name').max(100),
@@ -25,6 +27,9 @@ export default function SettingsPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const queryClient = useQueryClient();
   const org = useOrganization(orgId);
+  const ai = useApiQuery(['ai-settings', orgId], async () =>
+    unwrap(await api.GET('/api/v1/organizations/{orgId}/settings/ai', { params: { path: { orgId } } })),
+  );
   const [saved, setSaved] = useState(false);
   if (org.visibleError instanceof ApiError && org.visibleError.status === 404) return <NotFoundState />;
   if (!org.data) return <Loading label="Loading settings" />;
@@ -67,6 +72,20 @@ export default function SettingsPage() {
           }}
         />
       </Card>
+      {ai.data ? (
+        <AiSettingsCard
+          settings={ai.data}
+          onChange={async (disabled) => {
+            unwrap(
+              await api.PATCH('/api/v1/organizations/{orgId}/settings/ai', {
+                params: { path: { orgId } },
+                body: { disabled },
+              }),
+            );
+            await queryClient.invalidateQueries({ queryKey: ['ai-settings', orgId] });
+          }}
+        />
+      ) : null}
     </section>
   );
 }

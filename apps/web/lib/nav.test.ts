@@ -59,8 +59,14 @@ describe('product navigation (spec §21)', () => {
       'Infrastructure',
       'Databases',
       'Incidents & Alerts',
+      'AI Assistant',
       'Audit Log',
     ]);
+    expect(items.find((i) => i.label === 'AI Assistant')).toEqual({
+      label: 'AI Assistant',
+      href: '/orgs/o/products/p/ai',
+    });
+    expect(labels(buildProductNav('o', 'p', 'viewer'))).not.toContain('AI Assistant');
     expect(items.find((i) => i.label === 'Incidents & Alerts')).toEqual({
       label: 'Incidents & Alerts',
       href: '/orgs/o/products/p/incidents',
