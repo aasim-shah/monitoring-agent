@@ -66,19 +66,30 @@ func Config(in Input) ([]byte, error) {
 		"batch": map[string]any{"timeout": "10s"},
 	}
 	pipelines := map[string]any{}
+	exporters := map[string]any{}
+	filter := allowlist(prefixes)
 	if len(logIDs) > 0 {
-		prefixes = append(prefixes, "log")
-		metricsReceivers = append(metricsReceivers, "count")
-		// Counts are delta sums; remote_write accepts cumulative ones only.
-		metricsProcessors = []string{"memory_limiter", "filter/allowlist", "deltatocumulative", "resource_detection", "batch"}
-		processors["deltatocumulative"] = map[string]any{}
+		// The count connector emits only when lines arrive. A loopback Prometheus exporter
+		// keeps the running totals and the collector scrapes them every 30 s, so a burst of
+		// errors becomes a steady counter that rate() can read.
 		pipelines["logs"] = map[string]any{
 			"receivers":  logIDs,
 			"processors": []string{"memory_limiter"},
 			"exporters":  []string{"count"},
 		}
+		pipelines["metrics/logcounts"] = map[string]any{
+			"receivers": []string{"count"},
+			"exporters": []string{"prometheus/logcounts"},
+		}
+		exporters["prometheus/logcounts"] = map[string]any{
+			"endpoint":          logCountsEndpoint,
+			"metric_expiration": "720h",
+		}
+		receivers["prometheus/logcounts"] = logCountsScrape()
+		metricsReceivers = append(metricsReceivers, "prometheus/logcounts")
+		filter = allowlist(prefixes, `^log_(lines|pattern)_total$`)
 	}
-	processors["filter/allowlist"] = allowlist(prefixes)
+	processors["filter/allowlist"] = filter
 	pipelines["metrics"] = map[string]any{
 		"receivers":  metricsReceivers,
 		"processors": metricsProcessors,
@@ -90,25 +101,24 @@ func Config(in Input) ([]byte, error) {
 		},
 		"receivers":  receivers,
 		"processors": processors,
-		"exporters": map[string]any{
-			// The gateway adds agent, product, environment, and tenant labels (BR-04-02).
-			"prometheus_remote_write": map[string]any{
-				"endpoint":             strings.TrimRight(in.IngestURL, "/") + "/prometheus/api/v1/write",
-				"tls":                  tls,
-				"retry_on_failure":     enabled,
-				"wal":                  map[string]any{"directory": filepath.Join(in.StorageDir, "wal")},
-				"remote_write_queue":   map[string]any{"enabled": true, "queue_size": 10000},
-				"max_batch_size_bytes": 3000000,
-				"target_info":          map[string]any{"enabled": false},
-				// Resource attributes (host.name, process.pid, …) become labels.
-				"resource_to_telemetry_conversion": enabled,
-			},
-		},
-		"service": map[string]any{
-			"extensions": []string{"health_check"},
-			"telemetry":  map[string]any{"metrics": map[string]any{"level": "none"}},
-			"pipelines":  pipelines,
-		},
+		"exporters":  exporters,
+	}
+	exporters["prometheus_remote_write"] = map[string]any{
+		// The gateway adds agent, product, environment, and tenant labels (BR-04-02).
+		"endpoint":             strings.TrimRight(in.IngestURL, "/") + "/prometheus/api/v1/write",
+		"tls":                  tls,
+		"retry_on_failure":     enabled,
+		"wal":                  map[string]any{"directory": filepath.Join(in.StorageDir, "wal")},
+		"remote_write_queue":   map[string]any{"enabled": true, "queue_size": 10000},
+		"max_batch_size_bytes": 3000000,
+		"target_info":          map[string]any{"enabled": false},
+		// Resource attributes (host.name, process.pid, …) become labels.
+		"resource_to_telemetry_conversion": enabled,
+	}
+	cfg["service"] = map[string]any{
+		"extensions": []string{"health_check"},
+		"telemetry":  map[string]any{"metrics": map[string]any{"level": "none"}},
+		"pipelines":  pipelines,
 	}
 	if len(logIDs) > 0 {
 		cfg["connectors"] = map[string]any{"count": countConnector()}

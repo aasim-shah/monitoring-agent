@@ -21,8 +21,10 @@ const byProcess = (l: Record<string, string>) =>
   `${l.process_executable_name || 'process'} (pid ${l.process_pid ?? '?'})`;
 
 /**
- * Error lines per minute from the pack's log files (M11.2 count connector). 0 while lines are
- * counted but none are errors; a gap when nothing is counted (no zeros without data).
+ * Error lines per minute from the pack's log files (M11.2 count connector). A counter only
+ * appears with its first lines, so MetricsQL `increase_pure` (counters start at 0) is used:
+ * `rate` would drop the first burst. 0 while lines are counted but none are errors; a gap
+ * when nothing is counted (no zeros without data).
  */
 const logErrors = (pack: string): ChartTemplate => {
   const lines = `{__name__=~"log_lines(_total)?",service="${pack}"`;
@@ -30,7 +32,7 @@ const logErrors = (pack: string): ChartTemplate => {
     key: 'logErrors',
     title: 'Log errors per minute',
     unit: 'count',
-    promql: `(sum(rate(${lines},level="error"}[5m])) * 60) or (sum(rate(${lines}}[5m])) * 0)`,
+    promql: `(sum(increase_pure(${lines},level="error"}[5m])) / 5) or (sum(increase_pure(${lines}}[5m])) * 0)`,
   };
 };
 

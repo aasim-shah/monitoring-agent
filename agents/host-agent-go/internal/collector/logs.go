@@ -72,6 +72,17 @@ func addLogReceivers(receivers map[string]any, packs []PackConfig, files func(st
 	return ids
 }
 
+// logCountsEndpoint is loopback only: the agent opens no other listener (WB-04).
+const logCountsEndpoint = "127.0.0.1:13134"
+
+func logCountsScrape() map[string]any {
+	return map[string]any{"config": map[string]any{"scrape_configs": []any{map[string]any{
+		"job_name":        "pcp-log-counts",
+		"scrape_interval": "30s",
+		"static_configs":  []any{map[string]any{"targets": []string{logCountsEndpoint}}},
+	}}}}
+}
+
 func countConnector() map[string]any {
 	key := func(k string) map[string]any { return map[string]any{"key": k} }
 	return map[string]any{"logs": map[string]any{

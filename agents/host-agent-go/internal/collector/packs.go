@@ -94,12 +94,15 @@ func addPacks(receivers map[string]any, packs []PackConfig) ([]string, []string,
 
 // allowlist drops every metric outside the enabled prefixes (BR-11-06). OTTL drops
 // what the condition matches; `[.]` avoids escaping a backslash through JSON and OTTL.
-func allowlist(prefixes []string) map[string]any {
+// Extra patterns keep whole metric names (the scraped log counts).
+func allowlist(prefixes []string, keep ...string) map[string]any {
+	cond := fmt.Sprintf(`not IsMatch(name, "^(%s)[.]")`, strings.Join(prefixes, "|"))
+	for _, k := range keep {
+		cond += fmt.Sprintf(` and not IsMatch(name, "%s")`, k)
+	}
 	return map[string]any{
 		"error_mode": "ignore",
-		"metrics": map[string]any{
-			"metric": []string{fmt.Sprintf(`not IsMatch(name, "^(%s)[.]")`, strings.Join(prefixes, "|"))},
-		},
+		"metrics":    map[string]any{"metric": []string{cond}},
 	}
 }
 

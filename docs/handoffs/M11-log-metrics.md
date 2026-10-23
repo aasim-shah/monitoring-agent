@@ -27,15 +27,18 @@
 - **Pipelines.**
   - **logs:** `filelog/*` → `memory_limiter` → `count`.
   - **count connector:** `log.lines{service,level}` and `log.pattern{service,pattern}`; the second counts only lines where `pattern` is set.
-  - **metrics:** `count` is added as a receiver. `deltatocumulative` runs after the allowlist, because remote_write accepts only cumulative sums. The allowlist keeps the `log.` prefix.
-  - **No log files:** without packs that have log files, there is no logs pipeline, no connector, and no `deltatocumulative` (the Node.js pack uses the journal).
-- **Stored names:** `log_lines_total` and `log_pattern_total` (a monotonic sum gets `_total`).
-- **Collector build:** `filelogreceiver`, `deltatocumulativeprocessor`, and `countconnector` v0.162.0 were added to `collector/builder-config.yaml`. The downloads image changes, and agents upgrade by re-running the installer.
+  - **metrics/logcounts:** `count` → `prometheus/logcounts`, a Prometheus exporter on `127.0.0.1:13134` (loopback only) that keeps the running totals for 720 h.
+  - **metrics:** a `prometheus/logcounts` receiver scrapes that exporter every 30 s. The allowlist keeps exactly `log_lines_total` and `log_pattern_total` and drops the scrape's own `up` and `scrape_*` series.
+  - **Why the loop:** the count connector emits only when lines arrive. Sent straight to remote_write, a burst of 3 errors became one sample, and the chart showed nothing (found by the agent end-to-end test). The scrape turns it into a steady counter.
+  - **No log files:** without packs that have log files, there is no logs pipeline, connector, exporter, or scrape (the Node.js pack uses the journal).
+- **Stored names:** `log_lines_total` and `log_pattern_total`, with labels `service`, `level` or `pattern`, plus `job="pcp-log-counts"`.
+- **Collector build:** `filelogreceiver`, `countconnector`, `prometheusexporter`, and `prometheusreceiver` v0.162.0 were added to `collector/builder-config.yaml`. The downloads image changes, and agents upgrade by re-running the installer.
 - **Charts:** every pack with log files (Redis, PostgreSQL, MySQL, MongoDB, Kafka, nginx) gains "Log errors per minute":
 
-  `(sum(rate({__name__=~"log_lines(_total)?",service="<pack>",level="error"}[5m])) * 60) or (sum(rate(…all levels…)) * 0)`
+  `(sum(increase_pure({__name__=~"log_lines(_total)?",service="<pack>",level="error"}[5m])) / 5) or (sum(increase_pure(…all levels…[5m])) * 0)`
 
-  The chart shows 0 while lines are counted but none are errors. It shows a gap when nothing is counted, so it never draws zeros without data.
+  - **Why `increase_pure`:** a counter first appears when its first lines arrive, already at their count. `rate` would drop that first burst; MetricsQL `increase_pure` counts from 0.
+  - The chart shows 0 while lines are counted but none are errors. It shows a gap when nothing is counted, so it never draws zeros without data.
 
 ## Tests
 
@@ -44,7 +47,11 @@
   - the connector definitions, both pipelines, and the allowlist
   - no logs pipeline without log files
 - `TestRealCollectorAcceptsEveryPack` now runs with `LogFiles` set, so the built collector validates every pack with the log pipeline.
-- `service-metrics.int.test.ts` covers the template for each pack and 2 errors per minute in VictoriaMetrics, read back as 2.
+- `service-metrics.int.test.ts` covers:
+  - the template for each pack
+  - 2 errors per minute in steady state
+  - a new counter's first burst (appearing at 3) charted above 0
+- Locally, the real collector, a log file, and VictoriaMetrics give `log_lines_total{level="error"}` = 3 every 30 s after 3 error lines.
 
 ## Notes
 

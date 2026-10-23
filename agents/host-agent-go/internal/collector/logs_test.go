@@ -135,18 +135,31 @@ func TestPackLogFilesBecomeLogCounts(t *testing.T) {
 	if strings.Join(toStrings(logs["exporters"]), ",") != "count" {
 		t.Errorf("logs exporters = %v", logs["exporters"])
 	}
-	metrics := pipes["metrics"].(map[string]any)
-	if !contains(toStrings(metrics["receivers"]), "count") {
-		t.Errorf("count must feed the metrics pipeline: %v", metrics["receivers"])
+	// Counts arrive only with new lines; a loopback exporter holds the totals and the
+	// collector scrapes them every 30 s, so sparse errors still yield steady samples.
+	counts := pipes["metrics/logcounts"].(map[string]any)
+	if strings.Join(toStrings(counts["receivers"]), ",") != "count" ||
+		strings.Join(toStrings(counts["exporters"]), ",") != "prometheus/logcounts" {
+		t.Errorf("metrics/logcounts = %v", counts)
 	}
-	// Count sums are deltas; remote_write only accepts cumulative sums.
-	if !contains(toStrings(metrics["processors"]), "deltatocumulative") {
-		t.Errorf("metrics processors = %v", metrics["processors"])
+	exp := cfg["exporters"].(map[string]any)["prometheus/logcounts"].(map[string]any)
+	if exp["endpoint"] != "127.0.0.1:13134" {
+		t.Errorf("log counts exporter must listen on loopback only: %v", exp)
+	}
+	scrape := recv["prometheus/logcounts"].(map[string]any)["config"].(map[string]any)["scrape_configs"].([]any)[0].(map[string]any)
+	target := scrape["static_configs"].([]any)[0].(map[string]any)["targets"].([]any)[0]
+	if scrape["scrape_interval"] != "30s" || target != "127.0.0.1:13134" {
+		t.Errorf("scrape = %v", scrape)
+	}
+	metrics := pipes["metrics"].(map[string]any)
+	if !contains(toStrings(metrics["receivers"]), "prometheus/logcounts") || contains(toStrings(metrics["receivers"]), "count") {
+		t.Errorf("metrics receivers = %v", metrics["receivers"])
 	}
 	filter := cfg["processors"].(map[string]any)["filter/allowlist"].(map[string]any)
-	cond := filter["metrics"].(map[string]any)["metric"].([]any)[0].(string)
-	if !strings.Contains(cond, "|log)") {
-		t.Errorf("allowlist must keep log metrics: %s", cond)
+	conds := filter["metrics"].(map[string]any)["metric"].([]any)
+	cond := conds[0].(string)
+	if !strings.Contains(cond, `not IsMatch(name, "^log_(lines|pattern)_total$")`) {
+		t.Errorf("allowlist must keep the scraped log counts: %s", cond)
 	}
 }
 
@@ -159,8 +172,8 @@ func TestNoLogFilesNoLogsPipeline(t *testing.T) {
 	if _, ok := cfg["connectors"]; ok {
 		t.Error("count connector without file sources")
 	}
-	if contains(toStrings(pipes["metrics"].(map[string]any)["receivers"]), "count") {
-		t.Error("count receiver without file sources")
+	if contains(toStrings(pipes["metrics"].(map[string]any)["receivers"]), "prometheus/logcounts") {
+		t.Error("log counts scrape without file sources")
 	}
 }
 

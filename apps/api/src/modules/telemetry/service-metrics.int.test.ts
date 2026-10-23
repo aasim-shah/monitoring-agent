@@ -63,7 +63,13 @@ beforeAll(async () => {
     agent_id: agent.agentId,
   };
   await importLines([...series(own, 5_000_000), ...series({ ...own, tenant_id: randomUUID() }, 99)]);
+  // A first error burst: the scraped counter appears at 3, never at 0 (M11.2).
+  const burst = Object.entries({ ...own, service: 'nginx', level: 'error' })
+    .map(([k, v]) => `${k}="${v}"`)
+    .join(',');
+  await importLines([1, 2, 3].map((m) => `log_lines_total{${burst}} 3 ${(nowS - m * 30) * 1000}`));
   await enable('redis', { endpoint: '127.0.0.1:6379' });
+  await enable('nginx', { endpoint: 'http://127.0.0.1/nginx_status' });
   await enable('nodejs', {});
 });
 
@@ -110,8 +116,18 @@ describe('service charts (WB-11, fixed PromQL per pack)', () => {
     expect(values(chart('hitRatio').series[0].points).every((v) => Math.abs(v - 90) < 0.01)).toBe(true);
     const errors = values(chart('logErrors').series[0].points);
     expect(errors.length).toBeGreaterThan(5);
-    expect(errors.every((v) => Math.abs(v - 2) < 0.01)).toBe(true);
+    // The imported counter starts at 80 (increase_pure counts that at the series start) and
+    // ends a minute ago; between those edges it reads 2 errors a minute.
+    const steady = errors.slice(5, -1);
+    expect(steady.length).toBeGreaterThan(5);
+    expect(steady.every((v) => Math.abs(v - 2) < 0.01)).toBe(true);
     expect(chart('logErrors').title).toBe('Log errors per minute');
+  });
+
+  it('counts the first burst of errors of a new counter', async () => {
+    const body = (await get(`/api/v1/agents/${agent.agentId}/services/nginx/metrics?range=15m`)).json();
+    const chart = body.charts.find((c: { key: string }) => c.key === 'logErrors');
+    expect(Math.max(...values(chart.series[0].points))).toBeGreaterThan(0);
   });
 
   it('labels one series per Node.js process', async () => {
