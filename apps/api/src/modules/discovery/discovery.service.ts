@@ -68,7 +68,7 @@ export class DiscoveryService {
       });
       const connections = await tx.connection.findMany({
         where: {
-          executionLocation: 'private',
+          // Private (worker) and managed (Atlas, Supabase, …) databases alike.
           provider: { in: DB_PROVIDERS },
           status: { notIn: ['disconnected', 'revoked'] },
           scopes: { some: { productId } },
@@ -176,6 +176,7 @@ export class DiscoveryService {
             database: cfg.database,
             connectionId: c.id,
             status: c.status,
+            managed: c.executionLocation === 'cloud',
           },
           productId,
         });

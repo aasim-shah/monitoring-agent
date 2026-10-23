@@ -100,6 +100,26 @@ describe('ingestObservation (UC-10-01)', () => {
   });
 });
 
+describe('merged assets', () => {
+  it('routes observations of a merged identity to the asset it was merged into', async () => {
+    const kept = await inOrg(orgA, (tx) =>
+      ingestObservation(tx, orgA, host(`agent:${randomUUID()}`, 'kept')),
+    );
+    const key = `agent:${randomUUID()}`;
+    const dup = await inOrg(orgA, (tx) => ingestObservation(tx, orgA, host(key, 'dup')));
+    await sql(
+      `UPDATE assets SET lifecycle = 'retired', attributes = jsonb_build_object('mergedInto', $2::text) WHERE id = $1`,
+      [dup.assetId, kept.assetId],
+    );
+    const again = await inOrg(orgA, (tx) => ingestObservation(tx, orgA, host(key, 'dup')));
+    expect(again).toMatchObject({ assetId: kept.assetId, created: false });
+    const [row] = await sql(`SELECT lifecycle FROM assets WHERE id = $1`, [dup.assetId]);
+    expect(row!.lifecycle).toBe('retired');
+    const [k] = await sql(`SELECT name FROM assets WHERE id = $1`, [kept.assetId]);
+    expect(k!.name).toBe('kept');
+  });
+});
+
 describe('edges (UC-10-03, BR-10-03/04)', () => {
   const pair = async () => {
     const s = await inOrg(orgA, (tx) =>

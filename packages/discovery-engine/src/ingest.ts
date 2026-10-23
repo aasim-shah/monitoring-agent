@@ -52,19 +52,29 @@ export async function ingestObservation(
   let created = false;
   let aliasCandidateId: string | undefined;
 
-  const existing =
+  let existing =
     o.identity.kind === 'stable'
       ? await tx.asset.findUnique({
           where: { organizationId_identityKey: { organizationId, identityKey: o.identity.key } },
         })
       : null;
+  // A reviewer merged this identity into another asset: keep feeding that one (UC-10-02).
+  const mergedInto = (existing?.attributes as Record<string, unknown> | null)?.mergedInto;
+  let redirected = false;
+  if (existing?.lifecycle === 'retired' && typeof mergedInto === 'string') {
+    const target = await tx.asset.findUnique({ where: { id: mergedInto } });
+    if (target) {
+      existing = target;
+      redirected = true;
+    }
+  }
   if (existing) {
     assetId = existing.id;
     await tx.asset.update({
       where: { id: existing.id },
       data: {
-        name,
-        attributes,
+        // A merged identity keeps the reviewed asset's name and attributes.
+        ...(redirected ? {} : { name, attributes }),
         lastSeenAt: now,
         missedRuns: 0,
         ...(['discovered', 'missing', 'unreachable'].includes(existing.lifecycle)

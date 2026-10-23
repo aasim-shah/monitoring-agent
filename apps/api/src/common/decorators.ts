@@ -10,7 +10,15 @@ export const AGENT_ROUTE = 'pcp:agent-route';
 export const AGENT_ENROLL = 'pcp:agent-enroll';
 export const INTERNAL_ROUTE = 'pcp:internal';
 
-export type TenantResource = 'organization' | 'product' | 'environment' | 'connection' | 'agent';
+export type TenantResource =
+  | 'organization'
+  | 'product'
+  | 'environment'
+  | 'connection'
+  | 'agent'
+  | 'asset'
+  | 'relationship'
+  | 'asset_alias';
 
 /** Route parameter that identifies the tenant resource; `orgId`, `productId`, `environmentId` imply theirs. */
 export type TenantScopeOptions =

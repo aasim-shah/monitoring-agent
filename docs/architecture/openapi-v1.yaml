@@ -1938,12 +1938,118 @@ paths:
       operationId: listProductAssets
       tags: [assets]
       summary: Product assets
-      description: Product assets.
+      description: Assets linked to the product (retired ones only with `lifecycle=retired`). Requires `asset.view`.
       security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: type, in: query, schema: { type: string } }
+        - { name: lifecycle, in: query, schema: { type: string } }
+        - { name: source, in: query, schema: { type: string } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      type: object,
+                      required: [assets],
+                      properties: { assets: { type: array, items: { $ref: '#/components/schemas/Asset' } } },
+                    },
+                },
+            }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
+    post:
+      operationId: createProductAsset
+      tags: [assets]
+      summary: Add a manual asset
+      description: A `manually_managed` asset linked to the product (UC-10-05). Requires `product.manage`; audited.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [assetType, name]
+              properties:
+                assetType:
+                  {
+                    type: string,
+                    enum: [host, service, database, website, domain, repository, worker, external],
+                  }
+                name: { type: string, maxLength: 256 }
+                attributes: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Success
+          content: { application/json: { schema: { $ref: '#/components/schemas/Asset' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
+  /api/v1/products/{id}/review:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getProductReview
+      tags: [assets]
+      summary: Discovery review queue
+      description: Proposed and drifted edges with evidence, and open alias candidates. Requires `asset.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [edges, aliases]
+                properties:
+                  edges: { type: array, items: { $ref: '#/components/schemas/Relationship' } }
+                  aliases:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, reason, asset, candidate, createdAt]
+                      properties:
+                        id: { type: string, format: uuid }
+                        reason: { type: string }
+                        asset: { $ref: '#/components/schemas/AssetRef' }
+                        candidate: { $ref: '#/components/schemas/AssetRef' }
+                        createdAt: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
+  /api/v1/products/{id}/discovery/run:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: runDiscovery
+      tags: [assets]
+      summary: Run discovery now
+      description: Hosts, services, databases, websites, and correlation rules for the product. Requires `product.manage`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      type: object,
+                      required: [assets, edges],
+                      properties: { assets: { type: integer }, edges: { type: integer } },
+                    },
+                },
+            }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/assets:
     post:
       operationId: createAsset
@@ -1961,36 +2067,121 @@ paths:
       operationId: getAsset
       tags: [assets]
       summary: Asset detail
-      description: Asset detail.
+      description: Asset with its visible products and recent observations. Requires `asset.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Asset'
+                  - type: object
+                    required: [observations]
+                    properties:
+                      observations:
+                        type: array
+                        items:
+                          type: object
+                          required: [source, observedAt, attributes]
+                          properties:
+                            source: { type: string }
+                            observedAt: { type: string, format: date-time }
+                            attributes: { type: object, additionalProperties: true }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/assets/{id}/relationships:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listAssetRelationships
       tags: [assets]
       summary: Asset relationships
-      description: Asset relationships.
+      description: Edges whose other end is visible to the caller. Requires `asset.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [relationships]
+                properties:
+                  relationships:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Relationship'
+                        - type: object
+                          required: [direction, other]
+                          properties:
+                            direction: { type: string, enum: [outgoing, incoming] }
+                            other: { $ref: '#/components/schemas/AssetRef' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
+    post:
+      operationId: createAssetRelationship
+      tags: [assets]
+      summary: Add a manual relationship
+      description: A verified edge from this asset with `manual` evidence (UC-10-05). Requires `relationship.verify`; audited.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [targetAssetId, type]
+              properties:
+                targetAssetId: { type: string, format: uuid }
+                type: { $ref: '#/components/schemas/RelationshipType' }
+      responses:
+        '201':
+          description: Success
+          content: { application/json: { schema: { $ref: '#/components/schemas/Relationship' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/assets/{id}/impact:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getAssetImpact
       tags: [assets]
       summary: Blast radius
-      description: Blast radius.
+      description: >-
+        Dependents of the asset (depth 4 by default, at most 6) among assets visible to the caller. confirmed = the
+        dependent's own health is failing; potential = reached through verified or ≥ 0.8 edges; unknown = otherwise.
       security: [{ sessionCookie: [] }]
+      parameters: [{ name: depth, in: query, schema: { type: integer, minimum: 1, maximum: 6 } }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [impact]
+                properties:
+                  impact:
+                    type: array
+                    items:
+                      type: object
+                      required: [assetId, name, assetType, distance, impact, via]
+                      properties:
+                        assetId: { type: string, format: uuid }
+                        name: { type: string }
+                        assetType: { type: string }
+                        distance: { type: integer }
+                        impact: { type: string, enum: [confirmed, potential, unknown] }
+                        via: { type: array, items: { type: string } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/assets/{id}/live:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
@@ -2009,24 +2200,52 @@ paths:
       operationId: retireAsset
       tags: [assets]
       summary: Retire asset
-      description: Retire asset.
+      description: Keeps history; discovery no longer revives it. Requires `product.manage`; audited.
       security: [{ sessionCookie: [] }]
       responses:
-        '204': { $ref: '#/components/responses/NoContent' }
+        '200':
+          description: Success
+          content: { application/json: { schema: { $ref: '#/components/schemas/Asset' } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/asset-aliases/{id}/resolve:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: resolveAssetAlias
       tags: [assets]
       summary: Merge or keep separate
-      description: Merge or keep separate.
+      description: >-
+        merge keeps the older asset and moves edges, product links, and observations onto it; the merged asset is
+        retired with `mergedInto`. Requires `product.manage`; audited.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties: { action: { type: string, enum: [merge, keep_separate] } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      type: object,
+                      required: [status],
+                      properties: { status: { type: string, enum: [merged, kept_separate] } },
+                    },
+                },
+            }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/relationships:
     post:
       operationId: createRelationship
@@ -2044,48 +2263,123 @@ paths:
       operationId: verifyRelationship
       tags: [assets]
       summary: Confirm relationship
-      description: Confirm relationship.
+      description: Both ends must be visible to the caller. Requires `relationship.verify`; audited.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content: { application/json: { schema: { $ref: '#/components/schemas/Relationship' } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/relationships/{id}/reject:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: rejectRelationship
       tags: [assets]
       summary: Reject relationship
-      description: Reject relationship.
+      description: Both ends must be visible to the caller. Requires `relationship.verify`; audited.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content: { application/json: { schema: { $ref: '#/components/schemas/Relationship' } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
+  /api/v1/relationships/{id}/correct:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: correctRelationship
+      tags: [assets]
+      summary: Correct relationship
+      description: The old edge is rejected and the corrected one verified (UC-10-06). Requires `relationship.verify`; audited.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                targetAssetId: { type: string, format: uuid }
+                type: { $ref: '#/components/schemas/RelationshipType' }
+      responses:
+        '200':
+          description: Success
+          content: { application/json: { schema: { $ref: '#/components/schemas/Relationship' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/products/{id}/topology:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getProductTopology
       tags: [assets]
       summary: Product topology graph
-      description: Product topology graph.
+      description: Visible assets of the product and the edges between them (rejected ones left out). Requires `asset.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodes, edges]
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, assetType, lifecycle]
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        assetType: { type: string }
+                        lifecycle: { type: string }
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, source, target, type, verification, confidence]
+                      properties:
+                        id: { type: string, format: uuid }
+                        source: { type: string, format: uuid }
+                        target: { type: string, format: uuid }
+                        type: { $ref: '#/components/schemas/RelationshipType' }
+                        verification: { type: string, enum: [proposed, verified, rejected, drifted] }
+                        confidence: { type: number }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/products/{id}/coverage:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getProductCoverage
       tags: [assets]
       summary: Coverage report
-      description: Coverage report.
+      description: Counts by lifecycle and type, edges by verification, and assets not seen for 24 h. Requires `asset.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assets, byLifecycle, byType, edges, stale]
+                properties:
+                  assets: { type: integer }
+                  byLifecycle: { type: object, additionalProperties: { type: integer } }
+                  byType: { type: object, additionalProperties: { type: integer } }
+                  edges: { type: object, additionalProperties: { type: integer } }
+                  stale: { type: integer }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M9
   /api/v1/metrics/query:
     post:
       operationId: queryMetrics
@@ -3225,6 +3519,52 @@ components:
                   receivedAt: { type: string, format: date-time }
                   health: { type: string }
                   queueDepth: { type: integer }
+    AssetRef:
+      type: object
+      required: [id, name, assetType]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        assetType: { type: string }
+    Asset:
+      type: object
+      required: [id, assetType, name, lifecycle, source, attributes, firstSeenAt, lastSeenAt, productIds]
+      properties:
+        id: { type: string, format: uuid }
+        assetType:
+          { type: string, enum: [host, service, database, website, domain, repository, worker, external] }
+        name: { type: string }
+        lifecycle:
+          { type: string, enum: [discovered, active, unreachable, missing, retired, manually_managed] }
+        source: { type: string, enum: [agent, connector, product_config, manual] }
+        attributes: { type: object, additionalProperties: true }
+        firstSeenAt: { type: string, format: date-time }
+        lastSeenAt: { type: string, format: date-time }
+        productIds: { type: array, items: { type: string, format: uuid } }
+    RelationshipType:
+      type: string
+      enum: [HOSTS, ROUTES_TO, CONNECTS_TO, DEPENDS_ON, DEPLOYS, MONITORED_BY, REPORTS_TO, DEPLOYED_ON]
+    Relationship:
+      type: object
+      required: [id, type, verification, confidence, ruleId, source, target, evidence, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/RelationshipType' }
+        verification: { type: string, enum: [proposed, verified, rejected, drifted] }
+        confidence: { type: number }
+        ruleId: { type: [string, 'null'] }
+        source: { $ref: '#/components/schemas/AssetRef' }
+        target: { $ref: '#/components/schemas/AssetRef' }
+        evidence:
+          type: array
+          items:
+            type: object
+            required: [kind, detail, observedAt]
+            properties:
+              kind: { type: string, enum: [direct, ip_match, connection, name, manual, contradiction] }
+              detail: { type: object, additionalProperties: true }
+              observedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     MonitoringPack:
       type: object
       required: [id, name, description, defaultEndpoint, credentialFields, settings]

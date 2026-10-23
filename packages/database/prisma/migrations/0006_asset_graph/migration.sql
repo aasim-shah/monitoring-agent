@@ -204,3 +204,48 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- ===== Part 3: tenant resolution for asset routes (TenantGuard) =====
+-- Organization of an asset, relationship, or alias, only when p_user is a member of it.
+CREATE FUNCTION pcp_resolve_asset_org(p_asset uuid, p_user uuid)
+  RETURNS uuid
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = public, pg_temp
+  AS $$
+    SELECT a.organization_id FROM assets a
+    JOIN organization_members m ON m.organization_id = a.organization_id AND m.user_id = p_user
+    WHERE a.id = p_asset
+  $$;
+
+CREATE FUNCTION pcp_resolve_relationship_org(p_relationship uuid, p_user uuid)
+  RETURNS uuid
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = public, pg_temp
+  AS $$
+    SELECT r.organization_id FROM asset_relationships r
+    JOIN organization_members m ON m.organization_id = r.organization_id AND m.user_id = p_user
+    WHERE r.id = p_relationship
+  $$;
+
+CREATE FUNCTION pcp_resolve_asset_alias_org(p_alias uuid, p_user uuid)
+  RETURNS uuid
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = public, pg_temp
+  AS $$
+    SELECT x.organization_id FROM asset_aliases x
+    JOIN organization_members m ON m.organization_id = x.organization_id AND m.user_id = p_user
+    WHERE x.id = p_alias
+  $$;
+
+DO $$
+DECLARE
+  f text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY['pcp_resolve_asset_org(uuid, uuid)', 'pcp_resolve_relationship_org(uuid, uuid)', 'pcp_resolve_asset_alias_org(uuid, uuid)']
+  LOOP
+    EXECUTE format('ALTER FUNCTION %s OWNER TO pcp_rls_definer', f);
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pcp_app', f);
+  END LOOP;
+END
+$$;

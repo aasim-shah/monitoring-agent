@@ -23,7 +23,6 @@ afterAll(async () => {
   await t?.close();
 });
 
-
 const heartbeat = (a: EnrolledAgent, ip: string) =>
   t.app.inject({
     method: 'POST',

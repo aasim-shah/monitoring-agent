@@ -112,6 +112,16 @@ export class TenantGuard implements CanActivate {
                pcp_resolve_agent_product(${id}::uuid, ${userId}::uuid)::text AS product`;
       return row?.org ? { organizationId: row.org, productId: row.product ?? undefined } : null;
     }
+    if (resource === 'asset' || resource === 'relationship' || resource === 'asset_alias') {
+      // Organization only: assets can belong to several products, so product scope is
+      // enforced by the assets service (an edge needs both ends visible, D7).
+      const [row] = await this.prisma.$queryRaw<{ org: string | null }[]>`
+        SELECT CASE ${resource}
+          WHEN 'asset' THEN pcp_resolve_asset_org(${id}::uuid, ${userId}::uuid)
+          WHEN 'relationship' THEN pcp_resolve_relationship_org(${id}::uuid, ${userId}::uuid)
+          ELSE pcp_resolve_asset_alias_org(${id}::uuid, ${userId}::uuid) END::text AS org`;
+      return row?.org ? { organizationId: row.org } : null;
+    }
     if (resource === 'product') {
       const [row] = await this.prisma.$queryRaw<{ org: string | null }[]>`
         SELECT pcp_resolve_product_org(${id}::uuid, ${userId}::uuid)::text AS org`;

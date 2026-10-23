@@ -1927,11 +1927,61 @@ export interface paths {
         };
         /**
          * Product assets
-         * @description Product assets.
+         * @description Assets linked to the product (retired ones only with `lifecycle=retired`). Requires `asset.view`.
          */
         get: operations["listProductAssets"];
         put?: never;
+        /**
+         * Add a manual asset
+         * @description A `manually_managed` asset linked to the product (UC-10-05). Requires `product.manage`; audited.
+         */
+        post: operations["createProductAsset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Discovery review queue
+         * @description Proposed and drifted edges with evidence, and open alias candidates. Requires `asset.view`.
+         */
+        get: operations["getProductReview"];
+        put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/discovery/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run discovery now
+         * @description Hosts, services, databases, websites, and correlation rules for the product. Requires `product.manage`.
+         */
+        post: operations["runDiscovery"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1970,7 +2020,7 @@ export interface paths {
         };
         /**
          * Asset detail
-         * @description Asset detail.
+         * @description Asset with its visible products and recent observations. Requires `asset.view`.
          */
         get: operations["getAsset"];
         put?: never;
@@ -1993,11 +2043,15 @@ export interface paths {
         };
         /**
          * Asset relationships
-         * @description Asset relationships.
+         * @description Edges whose other end is visible to the caller. Requires `asset.view`.
          */
         get: operations["listAssetRelationships"];
         put?: never;
-        post?: never;
+        /**
+         * Add a manual relationship
+         * @description A verified edge from this asset with `manual` evidence (UC-10-05). Requires `relationship.verify`; audited.
+         */
+        post: operations["createAssetRelationship"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2016,7 +2070,7 @@ export interface paths {
         };
         /**
          * Blast radius
-         * @description Blast radius.
+         * @description Dependents of the asset (depth 4 by default, at most 6) among assets visible to the caller. confirmed = the dependent's own health is failing; potential = reached through verified or ≥ 0.8 edges; unknown = otherwise.
          */
         get: operations["getAssetImpact"];
         put?: never;
@@ -2064,7 +2118,7 @@ export interface paths {
         put?: never;
         /**
          * Retire asset
-         * @description Retire asset.
+         * @description Keeps history; discovery no longer revives it. Requires `product.manage`; audited.
          */
         post: operations["retireAsset"];
         delete?: never;
@@ -2087,7 +2141,7 @@ export interface paths {
         put?: never;
         /**
          * Merge or keep separate
-         * @description Merge or keep separate.
+         * @description merge keeps the older asset and moves edges, product links, and observations onto it; the merged asset is retired with `mergedInto`. Requires `product.manage`; audited.
          */
         post: operations["resolveAssetAlias"];
         delete?: never;
@@ -2130,7 +2184,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm relationship
-         * @description Confirm relationship.
+         * @description Both ends must be visible to the caller. Requires `relationship.verify`; audited.
          */
         post: operations["verifyRelationship"];
         delete?: never;
@@ -2153,9 +2207,32 @@ export interface paths {
         put?: never;
         /**
          * Reject relationship
-         * @description Reject relationship.
+         * @description Both ends must be visible to the caller. Requires `relationship.verify`; audited.
          */
         post: operations["rejectRelationship"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/relationships/{id}/correct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Correct relationship
+         * @description The old edge is rejected and the corrected one verified (UC-10-06). Requires `relationship.verify`; audited.
+         */
+        post: operations["correctRelationship"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2174,7 +2251,7 @@ export interface paths {
         };
         /**
          * Product topology graph
-         * @description Product topology graph.
+         * @description Visible assets of the product and the edges between them (rejected ones left out). Requires `asset.view`.
          */
         get: operations["getProductTopology"];
         put?: never;
@@ -2197,7 +2274,7 @@ export interface paths {
         };
         /**
          * Coverage report
-         * @description Coverage report.
+         * @description Counts by lifecycle and type, edges by verification, and assets not seen for 24 h. Requires `asset.view`.
          */
         get: operations["getProductCoverage"];
         put?: never;
@@ -3172,6 +3249,55 @@ export interface components {
                 health: string;
                 queueDepth: number;
             }[];
+        };
+        AssetRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            assetType: string;
+        };
+        Asset: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            assetType: "host" | "service" | "database" | "website" | "domain" | "repository" | "worker" | "external";
+            name: string;
+            /** @enum {string} */
+            lifecycle: "discovered" | "active" | "unreachable" | "missing" | "retired" | "manually_managed";
+            /** @enum {string} */
+            source: "agent" | "connector" | "product_config" | "manual";
+            attributes: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            productIds: string[];
+        };
+        /** @enum {string} */
+        RelationshipType: "HOSTS" | "ROUTES_TO" | "CONNECTS_TO" | "DEPENDS_ON" | "DEPLOYS" | "MONITORED_BY" | "REPORTS_TO" | "DEPLOYED_ON";
+        Relationship: {
+            /** Format: uuid */
+            id: string;
+            type: components["schemas"]["RelationshipType"];
+            /** @enum {string} */
+            verification: "proposed" | "verified" | "rejected" | "drifted";
+            confidence: number;
+            ruleId: string | null;
+            source: components["schemas"]["AssetRef"];
+            target: components["schemas"]["AssetRef"];
+            evidence: {
+                /** @enum {string} */
+                kind: "direct" | "ip_match" | "connection" | "name" | "manual" | "contradiction";
+                detail: {
+                    [key: string]: unknown;
+                };
+                /** Format: date-time */
+                observedAt: string;
+            }[];
+            /** Format: date-time */
+            updatedAt: string;
         };
         MonitoringPack: {
             id: string;
@@ -5741,6 +5867,74 @@ export interface operations {
     };
     listProductAssets: {
         parameters: {
+            query?: {
+                type?: string;
+                lifecycle?: string;
+                source?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        assets: components["schemas"]["Asset"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createProductAsset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    assetType: "host" | "service" | "database" | "website" | "domain" | "repository" | "worker" | "external";
+                    name: string;
+                    attributes?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Asset"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getProductReview: {
+        parameters: {
             query?: never;
             header?: never;
             path: {
@@ -5751,7 +5945,54 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        edges: components["schemas"]["Relationship"][];
+                        aliases: {
+                            /** Format: uuid */
+                            id: string;
+                            reason: string;
+                            asset: components["schemas"]["AssetRef"];
+                            candidate: components["schemas"]["AssetRef"];
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    runDiscovery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        assets: number;
+                        edges: number;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5782,7 +6023,24 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Asset"] & {
+                        observations: {
+                            source: string;
+                            /** Format: date-time */
+                            observedAt: string;
+                            attributes: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5799,12 +6057,26 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        relationships: (components["schemas"]["Relationship"] & {
+                            /** @enum {string} */
+                            direction: "outgoing" | "incoming";
+                            other: components["schemas"]["AssetRef"];
+                        })[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
     };
-    getAssetImpact: {
+    createAssetRelationship: {
         parameters: {
             query?: never;
             header?: never;
@@ -5814,9 +6086,64 @@ export interface operations {
             };
             cookie?: never;
         };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    targetAssetId: string;
+                    type: components["schemas"]["RelationshipType"];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Relationship"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getAssetImpact: {
+        parameters: {
+            query?: {
+                depth?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        impact: {
+                            /** Format: uuid */
+                            assetId: string;
+                            name: string;
+                            assetType: string;
+                            distance: number;
+                            /** @enum {string} */
+                            impact: "confirmed" | "potential" | "unknown";
+                            via: string[];
+                        }[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5850,7 +6177,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            204: components["responses"]["NoContent"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Asset"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5865,9 +6200,27 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "merge" | "keep_separate";
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "merged" | "kept_separate";
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5898,7 +6251,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Relationship"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5915,7 +6276,49 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Relationship"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    correctRelationship: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    targetAssetId?: string;
+                    type?: components["schemas"]["RelationshipType"];
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Relationship"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5932,7 +6335,35 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        nodes: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            assetType: string;
+                            lifecycle: string;
+                        }[];
+                        edges: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            source: string;
+                            /** Format: uuid */
+                            target: string;
+                            type: components["schemas"]["RelationshipType"];
+                            /** @enum {string} */
+                            verification: "proposed" | "verified" | "rejected" | "drifted";
+                            confidence: number;
+                        }[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -5949,7 +6380,27 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        assets: number;
+                        byLifecycle: {
+                            [key: string]: number;
+                        };
+                        byType: {
+                            [key: string]: number;
+                        };
+                        edges: {
+                            [key: string]: number;
+                        };
+                        stale: number;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
