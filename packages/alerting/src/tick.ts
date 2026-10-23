@@ -10,7 +10,7 @@ type Tx = Prisma.TransactionClient;
  */
 export async function tick(tx: Tx, organizationId: string, now: Date): Promise<NotifyRequest[]> {
   const rules = await tx.alertRule.findMany({
-    where: { enabled: true, template: { in: ['agent_heartbeat_missing', 'connection_degraded'] } },
+    where: { enabled: true, archivedAt: null, template: { in: ['agent_heartbeat_missing', 'connection_degraded'] } },
   });
   const alerts: NormalizedAlert[] = [];
   for (const rule of rules) {

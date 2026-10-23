@@ -217,6 +217,35 @@ describe('alert receiver (UC-13-02, BR-13-08)', () => {
   });
 });
 
+describe('deleting a rule keeps its incidents', () => {
+  it('archives the rule: no longer listed or evaluated, its incident history stays', async () => {
+    const { owner, productId } = await setup();
+    const rule = (
+      await call(owner.cookie, 'POST', `/api/v1/products/${productId}/alert-rules`, {
+        template: 'host_cpu_high',
+      })
+    ).json();
+    await receive([alert(owner.orgId, rule.id)]);
+    expect((await call(owner.cookie, 'DELETE', `/api/v1/alert-rules/${rule.id}`)).statusCode).toBe(204);
+    const list = await call(owner.cookie, 'GET', `/api/v1/products/${productId}/alert-rules`);
+    expect(list.json().rules).toEqual([]);
+    expect(tenantFile(owner.orgId)).toEqual({ groups: [] });
+    const incidents = (
+      await call(owner.cookie, 'GET', `/api/v1/products/${productId}/incidents?status=all`)
+    ).json().incidents;
+    expect(incidents).toHaveLength(1);
+    // Alerts for an archived rule are not ingested.
+    await receive([
+      alert(owner.orgId, rule.id, { labels: { ...alert(owner.orgId, rule.id).labels, agent_id: 'other' } }),
+    ]);
+    expect(
+      (await call(owner.cookie, 'GET', `/api/v1/products/${productId}/incidents?status=all`)).json()
+        .incidents,
+    ).toHaveLength(1);
+    expect((await call(owner.cookie, 'DELETE', `/api/v1/alert-rules/${rule.id}`)).statusCode).toBe(404);
+  });
+});
+
 describe('incidents (UC-13-06/08/11)', () => {
   it('acknowledges, resolves with a note, records a postmortem, and hides other products', async () => {
     const { owner, productId } = await setup();

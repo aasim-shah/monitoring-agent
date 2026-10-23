@@ -4,6 +4,7 @@ import {
   TEMPLATES,
   compileTenant,
   isTemplateId,
+  resolveManually,
   validateParams,
   type Params,
   type TemplateId,
@@ -14,7 +15,7 @@ import { withTenant } from '@pcp/tenant-security';
 import type { z } from 'zod';
 import type { AppConfig } from '../../config.js';
 import { ApiException, notFound } from '../../common/errors.js';
-import { APP_CONFIG, PRISMA } from '../../tokens.js';
+import { APP_CONFIG, CLOCK, PRISMA } from '../../tokens.js';
 import { AuditService } from '../auditing/audit.service.js';
 import { reloadVmalert, writeTenantRules } from './rule-files.js';
 import type { createRuleBody, updateRuleBody } from './schemas.js';
@@ -52,6 +53,7 @@ export class RulesService {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    @Inject(CLOCK) private readonly now: () => Date,
     private readonly audit: AuditService,
   ) {}
 
@@ -61,7 +63,7 @@ export class RulesService {
 
   async list(ctx: TenantContext, productId: string) {
     const rules = await withTenant(this.prisma, ctx, (tx) =>
-      tx.alertRule.findMany({ where: { productId }, orderBy: { createdAt: 'asc' } }),
+      tx.alertRule.findMany({ where: { productId, archivedAt: null }, orderBy: { createdAt: 'asc' } }),
     );
     return { rules: rules.map(view), templates: this.templates() };
   }
@@ -89,9 +91,9 @@ export class RulesService {
   async recommended(ctx: TenantContext, productId: string) {
     await withTenant(this.prisma, ctx, async (tx) => {
       const have = new Set(
-        (await tx.alertRule.findMany({ where: { productId }, select: { template: true } })).map(
-          (r) => r.template,
-        ),
+        (
+          await tx.alertRule.findMany({ where: { productId, archivedAt: null }, select: { template: true } })
+        ).map((r) => r.template),
       );
       const missing = RECOMMENDED.filter((t) => !have.has(t));
       for (const t of missing) await this.insert(tx, ctx, productId, t, params(t, {}), {});
@@ -110,7 +112,7 @@ export class RulesService {
   async update(ctx: TenantContext, id: string, body: z.output<typeof updateRuleBody>) {
     const rule = await withTenant(this.prisma, ctx, async (tx) => {
       const current = await tx.alertRule.findUnique({ where: { id } });
-      if (!current) throw notFound();
+      if (!current || current.archivedAt) throw notFound();
       const updated = await tx.alertRule.update({
         where: { id },
         data: {
@@ -139,10 +141,24 @@ export class RulesService {
     return view(rule);
   }
 
+  /**
+   * Deleting archives the rule: it stops evaluating and leaves the list, while its incidents
+   * (history, postmortems) stay. Open incidents of the rule are resolved with a note.
+   */
   async remove(ctx: TenantContext, id: string) {
+    const now = this.now();
     await withTenant(this.prisma, ctx, async (tx) => {
-      const { count } = await tx.alertRule.deleteMany({ where: { id } });
+      const { count } = await tx.alertRule.updateMany({
+        where: { id, archivedAt: null },
+        data: { archivedAt: now, enabled: false },
+      });
       if (!count) throw notFound();
+      const open = await tx.alertIncident.findMany({
+        where: { ruleId: id, status: { not: 'resolved' } },
+        select: { id: true },
+      });
+      const userId = ctx.actor.kind === 'user' ? ctx.actor.userId : 'system';
+      for (const i of open) await resolveManually(tx, i.id, userId, 'Alert rule deleted', now);
       await this.audit.record(tx, ctx, {
         action: 'alert_rule.delete',
         targetType: 'alert_rule',
@@ -182,7 +198,7 @@ export class RulesService {
   private async sync(ctx: TenantContext) {
     const system: TenantContext = { ...ctx, productIds: 'all' };
     const rules = await withTenant(this.prisma, system, async (tx) => {
-      const all = await tx.alertRule.findMany({ orderBy: { createdAt: 'asc' } });
+      const all = await tx.alertRule.findMany({ where: { archivedAt: null }, orderBy: { createdAt: 'asc' } });
       const enabled = all.some((r) => r.enabled);
       await tx.jobDefinition.upsert({
         where: {

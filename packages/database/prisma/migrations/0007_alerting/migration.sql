@@ -32,6 +32,7 @@ CREATE TABLE "alert_rules" (
     "params" JSONB NOT NULL DEFAULT '{}',
     "severity" "alert_severity" NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT true,
+    "archived_at" TIMESTAMPTZ(6),
     "created_by_user_id" UUID,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
@@ -186,7 +187,7 @@ CREATE FUNCTION pcp_alerting_orgs()
   LANGUAGE sql STABLE SECURITY DEFINER
   SET search_path = public, pg_temp
   AS $$
-    SELECT r.organization_id FROM alert_rules r WHERE r.enabled
+    SELECT r.organization_id FROM alert_rules r WHERE r.enabled AND r.archived_at IS NULL
     UNION
     SELECT i.organization_id FROM alert_incidents i WHERE i.status = 'open' AND i.severity = 'critical'
   $$;

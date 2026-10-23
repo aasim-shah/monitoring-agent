@@ -71,7 +71,7 @@ export async function ingest(
   const rules = new Map(
     (
       await tx.alertRule.findMany({
-        where: { id: { in: [...new Set(alerts.map((a) => a.ruleId))] } },
+        where: { id: { in: [...new Set(alerts.map((a) => a.ruleId))] }, archivedAt: null },
         select: { id: true, name: true, productId: true, severity: true },
       })
     ).map((r) => [r.id, r]),

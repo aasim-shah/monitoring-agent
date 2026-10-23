@@ -947,6 +947,8 @@ model AlertRule {
   params          Json          @default("{}")
   severity        AlertSeverity
   enabled         Boolean       @default(true)
+  /// Set when a member deletes the rule: it stops evaluating, its incidents stay.
+  archivedAt      DateTime?     @map("archived_at") @db.Timestamptz(6)
   createdByUserId String?       @map("created_by_user_id") @db.Uuid
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
