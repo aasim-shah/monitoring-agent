@@ -2940,7 +2940,7 @@ export interface paths {
         };
         /**
          * Action policies
-         * @description Action policies.
+         * @description Every capability for every environment of the product. Missing policies are disabled (BR-16-01). Requires `incident.view`.
          */
         get: operations["listActionPolicies"];
         put?: never;
@@ -2965,8 +2965,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Set action policy
-         * @description Set action policy.
+         * Configure an action policy
+         * @description Enables a capability for one environment with approver roles and allowlists (units, zones, workflows with refs). Requires `org.settings.manage`.
          */
         put: operations["putActionPolicy"];
         post?: never;
@@ -2986,10 +2986,33 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Propose action
-         * @description Propose action.
+         * Propose an action
+         * @description Validates the target, checks the policy, assesses impact from the asset graph, and returns the request: `rejected_policy`, `pending_approval`, or (non-production, policy without approval) `executing`. The same idempotency key returns the original request. Host restarts need agent 0.3.0 with pcp-helper (409 agent_upgrade_required); Cloudflare and GitHub actions need their connection (409 connection_required). Requires `action.propose`.
          */
         post: operations["proposeAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Actions of a product
+         * @description Up to 100, newest first; `status` filters. Requires `incident.view`.
+         */
+        get: operations["listActions"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3007,8 +3030,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Action request
-         * @description Action request.
+         * Action with approvals and executions
+         * @description Requires `incident.view`.
          */
         get: operations["getAction"];
         put?: never;
@@ -3033,7 +3056,7 @@ export interface paths {
         put?: never;
         /**
          * Approve
-         * @description Approve.
+         * @description By a member holding one of the policy's approver roles. In production the approver must differ from the requester (403 self_approval). Purge-everything needs two approvers. A complete approval issues a new signed 10-minute task, or waits while another action runs on the same target.
          */
         post: operations["approveAction"];
         delete?: never;
@@ -3056,7 +3079,7 @@ export interface paths {
         put?: never;
         /**
          * Reject
-         * @description Reject.
+         * @description By an approver, with a note. The rejection is audited.
          */
         post: operations["rejectAction"];
         delete?: never;
@@ -3077,7 +3100,7 @@ export interface paths {
         };
         /**
          * Executions
-         * @description Executions.
+         * @description Each attempt with its location, adapter, timing, result, and verification. Requires `incident.view`.
          */
         get: operations["listActionExecutions"];
         put?: never;
@@ -3185,6 +3208,91 @@ export interface components {
                 /** Format: date-time */
                 sentAt?: string | null;
             }[];
+        };
+        ActionPolicy: {
+            /** Format: uuid */
+            id?: string | null;
+            /** Format: uuid */
+            environmentId: string;
+            environmentName?: string;
+            production?: boolean;
+            capability: string;
+            label?: string;
+            enabled: boolean;
+            approverRoles: string[];
+            requireApproval: boolean;
+            settings: {
+                [key: string]: unknown;
+            };
+            /** @description False until the capability's connection type exists (Cloudflare */
+            available?: boolean;
+        };
+        ActionExecution: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            location: "agent" | "platform";
+            adapter: string;
+            adapterVersion: string;
+            /** Format: uuid */
+            agentTaskId?: string | null;
+            /** @enum {string} */
+            status: "running" | "succeeded" | "failed" | "expired";
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt?: string | null;
+            result?: {
+                [key: string]: unknown;
+            } | null;
+            verification?: {
+                [key: string]: unknown;
+            } | null;
+            error?: string | null;
+        };
+        ActionRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            productId: string;
+            /** Format: uuid */
+            environmentId: string;
+            capability: string;
+            target: {
+                [key: string]: unknown;
+            };
+            params: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            status: "proposed" | "rejected_policy" | "pending_approval" | "approved" | "executing" | "succeeded" | "failed" | "rejected" | "expired";
+            reason?: string | null;
+            impact?: {
+                [key: string]: unknown;
+            };
+            proposedByAi: boolean;
+            /** Format: uuid */
+            requestedByUserId?: string | null;
+            /** Format: uuid */
+            incidentId?: string | null;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string;
+            approvals?: {
+                /** Format: uuid */
+                id?: string;
+                /** Format: uuid */
+                userId?: string;
+                /** @enum {string} */
+                decision?: "approve" | "reject";
+                note?: string | null;
+                /** Format: date-time */
+                createdAt?: string;
+            }[];
+            executions?: components["schemas"]["ActionExecution"][];
         };
         WebsiteMonitor: {
             /** Format: uuid */
@@ -7997,7 +8105,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        policies: components["schemas"]["ActionPolicy"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -8014,9 +8132,29 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    environmentId: string;
+                    enabled: boolean;
+                    approverRoles?: ("owner" | "admin" | "operator")[];
+                    /** @description Ignored in production and for AI proposals */
+                    requireApproval?: boolean;
+                    settings?: {
+                        units?: string[];
+                        zones?: string[];
+                        workflows?: {
+                            workflow?: string;
+                            ref?: string;
+                        }[];
+                    };
+                };
+            };
+        };
         responses: {
             200: components["responses"]["Ok"];
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -8028,9 +8166,79 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    productId: string;
+                    /** Format: uuid */
+                    environmentId: string;
+                    /** @enum {string} */
+                    capability: "host.restart_service" | "cloudflare.purge_cache" | "github.workflow_dispatch";
+                    /**
+                     * @example {
+                     *       "agentId": "7b3c8f2a-1d4e-4c5b-9a6f-0e1d2c3b4a59"
+                     *     }
+                     */
+                    target: {
+                        [key: string]: unknown;
+                    };
+                    /**
+                     * @example {
+                     *       "unit": "api.service"
+                     *     }
+                     */
+                    params?: {
+                        [key: string]: unknown;
+                    };
+                    idempotencyKey: string;
+                    reason?: string;
+                    /** Format: uuid */
+                    incidentId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created (or the original request for a repeated key) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listActions: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
         requestBody?: never;
         responses: {
-            201: components["responses"]["Created"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        actions: components["schemas"]["ActionRequest"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -8047,7 +8255,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRequest"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -8062,11 +8278,27 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string;
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRequest"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     rejectAction: {
@@ -8079,11 +8311,28 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: string;
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listActionExecutions: {
@@ -8098,7 +8347,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        executions: components["schemas"]["ActionExecution"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

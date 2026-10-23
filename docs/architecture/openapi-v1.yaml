@@ -3259,83 +3259,206 @@ paths:
       operationId: listActionPolicies
       tags: [actions]
       summary: Action policies
-      description: Action policies.
+      description: Every capability for every environment of the product. Missing policies are disabled (BR-16-01). Requires `incident.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [policies]
+                properties:
+                  policies: { type: array, items: { $ref: '#/components/schemas/ActionPolicy' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M16
   /api/v1/products/{id}/action-policies/{type}:
-    parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/type' }]
+    parameters:
+      - { $ref: '#/components/parameters/id' }
+      - { $ref: '#/components/parameters/type' }
     put:
       operationId: putActionPolicy
       tags: [actions]
-      summary: Set action policy
-      description: Set action policy.
+      summary: Configure an action policy
+      description: Enables a capability for one environment with approver roles and allowlists (units, zones, workflows with refs). Requires `org.settings.manage`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [environmentId, enabled]
+              properties:
+                environmentId: { type: string, format: uuid }
+                enabled: { type: boolean }
+                approverRoles: { type: array, items: { type: string, enum: [owner, admin, operator] } }
+                requireApproval: { type: boolean, description: Ignored in production and for AI proposals, which always need approval. }
+                settings:
+                  type: object
+                  properties:
+                    units: { type: array, items: { type: string } }
+                    zones: { type: array, items: { type: string } }
+                    workflows: { type: array, items: { type: object, properties: { workflow: { type: string }, ref: { type: string } } } }
       responses:
         '200': { $ref: '#/components/responses/Ok' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M16
   /api/v1/actions/proposals:
     post:
       operationId: proposeAction
       tags: [actions]
-      summary: Propose action
-      description: Propose action.
+      summary: Propose an action
+      description: >-
+        Validates the target, checks the policy, assesses impact from the asset graph, and returns the request:
+        `rejected_policy`, `pending_approval`, or (non-production, policy without approval) `executing`. The same
+        idempotency key returns the original request. Host restarts need agent 0.3.0 with pcp-helper (409
+        agent_upgrade_required); Cloudflare and GitHub actions need their connection (409 connection_required).
+        Requires `action.propose`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, environmentId, capability, target, idempotencyKey]
+              properties:
+                productId: { type: string, format: uuid }
+                environmentId: { type: string, format: uuid }
+                capability: { type: string, enum: [host.restart_service, cloudflare.purge_cache, github.workflow_dispatch] }
+                target: { type: object, additionalProperties: true, example: { agentId: 7b3c8f2a-1d4e-4c5b-9a6f-0e1d2c3b4a59 } }
+                params: { type: object, additionalProperties: true, example: { unit: api.service } }
+                idempotencyKey: { type: string, minLength: 8 }
+                reason: { type: string }
+                incidentId: { type: string, format: uuid }
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Created (or the original request for a repeated key)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionRequest' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M16
+  /api/v1/products/{id}/actions:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listActions
+      tags: [actions]
+      summary: Actions of a product
+      description: Up to 100, newest first; `status` filters. Requires `incident.view`.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [actions]
+                properties:
+                  actions: { type: array, items: { $ref: '#/components/schemas/ActionRequest' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M16
   /api/v1/actions/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getAction
       tags: [actions]
-      summary: Action request
-      description: Action request.
+      summary: Action with approvals and executions
+      description: Requires `incident.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M16
   /api/v1/actions/{id}/approve:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: approveAction
       tags: [actions]
       summary: Approve
-      description: Approve.
+      description: >-
+        By a member holding one of the policy's approver roles. In production the approver must differ from the
+        requester (403 self_approval). Purge-everything needs two approvers. A complete approval issues a new signed
+        10-minute task, or waits while another action runs on the same target.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { note: { type: string } } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M16
   /api/v1/actions/{id}/reject:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: rejectAction
       tags: [actions]
       summary: Reject
-      description: Reject.
+      description: By an approver, with a note. The rejection is audited.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [note], properties: { note: { type: string } } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActionRequest' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M16
   /api/v1/actions/{id}/executions:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: listActionExecutions
       tags: [actions]
       summary: Executions
-      description: Executions.
+      description: Each attempt with its location, adapter, timing, result, and verification. Requires `incident.view`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [executions]
+                properties:
+                  executions: { type: array, items: { $ref: '#/components/schemas/ActionExecution' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M16
 components:
   securitySchemes:
     sessionCookie:
@@ -3506,6 +3629,66 @@ components:
                   attempts: { type: integer }
                   lastError: { type: string, nullable: true }
                   sentAt: { type: string, format: date-time, nullable: true }
+    ActionPolicy:
+      type: object
+      required: [environmentId, capability, enabled, approverRoles, requireApproval, settings]
+      properties:
+        id: { type: string, format: uuid, nullable: true }
+        environmentId: { type: string, format: uuid }
+        environmentName: { type: string }
+        production: { type: boolean }
+        capability: { type: string }
+        label: { type: string }
+        enabled: { type: boolean }
+        approverRoles: { type: array, items: { type: string } }
+        requireApproval: { type: boolean }
+        settings: { type: object, additionalProperties: true }
+        available: { type: boolean, description: False until the capability's connection type exists (Cloudflare, GitHub). }
+    ActionExecution:
+      type: object
+      required: [id, location, adapter, adapterVersion, status, startedAt]
+      properties:
+        id: { type: string, format: uuid }
+        location: { type: string, enum: [agent, platform] }
+        adapter: { type: string }
+        adapterVersion: { type: string }
+        agentTaskId: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [running, succeeded, failed, expired] }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+        result: { type: object, nullable: true, additionalProperties: true }
+        verification: { type: object, nullable: true, additionalProperties: true }
+        error: { type: string, nullable: true }
+    ActionRequest:
+      type: object
+      required: [id, productId, environmentId, capability, target, params, status, proposedByAi, expiresAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        environmentId: { type: string, format: uuid }
+        capability: { type: string }
+        target: { type: object, additionalProperties: true }
+        params: { type: object, additionalProperties: true }
+        status: { type: string, enum: [proposed, rejected_policy, pending_approval, approved, executing, succeeded, failed, rejected, expired] }
+        reason: { type: string, nullable: true }
+        impact: { type: object, additionalProperties: true }
+        proposedByAi: { type: boolean }
+        requestedByUserId: { type: string, format: uuid, nullable: true }
+        incidentId: { type: string, format: uuid, nullable: true }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        approvals:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              userId: { type: string, format: uuid }
+              decision: { type: string, enum: [approve, reject] }
+              note: { type: string, nullable: true }
+              createdAt: { type: string, format: date-time }
+        executions: { type: array, items: { $ref: '#/components/schemas/ActionExecution' } }
     WebsiteMonitor:
       type: object
       required: [id, productId, url, host, intervalSeconds, status, verification]

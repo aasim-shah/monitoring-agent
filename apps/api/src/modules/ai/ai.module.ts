@@ -1,3 +1,4 @@
+import { ActionsModule } from '../actions/actions.module.js';
 import { Module } from '@nestjs/common';
 import { AssetsModule } from '../assets/assets.module.js';
 import { AuditingModule } from '../auditing/auditing.module.js';
@@ -6,7 +7,7 @@ import { AiController } from './ai.controller.js';
 import { AiService } from './ai.service.js';
 
 @Module({
-  imports: [AssetsModule, AuditingModule, TelemetryModule],
+  imports: [AssetsModule, AuditingModule, TelemetryModule, ActionsModule],
   controllers: [AiController],
   providers: [AiService],
 })

@@ -111,6 +111,9 @@ importers:
       '@pcp/alerting':
         specifier: workspace:*
         version: link:../../packages/alerting
+      '@pcp/automation':
+        specifier: workspace:*
+        version: link:../../packages/automation
       '@pcp/connector-runtime':
         specifier: workspace:*
         version: link:../../packages/connector-runtime

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { defineTool, ToolNotFound, type Tool } from '@pcp/ai-orchestrator';
 import type { PrismaClient } from '@pcp/database';
 import type { TenantContext } from '@pcp/shared-contracts';
@@ -8,8 +9,24 @@ import type { AssetsService } from '../assets/assets.service.js';
 import { FLEET_QUERIES } from '../telemetry/host-metrics.js';
 import type { TelemetryQueryService } from '../telemetry/query.service.js';
 
+/** Creates an action proposal flagged as the AI's (M16); it always waits for a person. */
+export type ProposeAction = (
+  ctx: TenantContext,
+  input: {
+    productId: string;
+    environmentId: string;
+    capability: string;
+    target: Record<string, unknown>;
+    params: Record<string, unknown>;
+    idempotencyKey: string;
+    reason?: string;
+  },
+  opts: { proposedByAi: true },
+) => Promise<{ id: string; status: string; reason: string | null }>;
+
 /** What every tool needs; the product is the conversation's, never chosen by the model. */
 export interface AiDeps {
+  proposeAction?: ProposeAction;
   prisma: PrismaClient;
   assets: AssetsService;
   telemetry: TelemetryQueryService;
@@ -78,6 +95,46 @@ async function hostStats(
 }
 
 export const AI_TOOLS: Tool[] = [
+  defineTool<{ agentId: string; unit: string; reason: string }, AiDeps>({
+    name: 'proposeAction',
+    description:
+      'Propose restarting one systemd service on a host of this product. This only creates a request that a person must review and approve; it never runs by itself. Use it only when the evidence points at a stuck service, and say so in the reason.',
+    permission: 'action.propose',
+    input: z.object({
+      agentId: UUID.describe('The host agent ID'),
+      unit: z.string().max(128).describe('The systemd unit, e.g. api.service'),
+      reason: z.string().max(300).describe('Why, citing the evidence'),
+    }),
+    async run(ctx, input, d) {
+      if (!d.proposeAction) throw new ToolNotFound();
+      const agent = await scoped(() =>
+        withTenant(d.prisma, ctx, (tx) =>
+          tx.agent.findFirst({
+            where: { id: input.agentId, productId: d.productId },
+            select: { environmentId: true },
+          }),
+        ),
+      );
+      if (!agent) throw new ToolNotFound();
+      const r = await d.proposeAction(
+        ctx,
+        {
+          productId: d.productId,
+          environmentId: agent.environmentId,
+          capability: 'host.restart_service',
+          target: { agentId: input.agentId },
+          params: { unit: input.unit },
+          idempotencyKey: `ai-${randomUUID()}`,
+          reason: input.reason,
+        },
+        { proposedByAi: true },
+      );
+      return {
+        data: { requestId: r.id, status: r.status, policyNote: r.reason },
+        sources: [{ label: 'Approval request', href: `${base(d)}/automations/${r.id}` }],
+      };
+    },
+  }),
   defineTool<Record<string, never>, AiDeps>({
     name: 'listProducts',
     description: 'Products the asking member can see in this organization.',

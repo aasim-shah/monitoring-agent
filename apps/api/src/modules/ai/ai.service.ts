@@ -1,3 +1,4 @@
+import { ActionsService } from '../actions/actions.service.js';
 import { Inject, Injectable } from '@nestjs/common';
 import { runInvestigation, type ChatMessage, type ChatProvider, type Evidence } from '@pcp/ai-orchestrator';
 import type { Prisma, PrismaClient } from '@pcp/database';
@@ -12,7 +13,7 @@ import { AuditService } from '../auditing/audit.service.js';
 import { SseWriter } from '../logs/sse-writer.js';
 import { TelemetryQueryService } from '../telemetry/query.service.js';
 import { buildProvider } from './provider.factory.js';
-import { AI_TOOLS } from './tools.js';
+import { AI_TOOLS, type ProposeAction } from './tools.js';
 
 /** Conversations are listed for 90 days (master plan §3). */
 const RETENTION_MS = 90 * 86400_000;
@@ -41,6 +42,7 @@ export class AiService {
     private readonly assets: AssetsService,
     private readonly telemetry: TelemetryQueryService,
     private readonly audit: AuditService,
+    private readonly actions: ActionsService,
   ) {
     this.provider = buildProvider(config);
   }
@@ -205,6 +207,7 @@ export class AiService {
           prisma: this.prisma,
           assets: this.assets,
           telemetry: this.telemetry,
+          proposeAction: ((c, input, opts) => this.actions.propose(c, input, opts)) as ProposeAction,
           productId: setup.productId,
           orgId: ctx.organizationId,
           now: this.now,

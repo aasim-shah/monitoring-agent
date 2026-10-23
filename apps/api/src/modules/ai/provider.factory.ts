@@ -7,6 +7,8 @@ import {
 } from '@pcp/ai-orchestrator';
 import type { AppConfig } from '../../config.js';
 
+const RESTART =
+  /restart (\S+\.service) on (?:agent |host )?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
 const ASSET = /asset ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
 
 /**
@@ -17,6 +19,16 @@ function fakeStep(req: ChatRequest): ScriptStep {
   const question = [...req.messages].reverse().find((m) => m.role === 'user')?.content ?? '';
   const results = req.messages.filter((m) => m.role === 'tool');
   if (results.length === 0) {
+    const restart = RESTART.exec(question);
+    if (restart)
+      return {
+        toolCalls: [
+          {
+            name: 'proposeAction',
+            arguments: { agentId: restart[2], unit: restart[1], reason: 'Asked to restart a stuck service' },
+          },
+        ],
+      };
     const asset = ASSET.exec(question);
     if (asset) return { toolCalls: [{ name: 'getAssetDetails', arguments: { assetId: asset[1] } }] };
     if (/products/i.test(question)) return { toolCalls: [{ name: 'listProducts', arguments: {} }] };

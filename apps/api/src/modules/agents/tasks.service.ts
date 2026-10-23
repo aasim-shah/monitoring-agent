@@ -20,6 +20,8 @@ export interface NewTask {
   ttlSeconds?: number;
   maxRuntimeSeconds?: number;
   maxResponseBytes?: number;
+  /** The approval this task carries out (M16 actions); signed with the task. */
+  approvalId?: string;
   /**
    * Opens a stream session with this ID in the same transaction, before the agent is woken,
    * so its first chunk always finds the session (log tail).
@@ -96,6 +98,7 @@ export class TasksService implements OnApplicationShutdown {
       resourceScope: input.resourceScope ?? {},
       maxRuntimeSeconds: input.maxRuntimeSeconds ?? 60,
       maxResponseBytes: input.maxResponseBytes ?? 65_536,
+      ...(input.approvalId ? { approvalId: input.approvalId } : {}),
       payload: input.payload,
     };
     const signature = signer.sign(unsigned);
@@ -114,6 +117,7 @@ export class TasksService implements OnApplicationShutdown {
           expiresAt: new Date(unsigned.expiresAt),
           maxRuntimeSeconds: unsigned.maxRuntimeSeconds,
           maxResponseBytes: unsigned.maxResponseBytes,
+          approvalId: input.approvalId ?? null,
           signature,
           createdByUserId: ctx.actor.kind === 'user' ? ctx.actor.userId : null,
         },

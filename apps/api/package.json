@@ -20,6 +20,7 @@
     "@pcp/agent-protocol": "workspace:*",
     "@pcp/ai-orchestrator": "workspace:*",
     "@pcp/alerting": "workspace:*",
+    "@pcp/automation": "workspace:*",
     "@pcp/connector-runtime": "workspace:*",
     "@pcp/connector-sdk": "workspace:*",
     "@pcp/connectors-databases": "workspace:*",
