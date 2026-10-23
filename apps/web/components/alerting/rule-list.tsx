@@ -58,8 +58,8 @@ export function RuleList({
       {rules.length === 0 ? (
         <div className="space-y-3 rounded-lg border border-border bg-card px-4 py-6 text-sm">
           <p className="text-muted-foreground">
-            No alert rules yet. The recommended set covers CPU, memory, disk, log errors, and agents that stop
-            reporting.
+            No alert rules yet. The recommended set covers CPU, memory, disk, log errors, agents that stop
+            reporting, and websites that are down or have an expiring certificate.
           </p>
           {canManage ? <Button onClick={onAddRecommended}>Add recommended rules</Button> : null}
         </div>

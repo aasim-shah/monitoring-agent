@@ -10,10 +10,11 @@ RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod \
     go install go.opentelemetry.io/collector/cmd/builder@v0.162.0
 WORKDIR /build
 COPY agents/host-agent-go/collector/builder-config.yaml .
+# go build -p 2: the collector's largest packages (AWS SDK) run out of memory on 4 GB build VMs when compiled in parallel.
 RUN --mount=type=cache,id=go-mod,target=/go/pkg/mod --mount=type=cache,id=go-build,target=/root/.cache/go-build \
     builder --config builder-config.yaml --skip-compilation && \
     cd build && for arch in amd64 arm64; do \
-      CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags="-s -w" -o /out/$arch/pcp-otelcol . || exit 1; \
+      CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -p 2 -trimpath -ldflags="-s -w" -o /out/$arch/pcp-otelcol . || exit 1; \
     done
 
 FROM --platform=$BUILDPLATFORM golang:1.23.12-alpine AS agentctl

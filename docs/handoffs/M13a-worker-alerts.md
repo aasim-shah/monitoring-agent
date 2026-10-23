@@ -29,7 +29,7 @@
 
   - Only active monitors fire. A paused or unverified monitor resolves anything open.
   - Titles read "Website down on shop.example.com" and "TLS certificate expiring on …".
-- **Compose:** the worker gets `VM_IMPORT_URL=http://victoriametrics:8428`, and the e2e override allowlists `web:3000`.
+- **Compose:** the worker gets `VM_IMPORT_URL=http://victoriametrics:8428`, and the e2e override allowlists `web:3001`.
 
 ## Tests
 
