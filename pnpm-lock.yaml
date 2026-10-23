@@ -299,6 +299,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@pcp/alerting':
+        specifier: workspace:*
+        version: link:../../packages/alerting
       '@pcp/connector-runtime':
         specifier: workspace:*
         version: link:../../packages/connector-runtime
@@ -311,19 +314,43 @@ importers:
       '@pcp/jobs':
         specifier: workspace:*
         version: link:../../packages/jobs
+      '@pcp/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@pcp/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
+      '@pcp/shared-contracts':
+        specifier: workspace:*
+        version: link:../../packages/shared-contracts
+      '@pcp/tenant-security':
+        specifier: workspace:*
+        version: link:../../packages/tenant-security
+      nodemailer:
+        specifier: 10.2.0
+        version: 10.2.0
       zod:
         specifier: 3.25.76
         version: 3.25.76
     devDependencies:
+      '@pcp/test-support':
+        specifier: workspace:*
+        version: link:../../packages/test-support
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
+      '@types/nodemailer':
+        specifier: 8.0.2
+        version: 8.0.2
+      '@types/pg':
+        specifier: 8.15.6
+        version: 8.15.6
       eslint:
         specifier: 9.39.5
         version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: 8.16.3
+        version: 8.16.3
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -678,6 +705,43 @@ importers:
       '@pcp/test-support':
         specifier: workspace:*
         version: link:../test-support
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
+      '@types/pg':
+        specifier: 8.15.6
+        version: 8.15.6
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)
+      pg:
+        specifier: 8.16.3
+        version: 8.16.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.12
+        version: 4.1.12(@types/node@22.20.5)(jsdom@26.1.0)(vite@7.3.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.8.4))
+
+  packages/notifications:
+    dependencies:
+      '@pcp/connector-sdk':
+        specifier: workspace:*
+        version: link:../connector-sdk
+      '@pcp/database':
+        specifier: workspace:*
+        version: link:../database
+      '@pcp/secrets':
+        specifier: workspace:*
+        version: link:../secrets
+      '@pcp/shared-contracts':
+        specifier: workspace:*
+        version: link:../shared-contracts
+      '@pcp/tenant-security':
+        specifier: workspace:*
+        version: link:../tenant-security
+    devDependencies:
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5

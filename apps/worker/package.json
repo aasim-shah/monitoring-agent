@@ -11,16 +11,25 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@pcp/health": "workspace:*",
-    "zod": "3.25.76",
+    "@pcp/alerting": "workspace:*",
     "@pcp/connector-runtime": "workspace:*",
     "@pcp/database": "workspace:*",
+    "@pcp/health": "workspace:*",
     "@pcp/jobs": "workspace:*",
-    "@pcp/secrets": "workspace:*"
+    "@pcp/notifications": "workspace:*",
+    "@pcp/secrets": "workspace:*",
+    "@pcp/shared-contracts": "workspace:*",
+    "@pcp/tenant-security": "workspace:*",
+    "nodemailer": "10.2.0",
+    "zod": "3.25.76"
   },
   "devDependencies": {
+    "@pcp/test-support": "workspace:*",
     "@types/node": "22.20.5",
+    "@types/nodemailer": "8.0.2",
+    "@types/pg": "8.15.6",
     "eslint": "9.39.5",
+    "pg": "8.16.3",
     "typescript": "5.9.3",
     "vitest": "4.1.12"
   }

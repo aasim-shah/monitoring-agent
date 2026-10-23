@@ -27,3 +27,4 @@ export {
   type NotifyRequest,
 } from './engine.js';
 export { createDeliveries } from './deliveries.js';
+export { tick } from './tick.js';

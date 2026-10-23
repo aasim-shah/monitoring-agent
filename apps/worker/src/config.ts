@@ -8,6 +8,11 @@ const schema = z.object({
   /** Connects as pcp_scheduler (reads schedules through pcp_due_job_definitions only). */
   SCHEDULER_DATABASE_URL: z.string().min(1),
   RECONCILE_EVERY_SECONDS: z.coerce.number().int().min(5).default(60),
+  /** Incident notifications (M12.3): unset SMTP_URL logs instead of sending email. */
+  SMTP_URL: z.string().url().optional(),
+  MAIL_FROM: z.string().min(3).default('Product Control Plane <alerts@localhost>'),
+  /** Links in notifications point here. */
+  APP_ORIGIN: z.string().url().default('http://localhost:8080'),
 });
 
 export interface WorkerConfig {
@@ -17,6 +22,9 @@ export interface WorkerConfig {
   databaseUrl: string;
   schedulerDatabaseUrl: string;
   reconcileEverySeconds: number;
+  smtpUrl?: string;
+  mailFrom: string;
+  appOrigin: string;
 }
 
 export function loadConfig(env: Record<string, string | undefined>): WorkerConfig {
@@ -35,5 +43,8 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
     databaseUrl: c.DATABASE_URL,
     schedulerDatabaseUrl: c.SCHEDULER_DATABASE_URL,
     reconcileEverySeconds: c.RECONCILE_EVERY_SECONDS,
+    smtpUrl: c.SMTP_URL,
+    mailFrom: c.MAIL_FROM,
+    appOrigin: new URL(c.APP_ORIGIN).origin,
   };
 }

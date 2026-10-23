@@ -296,7 +296,8 @@ async function correlate(
 }
 
 function target(labels: Record<string, string>, c: Correlation): string {
-  const host = c.host?.name ?? labels.agent_id ?? labels.connection_name ?? 'this organization';
+  const host =
+    c.host?.name ?? labels.hostname ?? labels.connection_name ?? labels.agent_id ?? 'this organization';
   const detail = labels.mountpoint ?? labels.service;
   return detail ? `${host} (${detail})` : host;
 }

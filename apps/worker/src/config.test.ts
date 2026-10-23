@@ -24,4 +24,23 @@ describe('worker config', () => {
   it('treats empty values as unset', () => {
     expect(() => loadConfig({ ...base, DATABASE_URL: '' })).toThrow(/DATABASE_URL/);
   });
+  it('reads mail and the dashboard origin for notifications (M12.3)', () => {
+    expect(loadConfig(base)).toMatchObject({
+      smtpUrl: undefined,
+      mailFrom: 'Product Control Plane <alerts@localhost>',
+      appOrigin: 'http://localhost:8080',
+    });
+    expect(
+      loadConfig({
+        ...base,
+        SMTP_URL: 'smtp://mailpit:1025',
+        MAIL_FROM: 'PCP <alerts@example.com>',
+        APP_ORIGIN: 'https://monitor.example.com/',
+      }),
+    ).toMatchObject({
+      smtpUrl: 'smtp://mailpit:1025',
+      mailFrom: 'PCP <alerts@example.com>',
+      appOrigin: 'https://monitor.example.com',
+    });
+  });
 });
