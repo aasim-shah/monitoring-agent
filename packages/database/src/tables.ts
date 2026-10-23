@@ -42,6 +42,9 @@ export const TENANT_TABLES = [
   'ai_runs',
   'ai_tool_executions',
   'website_monitors',
+  'report_schedules',
+  'generated_reports',
+  'report_deliveries',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];

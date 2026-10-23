@@ -11,4 +11,10 @@ describe('jobId', () => {
     );
     expect(jobId('connection-validate', 'org-1', 'conn-1')).not.toContain(':');
   });
+
+  it('names one daily report per schedule and local date (WB-15 report:<org>:<schedule>:<localDate>)', () => {
+    expect(jobId('report-generate', 'org-1', 'sched-1', '2026-10-25')).toBe(
+      'report-generate__org-1__sched-1__2026-10-25',
+    );
+  });
 });

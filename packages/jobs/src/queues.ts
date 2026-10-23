@@ -11,6 +11,9 @@ export const JOB_KINDS = [
   'notification-deliver',
   // M13a: one website probe (entity = monitor).
   'website-probe',
+  // M15: one daily report (entity = schedule, window = local date) and one report delivery (entity = delivery).
+  'report-generate',
+  'report-deliver',
 ] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
@@ -22,6 +25,8 @@ export interface ConnectionJobPayload {
   organizationId: string;
   connectionId: string;
   requestId: string;
+  /** M15 report jobs: the local date, plus `__v<n>` for a regeneration. */
+  window?: string;
 }
 
 export interface Queues {
@@ -65,6 +70,8 @@ export async function enqueue(
   window?: string,
 ): Promise<string> {
   const id = jobId(kind, payload.organizationId, payload.connectionId, window);
-  await queues.get(kind).add(kind, payload, { ...queues.jobOptions(), jobId: id });
+  await queues
+    .get(kind)
+    .add(kind, window ? { ...payload, window } : payload, { ...queues.jobOptions(), jobId: id });
   return id;
 }

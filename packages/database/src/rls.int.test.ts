@@ -223,6 +223,21 @@ beforeAll(async () => {
          VALUES ($1, $2, $3, 'https://shop.example.com', 'shop.example.com', 'tok', now())`,
         [randomUUID(), org, product],
       );
+      const [schedule, report] = [randomUUID(), randomUUID()];
+      await c.query(
+        `INSERT INTO report_schedules (id, organization_id, product_id, name, timezone, local_time, next_run_at, updated_at)
+         VALUES ($1, $2, $3, 'Daily', 'Europe/Berlin', '08:00', now(), now())`,
+        [schedule, org, product],
+      );
+      await c.query(
+        `INSERT INTO generated_reports (id, organization_id, product_id, schedule_id, local_date, window_start, window_end, timezone, snapshot, narrative_status)
+         VALUES ($1, $2, $3, $4, '2026-10-25', now(), now(), 'Europe/Berlin', '{}', 'deferred')`,
+        [report, org, product, schedule],
+      );
+      await c.query(
+        `INSERT INTO report_deliveries (id, organization_id, report_id, kind, target) VALUES ($1, $2, $3, 'email', 'ops@example.com')`,
+        [randomUUID(), org, report],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

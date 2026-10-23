@@ -217,14 +217,16 @@ model Product {
   repositories   String[] @default([])
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  environments   Environment[]
-  resourceScopes ConnectionResourceScope[]
-  assets         ProductAsset[]
-  discoveryRuns  DiscoveryRun[]
-  alertRules     AlertRule[]
-  conversations  AiConversation[]
-  websites       WebsiteMonitor[]
+  organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  environments    Environment[]
+  resourceScopes  ConnectionResourceScope[]
+  assets          ProductAsset[]
+  discoveryRuns   DiscoveryRun[]
+  alertRules      AlertRule[]
+  conversations   AiConversation[]
+  websites        WebsiteMonitor[]
+  reportSchedules ReportSchedule[]
+  reports         GeneratedReport[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -1222,4 +1224,88 @@ model WebsiteMonitor {
   @@unique([organizationId, url])
   @@index([organizationId, productId])
   @@map("website_monitors")
+}
+
+enum ReportNarrativeStatus {
+  verified
+  deferred
+  disabled
+
+  @@map("report_narrative_status")
+}
+
+/// A daily report schedule (WB-15 UC-15-01); next_run_at is the UTC instant of the next local run.
+model ReportSchedule {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  productId       String   @map("product_id") @db.Uuid
+  environmentId   String?  @map("environment_id") @db.Uuid
+  name            String
+  template        String   @default("daily")
+  /// IANA timezone, e.g. Europe/Berlin.
+  timezone        String
+  /// Local wall time HH:MM.
+  localTime       String   @map("local_time")
+  channelIds      String[] @default([]) @map("channel_ids") @db.Uuid
+  recipients      String[] @default([])
+  enabled         Boolean  @default(true)
+  nextRunAt       DateTime @map("next_run_at") @db.Timestamptz(6)
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product Product           @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  reports GeneratedReport[]
+
+  @@index([organizationId, productId])
+  @@index([nextRunAt])
+  @@map("report_schedules")
+}
+
+/// One version of a report for a local date (BR-15-04/06); the snapshot holds every number.
+model GeneratedReport {
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String                @map("organization_id") @db.Uuid
+  productId       String                @map("product_id") @db.Uuid
+  scheduleId      String?               @map("schedule_id") @db.Uuid
+  localDate       DateTime              @map("local_date") @db.Date
+  version         Int                   @default(1)
+  windowStart     DateTime              @map("window_start") @db.Timestamptz(6)
+  windowEnd       DateTime              @map("window_end") @db.Timestamptz(6)
+  timezone        String
+  snapshot        Json
+  narrative       String?
+  narrativeStatus ReportNarrativeStatus @map("narrative_status")
+  problems        Json                  @default("[]")
+  late            Boolean               @default(false)
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  product    Product          @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  schedule   ReportSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  deliveries ReportDelivery[]
+
+  @@unique([scheduleId, localDate, version])
+  @@index([organizationId, productId, createdAt])
+  @@map("generated_reports")
+}
+
+/// One recipient of one report: a notification channel ("channel:<id>") or a direct email address.
+model ReportDelivery {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  reportId       String         @map("report_id") @db.Uuid
+  channelId      String?        @map("channel_id") @db.Uuid
+  kind           ChannelKind
+  target         String
+  status         DeliveryStatus @default(pending)
+  attempts       Int            @default(0)
+  lastError      String?        @map("last_error")
+  sentAt         DateTime?      @map("sent_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  report GeneratedReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, target])
+  @@index([organizationId])
+  @@map("report_deliveries")
 }
