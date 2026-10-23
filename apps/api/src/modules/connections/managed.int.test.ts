@@ -91,6 +91,41 @@ describe('managed databases (Atlas, Supabase)', () => {
     ).toBe(400);
   });
 
+  it('lets an admin accept a write-capable user on a managed database (UC-07-06)', async () => {
+    const owner = await ownerWithOrg(t);
+    const id = (await managed(owner, 'mongodb', { host: 'c.mongodb.net', database: 'x', tls: true })).json
+      .id as string;
+    await req(owner.cookie, 'POST', `/api/v1/connections/${id}/authorize`, {
+      credentials: { connectionString: 'mongodb+srv://admin:pw@c.mongodb.net/x' },
+    });
+    await sql(
+      `UPDATE connections SET status = 'degraded', status_reason = 'permission_denied' WHERE id = $1`,
+      [id],
+    );
+    const res = await req(owner.cookie, 'POST', `/api/v1/connections/${id}/write-override`, {});
+    expect(res.status, res.body).toBe(202);
+    const [row] = await sql<{ ack: boolean }>(
+      `SELECT (config->>'writeOverrideAcknowledged')::boolean AS ack FROM connections WHERE id = $1`,
+      [id],
+    );
+    expect(row!.ack).toBe(true);
+    const [audit] = await sql<{ n: number }>(
+      `SELECT count(*)::int AS n FROM audit_logs WHERE target_id = $1 AND action = 'connection.write_override'`,
+      [id],
+    );
+    expect(audit!.n).toBe(1);
+    // Only database connectors have this override.
+    const mock = await req(owner.cookie, 'POST', `/api/v1/organizations/${owner.orgId}/connections`, {
+      provider: 'mock',
+      displayName: 'M',
+      executionLocation: 'cloud',
+      config: {},
+    });
+    expect(
+      (await req(owner.cookie, 'POST', `/api/v1/connections/${mock.json.id}/write-override`, {})).status,
+    ).toBe(400);
+  });
+
   it('shows the platform egress IP to allowlist (e.g. Atlas network access)', async () => {
     const owner = await ownerWithOrg(t);
     expect((await req(owner.cookie, 'GET', '/api/v1/connectors/catalog')).json.egressIp).toBe(

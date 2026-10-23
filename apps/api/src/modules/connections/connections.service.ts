@@ -123,8 +123,8 @@ export class ConnectionsService {
   /** UC-07-06: an admin accepts a database user that can write; audited, then revalidated. */
   async acknowledgeWriteOverride(ctx: TenantContext, id: string): Promise<string> {
     const current = await this.get(ctx, id);
-    if (current.executionLocation !== 'private')
-      throw new ApiException(400, 'not_private', 'Only private database connections');
+    if (!DB_PROVIDERS.includes(current.provider))
+      throw new ApiException(400, 'not_database', 'Only database connections have a write override');
     if (TERMINAL.includes(current.status)) throw closed();
     const updated = await withTenant(this.prisma, ctx, async (tx) => {
       const c = await tx.connection.update({
@@ -139,7 +139,10 @@ export class ConnectionsService {
       });
       return c;
     });
-    return this.privateOps.dispatch(ctx, updated, 'validate');
+    // Revalidate where the connection runs: the private worker, or the job queue (managed).
+    return current.executionLocation === 'private'
+      ? this.privateOps.dispatch(ctx, updated, 'validate')
+      : this.queue(ctx, 'connection-validate', id);
   }
 
   async runTemplate(
