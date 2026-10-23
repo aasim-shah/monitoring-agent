@@ -3,7 +3,7 @@
 # - Agents on 8443 (TLS + client certificates terminate in Caddy).
 # - Hard memory caps so the platform cannot take memory from other apps on the host.
 # Start with: docker compose -p pcp -f compose.yaml -f deploy/vps/compose.vps.yaml --env-file .env \
-#   up -d --no-build caddy ingest-gateway mailpit
+#   up -d --no-build caddy ingest-gateway mailpit worker
 services:
   caddy:
     ports: !override
@@ -22,6 +22,10 @@ services:
 
   migrate:
     deploy: { resources: { limits: { memory: 256m } } }
+
+  # Runs connection validation and managed-database health checks.
+  worker:
+    deploy: { resources: { limits: { memory: 192m } } }
 
   postgres:
     deploy: { resources: { limits: { memory: 320m } } }
