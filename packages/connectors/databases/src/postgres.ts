@@ -101,9 +101,11 @@ export function createPostgresConnector(templates: ReadOnlyTemplate[] = POSTGRES
     version: '1.0.0',
     displayName: 'PostgreSQL',
     executionLocations: ['private', 'cloud'],
+    // A pasted connection string (managed databases) or username/password.
     credentialFields: [
-      { name: 'username', label: 'Username', secret: false },
-      { name: 'password', label: 'Password', secret: true },
+      { name: 'connectionString', label: 'Connection string', secret: true, required: false },
+      { name: 'username', label: 'Username', secret: false, required: false },
+      { name: 'password', label: 'Password', secret: true, required: false },
     ],
     templates,
     capabilities: () => ['config_validation', 'validate', 'health'],

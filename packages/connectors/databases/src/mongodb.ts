@@ -107,7 +107,10 @@ async function mongoHosts(c: ParsedConnection): Promise<Array<{ host: string; po
   });
 }
 
-async function withClient<T>(ctx: ExecutionContext, fn: (c: MongoClient, database: string) => Promise<T>): Promise<T> {
+async function withClient<T>(
+  ctx: ExecutionContext,
+  fn: (c: MongoClient, database: string) => Promise<T>,
+): Promise<T> {
   const cfg = parseDbConfig(ctx.config, 27017);
   const { username, password, connection } = await dbCredentials(ctx);
   const database = connection?.database || cfg.database;
@@ -153,9 +156,11 @@ export function createMongodbConnector(templates: ReadOnlyTemplate[] = MONGODB_T
     version: '1.0.0',
     displayName: 'MongoDB',
     executionLocations: ['private', 'cloud'],
+    // A pasted connection string (managed databases) or username/password.
     credentialFields: [
-      { name: 'username', label: 'Username', secret: false },
-      { name: 'password', label: 'Password', secret: true },
+      { name: 'connectionString', label: 'Connection string', secret: true, required: false },
+      { name: 'username', label: 'Username', secret: false, required: false },
+      { name: 'password', label: 'Password', secret: true, required: false },
     ],
     templates,
     capabilities: () => ['config_validation', 'validate', 'health'],

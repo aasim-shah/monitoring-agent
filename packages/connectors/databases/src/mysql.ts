@@ -61,7 +61,9 @@ async function withConnection<T>(ctx: ExecutionContext, fn: (c: mysql.Connection
       user: username,
       password,
       database: connection?.database ?? cfg.database,
-      ssl: cfg.tls ? { rejectUnauthorized: cfg.tlsVerify, ...(isIP(host) ? {} : { servername: host }) } : undefined,
+      ssl: cfg.tls
+        ? { rejectUnauthorized: cfg.tlsVerify, ...(isIP(host) ? {} : { servername: host }) }
+        : undefined,
       connectTimeout: CONNECT_TIMEOUT_MS,
       dateStrings: false,
     });
@@ -85,9 +87,11 @@ export function createMysqlConnector(templates: ReadOnlyTemplate[] = MYSQL_TEMPL
     version: '1.0.0',
     displayName: 'MySQL',
     executionLocations: ['private', 'cloud'],
+    // A pasted connection string (managed databases) or username/password.
     credentialFields: [
-      { name: 'username', label: 'Username', secret: false },
-      { name: 'password', label: 'Password', secret: true },
+      { name: 'connectionString', label: 'Connection string', secret: true, required: false },
+      { name: 'username', label: 'Username', secret: false, required: false },
+      { name: 'password', label: 'Password', secret: true, required: false },
     ],
     templates,
     capabilities: () => ['config_validation', 'validate', 'health'],

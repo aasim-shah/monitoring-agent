@@ -9,6 +9,9 @@ import { withTenant } from '@pcp/tenant-security';
 import { ApiException, notFound } from '../../common/errors.js';
 import { KEY_RING, PRISMA } from '../../tokens.js';
 import { PrivateOpsService } from './private-ops.service.js';
+import { parseConnectionString, type ParsedConnection } from '@pcp/connectors-databases';
+
+const DB_PROVIDERS = ['postgres', 'mysql', 'mongodb'];
 import { AuditService } from '../auditing/audit.service.js';
 import { CONNECTOR_REGISTRY, CONNECTOR_RUNTIME, QUEUES } from './registry.provider.js';
 
@@ -82,6 +85,9 @@ export class ConnectionsService {
       );
     const isPrivate = input.executionLocation === 'private';
     if (isPrivate) await this.privateOps.assertConfig(ctx, input.config);
+    // Managed databases are reached over the internet: never in plaintext.
+    if (!isPrivate && DB_PROVIDERS.includes(input.provider) && input.config.tls === false)
+      throw new ApiException(400, 'validation_failed', 'Managed databases require TLS');
 
     const created = await withTenant(this.prisma, ctx, async (tx) => {
       const connection = await tx.connection.create({
@@ -198,7 +204,9 @@ export class ConnectionsService {
       );
     const connector = this.registry.get(current.provider);
     const fields = connector.credentialFields ?? [];
-    const missing = fields.filter((f) => !credentials[f.name]).map((f) => `credentials.${f.name}`);
+    const missing = fields
+      .filter((f) => f.required !== false && !credentials[f.name])
+      .map((f) => `credentials.${f.name}`);
     const unknown = Object.keys(credentials)
       .filter((k) => !fields.some((f) => f.name === k))
       .map((k) => `credentials.${k}`);
@@ -209,8 +217,44 @@ export class ConnectionsService {
         `Invalid fields: ${[...missing, ...unknown].join(', ')}`,
       );
 
+    // Managed databases: a pasted connection string fills the non-secret config (host, port, database).
+    let configPatch: Record<string, unknown> = {};
+    if (DB_PROVIDERS.includes(current.provider)) {
+      if (!credentials.connectionString && !credentials.username)
+        throw new ApiException(400, 'validation_failed', 'Invalid fields: credentials.connectionString');
+      if (credentials.connectionString) {
+        let parsed: ParsedConnection;
+        try {
+          parsed = parseConnectionString(credentials.connectionString);
+        } catch {
+          throw new ApiException(400, 'validation_failed', 'Invalid fields: credentials.connectionString');
+        }
+        if (parsed.engine !== current.provider)
+          throw new ApiException(
+            400,
+            'validation_failed',
+            `This is a ${parsed.engine} connection string, not ${current.provider}`,
+          );
+        configPatch = {
+          host: parsed.host,
+          port: parsed.port,
+          ...(parsed.database ? { database: parsed.database } : {}),
+        };
+      }
+    }
+
     const connection = await withTenant(this.prisma, ctx, async (tx) => {
       await storeCredentials(tx, ctx, id, credentials, this.keys);
+      if (Object.keys(configPatch).length)
+        await tx.connection.update({
+          where: { id },
+          data: {
+            config: {
+              ...(current.config as Record<string, unknown>),
+              ...configPatch,
+            } as Prisma.InputJsonValue,
+          },
+        });
       const updated = await tx.connection.update({
         where: { id },
         data: { status: transition(current.status, 'auth_completed'), statusReason: null },
@@ -314,6 +358,8 @@ export class ConnectionsService {
       const c = await tx.connection.findUnique({ where: { id }, select: { status: true } });
       if (!c) throw notFound();
       await tx.connectionSecret.deleteMany({ where: { connectionId: id } });
+      // Scheduled health checks and syncs stop with the connection.
+      await tx.jobDefinition.updateMany({ where: { entityId: id }, data: { enabled: false } });
       if (TERMINAL.includes(c.status)) return c.status;
       await tx.connection.update({
         where: { id },

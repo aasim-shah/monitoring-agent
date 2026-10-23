@@ -21,14 +21,12 @@ beforeAll(async () => {
   await admin.connect();
   const app = admin.db('firemaps');
   const now = Date.now();
-  await app
-    .collection('incidents')
-    .insertMany(
-      Array.from({ length: 5000 }, (_, i) => ({
-        createdAt: new Date(now - (i % 5) * 86400_000),
-        severity: i % 3,
-      })),
-    );
+  await app.collection('incidents').insertMany(
+    Array.from({ length: 5000 }, (_, i) => ({
+      createdAt: new Date(now - (i % 5) * 86400_000),
+      severity: i % 3,
+    })),
+  );
   await app.collection('stations').insertMany([{ name: 'A' }, { name: 'B' }]);
   await admin.db('admin').command({
     createUser: 'ro',

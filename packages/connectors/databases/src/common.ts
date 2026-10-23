@@ -1,5 +1,10 @@
 import { isIP } from 'node:net';
-import { ConnectorError, assertPublicDestination, type ExecutionContext, type TemplateResult } from '@pcp/connector-sdk';
+import {
+  ConnectorError,
+  assertPublicDestination,
+  type ExecutionContext,
+  type TemplateResult,
+} from '@pcp/connector-sdk';
 
 /** BR-07-04: at most 1,000 rows and 5 s per statement. */
 export const MAX_ROWS = 1000;
@@ -93,7 +98,8 @@ export function parseConnectionString(uri: string): ParsedConnection {
         : scheme === 'mongodb' || scheme === 'mongodb+srv'
           ? 'mongodb'
           : undefined;
-  if (!engine) throw invalid('the connection string must start with postgres://, mysql://, or mongodb(+srv)://');
+  if (!engine)
+    throw invalid('the connection string must start with postgres://, mysql://, or mongodb(+srv)://');
   const m = /^[a-z+]+:\/\/(?:([^:@/]*)(?::([^@]*))?@)?([^/?#]+)(?:\/([^?#]*))?/i.exec(uri.trim());
   if (!m) throw invalid('the connection string is not a valid URI');
   const decode = (v: string | undefined) => {
@@ -105,7 +111,9 @@ export function parseConnectionString(uri: string): ParsedConnection {
   };
   const first = m[3]!.split(',')[0]!;
   const bracketed = /^\[([^\]]+)\](?::(\d+))?$/.exec(first);
-  const [host, port] = bracketed ? [bracketed[1]!, bracketed[2]] : [first.replace(/:\d+$/, ''), /:(\d+)$/.exec(first)?.[1]];
+  const [host, port] = bracketed
+    ? [bracketed[1]!, bracketed[2]]
+    : [first.replace(/:\d+$/, ''), /:(\d+)$/.exec(first)?.[1]];
   return {
     engine,
     host,
@@ -124,7 +132,12 @@ export function parseConnectionString(uri: string): ParsedConnection {
  * connection cannot be aimed at the platform's own private services. Returns the
  * vetted address to connect to (pinned: no second lookup).
  */
-export async function targetAddress(ctx: ExecutionContext, cfg: DbConfig, host: string, port: number): Promise<string> {
+export async function targetAddress(
+  ctx: ExecutionContext,
+  cfg: DbConfig,
+  host: string,
+  port: number,
+): Promise<string> {
   if (ctx.executionLocation !== 'cloud') return host;
   if (!cfg.tls) throw invalid('managed databases are reached over the internet: TLS is required');
   const url = new URL(`https://${isIP(host) === 6 ? `[${host}]` : host}:${port}/`);

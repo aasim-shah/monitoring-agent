@@ -199,3 +199,43 @@ describe('ConnectorRuntime.discover', () => {
     expect(page.observations.map((o) => o.externalId)).toEqual(['mock-1', 'mock-2']);
   });
 });
+
+describe('ConnectorRuntime.health (managed databases)', () => {
+  const statusOf = (id: string) =>
+    withTenant(prisma, ctx(orgA), (tx) => tx.connection.findUniqueOrThrow({ where: { id } }));
+
+  it('records health, degrades a connected connection on failure, and recovers', async () => {
+    const id = await connection('ok');
+    await runtime.validate(ctx(orgA), id);
+    expect((await statusOf(id)).status).toBe('connected');
+    await expect(runtime.health(ctx(orgA), id)).resolves.toMatchObject({ ok: true });
+
+    await sql(`UPDATE connections SET config = '{"behavior":"unavailable"}' WHERE id = $1`, [id]);
+    await expect(runtime.health(ctx(orgA), id)).resolves.toMatchObject({
+      ok: false,
+      reason: 'provider_unavailable',
+    });
+    expect(await statusOf(id)).toMatchObject({ status: 'degraded', statusReason: 'provider_unavailable' });
+
+    await sql(`UPDATE connections SET config = '{"behavior":"ok"}' WHERE id = $1`, [id]);
+    await runtime.health(ctx(orgA), id);
+    expect(await statusOf(id)).toMatchObject({ status: 'connected', statusReason: null });
+    const rows = await sql(`SELECT ok FROM connection_health WHERE connection_id = $1 ORDER BY checked_at`, [
+      id,
+    ]);
+    expect(rows.map((r) => r.ok)).toEqual([true, true, false, true]);
+  });
+
+  it('schedules a 5-minute health check once a cloud connection with health is connected', async () => {
+    const id = await connection('ok');
+    await runtime.validate(ctx(orgA), id);
+    const defs = await sql(`SELECT kind, every_seconds, enabled FROM job_definitions WHERE entity_id = $1`, [
+      id,
+    ]);
+    expect(defs).toEqual([{ kind: 'connection-health', every_seconds: 300, enabled: true }]);
+    await runtime.validate(ctx(orgA), id); // idempotent
+    expect(await sql(`SELECT count(*)::int AS n FROM job_definitions WHERE entity_id = $1`, [id])).toEqual([
+      { n: 1 },
+    ]);
+  });
+});

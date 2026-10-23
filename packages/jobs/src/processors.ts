@@ -27,7 +27,7 @@ const systemContext = (organizationId: string, job: Job): TenantContext => ({
   requestId: job.data.requestId,
 });
 
-const SYNC_KIND: Record<JobKind, 'validate' | 'discover'> = {
+const SYNC_KIND: Record<Exclude<JobKind, 'connection-health'>, 'validate' | 'discover'> = {
   'connection-validate': 'validate',
   'connection-discover': 'discover',
 };
@@ -40,6 +40,15 @@ export function startProcessors(deps: ProcessorDeps): Processors {
   const process = (kind: JobKind) => async (job: Job<ConnectionJobPayload>) => {
     const { organizationId, connectionId } = job.data;
     const ctx = systemContext(organizationId, job);
+    // Health checks are recorded in connection_health by the runtime, not as sync runs.
+    if (kind === 'connection-health') {
+      try {
+        return await deps.runtime.health(ctx, connectionId);
+      } catch (err) {
+        if (err instanceof NotFoundError) return { skipped: 'connection not found' };
+        throw err;
+      }
+    }
     const run = await withTenant(deps.prisma, ctx, async (tx) => {
       const exists = await tx.connection.findUnique({
         where: { id: connectionId },

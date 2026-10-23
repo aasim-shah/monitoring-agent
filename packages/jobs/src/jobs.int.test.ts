@@ -118,6 +118,21 @@ describe('job processors', () => {
     expect(c.status).toBe('connected');
   });
 
+  it('runs scheduled health checks for managed connections and records them', async () => {
+    const id = await connection('ok');
+    await enqueue(queues, 'connection-validate', { organizationId: org, connectionId: id, requestId: 'h0' });
+    await eventually(
+      () => runs(id),
+      (r) => r[0]?.status === 'succeeded',
+    );
+    await enqueue(queues, 'connection-health', { organizationId: org, connectionId: id, requestId: 'h1' });
+    const health = await eventually(
+      () => sql(`SELECT ok FROM connection_health WHERE connection_id = $1 ORDER BY checked_at`, [id]),
+      (r) => r.length === 2,
+    );
+    expect(health.map((r) => r.ok)).toEqual([true, true]);
+  });
+
   it('runs a job enqueued twice only once (Review Focus #3)', async () => {
     const id = await connection('ok');
     const payload = { organizationId: org, connectionId: id, requestId: 'r2' };
@@ -160,17 +175,20 @@ describe('schedule reconciliation (Review Focus #4)', () => {
        ($1, $3, 'connection-validate', $4, 900), ($2, $3, 'connection-discover', $5, 21600)`,
       [d1, d2, org, c1, c2],
     );
+    // Other tests' connections may own schedules too (e.g. health); look at this test's only.
+    const mine = async (q: typeof queues) =>
+      (await q.schedulerIds()).filter((i) => [`schedule-${d1}`, `schedule-${d2}`].includes(i)).sort();
     await reconcileSchedules(scheduler, queues);
-    expect((await queues.schedulerIds()).sort()).toEqual([`schedule-${d1}`, `schedule-${d2}`].sort());
+    expect(await mine(queues)).toEqual([`schedule-${d1}`, `schedule-${d2}`].sort());
 
     // A fresh process (new queue connections) reconciles to the same set.
     const fresh = createQueues(redis.url);
     await reconcileSchedules(scheduler, fresh);
-    expect((await fresh.schedulerIds()).sort()).toEqual([`schedule-${d1}`, `schedule-${d2}`].sort());
+    expect(await mine(fresh)).toEqual([`schedule-${d1}`, `schedule-${d2}`].sort());
 
     await sql(`UPDATE job_definitions SET enabled = false WHERE id = $1`, [d2]);
     await reconcileSchedules(scheduler, fresh);
-    expect(await fresh.schedulerIds()).toEqual([`schedule-${d1}`]);
+    expect(await mine(fresh)).toEqual([`schedule-${d1}`]);
     await fresh.close();
   });
 });
