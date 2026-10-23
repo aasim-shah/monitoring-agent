@@ -36,7 +36,7 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
     { label: 'Health Overview', href: `/orgs/${orgId}/products/${productId}` },
     { label: 'Integrations', milestone: 'M7' },
     { label: 'Agents', href: `/orgs/${orgId}/products/${productId}/agents`, permission: 'agent.view' },
-    { label: 'Assets', milestone: 'M9' },
+    { label: 'Assets', href: `/orgs/${orgId}/products/${productId}/assets`, permission: 'asset.view' },
     {
       label: 'Infrastructure',
       href: `/orgs/${orgId}/products/${productId}/infrastructure`,

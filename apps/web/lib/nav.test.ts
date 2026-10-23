@@ -50,6 +50,7 @@ describe('product navigation (spec §21)', () => {
     expect(items.filter((i) => i.href).map((i) => i.label)).toEqual([
       'Health Overview',
       'Agents',
+      'Assets',
       'Infrastructure',
       'Databases',
       'Audit Log',
