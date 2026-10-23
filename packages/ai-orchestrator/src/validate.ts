@@ -2,7 +2,6 @@
 const SMALL_COUNT = 10;
 
 const EXCLUDE = [
-  /\[E\d+\]/g, // citations
   /\b\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?\b/g, // dates and ISO timestamps
   /\b\d{1,2}:\d{2}(:\d{2})?\b/g, // times
   /\bFinding \d+\b/gi, // finding numbers
@@ -14,8 +13,10 @@ const NUMBER = /-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/g;
 const normalize = (text: string) =>
   text.replace(/[\u2010-\u2015\u2212]/g, '-').replace(/[\u00a0\u2009\u202f]/g, ' ');
 
-function numbersIn(text: string): Array<{ value: number; decimals: number; raw: string }> {
-  let t = normalize(text);
+const EVIDENCE_CITATION = /\[(E\d+)\]/g;
+
+function numbersIn(text: string, citation: RegExp): Array<{ value: number; decimals: number; raw: string }> {
+  let t = normalize(text).replace(new RegExp(citation.source, 'g'), ' ');
   for (const re of EXCLUDE) t = t.replace(re, ' ');
   return [...t.matchAll(NUMBER)].map((m) => {
     const raw = m[0].replace(/,/g, '');
@@ -32,13 +33,18 @@ export function validateAnswer(
   text: string,
   evidence: Array<{ id: string; json: string }>,
   question: string,
+  /** `citation`: how evidence IDs are cited, with the ID as group 1 (reports cite `[S3]`). */
+  opts: { citation?: RegExp } = {},
 ): { ok: boolean; problems: string[] } {
+  const citation = opts.citation ?? EVIDENCE_CITATION;
   const problems: string[] = [];
   const ids = new Set(evidence.map((e) => e.id));
-  for (const m of new Set([...text.matchAll(/\[(E\d+)\]/g)].map((x) => x[1]!)))
+  for (const m of new Set([...text.matchAll(new RegExp(citation.source, 'g'))].map((x) => x[1]!)))
     if (!ids.has(m)) problems.push(`${m} is not an evidence ID`);
-  const known = numbersIn(evidence.map((e) => e.json).join(' ') + ' ' + question).map((n) => n.value);
-  for (const n of numbersIn(text)) {
+  const known = numbersIn(evidence.map((e) => e.json).join(' ') + ' ' + question, citation).map(
+    (n) => n.value,
+  );
+  for (const n of numbersIn(text, citation)) {
     if (Number.isInteger(n.value) && Math.abs(n.value) <= SMALL_COUNT) continue;
     const f = 10 ** n.decimals;
     const supported = known.some((k) => Math.round(k * f) / f === n.value || k === n.value);
