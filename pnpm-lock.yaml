@@ -358,6 +358,9 @@ importers:
       '@pcp/database':
         specifier: workspace:*
         version: link:../database
+      '@pcp/discovery-engine':
+        specifier: workspace:*
+        version: link:../discovery-engine
       yaml:
         specifier: 2.8.4
         version: 2.8.4
