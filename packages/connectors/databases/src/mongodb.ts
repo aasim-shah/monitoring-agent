@@ -5,6 +5,7 @@ import {
   type ExecutionContext,
   type ReadOnlyTemplate,
 } from '@pcp/connector-sdk';
+import { resolveSrv } from 'node:dns/promises';
 import { MongoClient, type Document } from 'mongodb';
 import {
   CONNECT_TIMEOUT_MS,
@@ -14,6 +15,8 @@ import {
   classify,
   dbCredentials,
   parseDbConfig,
+  targetAddress,
+  type ParsedConnection,
 } from './common.js';
 import { DB_CONFIG_SCHEMA } from './postgres.js';
 
@@ -89,32 +92,54 @@ function fill(value: unknown, params: Record<string, string>, window: { from: Da
   return value;
 }
 
-async function withClient<T>(
-  ctx: ExecutionContext,
-  fn: (c: MongoClient, database: string) => Promise<T>,
-): Promise<T> {
+/** Every host a MongoDB URI would reach, for the cloud destination check. */
+async function mongoHosts(c: ParsedConnection): Promise<Array<{ host: string; port: number }>> {
+  if (c.srv) {
+    const records = await resolveSrv(`_mongodb._tcp.${c.host}`).catch(() => {
+      throw new ConnectorError('network_unreachable', `mongodb: no SRV records for ${c.host}`);
+    });
+    return records.map((r) => ({ host: r.name, port: r.port }));
+  }
+  const list = /^[a-z+]+:\/\/(?:[^@/]*@)?([^/?#]+)/i.exec(c.uri ?? '')?.[1] ?? `${c.host}:${c.port}`;
+  return list.split(',').map((h) => {
+    const m = /^\[?([^\]]+?)\]?(?::(\d+))?$/.exec(h)!;
+    return { host: m[1]!, port: m[2] ? Number(m[2]) : 27017 };
+  });
+}
+
+async function withClient<T>(ctx: ExecutionContext, fn: (c: MongoClient, database: string) => Promise<T>): Promise<T> {
   const cfg = parseDbConfig(ctx.config, 27017);
-  if (!cfg.database) throw new ConnectorError('invalid_config', 'database is required');
-  const { username, password } = await dbCredentials(ctx);
+  const { username, password, connection } = await dbCredentials(ctx);
+  const database = connection?.database || cfg.database;
+  if (!database) throw new ConnectorError('invalid_config', 'database is required');
   const authSource = typeof ctx.config.authSource === 'string' ? ctx.config.authSource : 'admin';
-  const client = new MongoClient(
-    `mongodb://${cfg.host.includes(':') ? `[${cfg.host}]` : cfg.host}:${cfg.port}`,
-    {
+  const options = {
+    tls: cfg.tls,
+    tlsAllowInvalidCertificates: cfg.tls && !cfg.tlsVerify,
+    serverSelectionTimeoutMS: CONNECT_TIMEOUT_MS,
+    connectTimeoutMS: CONNECT_TIMEOUT_MS,
+    socketTimeoutMS: STATEMENT_TIMEOUT_MS + 2000,
+    readPreference: 'secondaryPreferred' as const,
+    appName: 'pcp-monitor',
+  };
+  let client: MongoClient;
+  if (connection?.uri) {
+    if (ctx.executionLocation === 'cloud')
+      for (const h of await mongoHosts(connection)) await targetAddress(ctx, cfg, h.host, h.port);
+    // The URI keeps its own options (replicaSet, authSource); ours bound time and force TLS.
+    client = new MongoClient(connection.uri, options);
+  } else {
+    await targetAddress(ctx, cfg, cfg.host, cfg.port);
+    client = new MongoClient(`mongodb://${cfg.host.includes(':') ? `[${cfg.host}]` : cfg.host}:${cfg.port}`, {
+      ...options,
       auth: { username, password },
       authSource,
-      tls: cfg.tls,
-      tlsAllowInvalidCertificates: cfg.tls && !cfg.tlsVerify,
-      serverSelectionTimeoutMS: CONNECT_TIMEOUT_MS,
-      connectTimeoutMS: CONNECT_TIMEOUT_MS,
-      socketTimeoutMS: STATEMENT_TIMEOUT_MS + 2000,
-      readPreference: 'secondaryPreferred',
       directConnection: true,
-      appName: 'pcp-private-worker',
-    },
-  );
+    });
+  }
   try {
     await client.connect();
-    return await fn(client, cfg.database);
+    return await fn(client, database);
   } catch (err) {
     throw classify(err, ENGINE);
   } finally {
@@ -127,7 +152,7 @@ export function createMongodbConnector(templates: ReadOnlyTemplate[] = MONGODB_T
     type: 'mongodb',
     version: '1.0.0',
     displayName: 'MongoDB',
-    executionLocations: ['private'],
+    executionLocations: ['private', 'cloud'],
     credentialFields: [
       { name: 'username', label: 'Username', secret: false },
       { name: 'password', label: 'Password', secret: true },
