@@ -9,6 +9,8 @@ export const JOB_KINDS = [
   // M12: per-organization alert tick (entity = organization) and one notification delivery (entity = delivery).
   'alert-tick',
   'notification-deliver',
+  // M13a: one website probe (entity = monitor).
+  'website-probe',
 ] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 

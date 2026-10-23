@@ -218,6 +218,11 @@ beforeAll(async () => {
         `INSERT INTO ai_tool_executions (id, organization_id, run_id, tool, input, status) VALUES ($1, $2, $3, 'listAssets', '{}', 'ok')`,
         [randomUUID(), org, run],
       );
+      await c.query(
+        `INSERT INTO website_monitors (id, organization_id, product_id, url, host, verify_token, updated_at)
+         VALUES ($1, $2, $3, 'https://shop.example.com', 'shop.example.com', 'tok', now())`,
+        [randomUUID(), org, product],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

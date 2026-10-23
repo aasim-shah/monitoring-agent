@@ -129,4 +129,27 @@ describe('alerting cross-tenant functions', () => {
     expect(await q(conv, user)).toEqual([{ organization_id: orgA, product_id: productA }]);
     expect(await q(conv, randomUUID())).toEqual([]);
   });
+
+  it('pcp_resolve_website_monitor answers members only, with the product', async () => {
+    const user = randomUUID();
+    await run(db.superuserUrl, `INSERT INTO users (id, email) VALUES ($1, $2)`, [
+      user,
+      `${user}@example.com`,
+    ]);
+    await run(
+      db.superuserUrl,
+      `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'viewer')`,
+      [randomUUID(), orgA, user],
+    );
+    const mon = randomUUID();
+    await run(
+      db.superuserUrl,
+      `INSERT INTO website_monitors (id, organization_id, product_id, url, host, verify_token, updated_at) VALUES ($1, $2, $3, 'https://a.example.com', 'a.example.com', 't', now())`,
+      [mon, orgA, productA],
+    );
+    const q = (id: string, u: string) =>
+      run(db.appUrl, `SELECT organization_id, product_id FROM pcp_resolve_website_monitor($1, $2)`, [id, u]);
+    expect(await q(mon, user)).toEqual([{ organization_id: orgA, product_id: productA }]);
+    expect(await q(mon, randomUUID())).toEqual([]);
+  });
 });

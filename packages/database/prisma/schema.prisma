@@ -224,6 +224,7 @@ model Product {
   discoveryRuns  DiscoveryRun[]
   alertRules     AlertRule[]
   conversations  AiConversation[]
+  websites       WebsiteMonitor[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -1177,4 +1178,48 @@ model AiToolExecution {
 
   @@index([runId])
   @@map("ai_tool_executions")
+}
+
+// ===== M13a: website monitoring (spec §6.2, §7.4, WB-09) =====
+
+enum WebsiteMonitorStatus {
+  pending_verification
+  active
+  paused
+
+  @@map("website_monitor_status")
+}
+
+/// A probed URL; probes start only after DNS TXT verification (BR-09-01).
+model WebsiteMonitor {
+  id                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId        String               @map("organization_id") @db.Uuid
+  productId             String               @map("product_id") @db.Uuid
+  url                   String
+  host                  String
+  intervalSeconds       Int                  @default(60) @map("interval_seconds")
+  /// Null: any 2xx or 3xx after redirects counts as up.
+  expectedStatus        Int?                 @map("expected_status")
+  verifyToken           String               @map("verify_token")
+  verifiedAt            DateTime?            @map("verified_at") @db.Timestamptz(6)
+  verificationCheckedAt DateTime?            @map("verification_checked_at") @db.Timestamptz(6)
+  status                WebsiteMonitorStatus @default(pending_verification)
+  pausedReason          String?              @map("paused_reason")
+  lastCheckedAt         DateTime?            @map("last_checked_at") @db.Timestamptz(6)
+  lastUp                Boolean?             @map("last_up")
+  lastStatusCode        Int?                 @map("last_status_code")
+  lastError             String?              @map("last_error")
+  lastTotalMs           Int?                 @map("last_total_ms")
+  consecutiveFailures   Int                  @default(0) @map("consecutive_failures")
+  tlsExpiresAt          DateTime?            @map("tls_expires_at") @db.Timestamptz(6)
+  tlsIssuer             String?              @map("tls_issuer")
+  createdByUserId       String?              @map("created_by_user_id") @db.Uuid
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product Product @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([organizationId, url])
+  @@index([organizationId, productId])
+  @@map("website_monitors")
 }
