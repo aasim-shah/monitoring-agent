@@ -20,6 +20,9 @@ type Options struct {
 	Rate  int           // lines per second
 	Flush time.Duration // how often a chunk is sent
 	Poll  time.Duration // file polling interval
+	// Idle is how long a quiet stream waits before sending an empty chunk, so it learns
+	// within seconds that the viewer left (the control plane answers 404).
+	Idle time.Duration
 }
 
 func (o Options) withDefaults() Options {
@@ -31,6 +34,9 @@ func (o Options) withDefaults() Options {
 	}
 	if o.Poll <= 0 {
 		o.Poll = 250 * time.Millisecond
+	}
+	if o.Idle <= 0 {
+		o.Idle = 5 * time.Second
 	}
 	return o
 }
@@ -90,6 +96,7 @@ func Stream(ctx context.Context, src Source, send func([]string) error, opts Opt
 	perFlush := max(1, int(float64(opts.Rate)*opts.Flush.Seconds()))
 	ticker := time.NewTicker(opts.Flush)
 	defer ticker.Stop()
+	lastSend := time.Now()
 	for {
 		select {
 		case <-ctx.Done():
@@ -104,12 +111,13 @@ func Stream(ctx context.Context, src Source, send func([]string) error, opts Opt
 			if dropped > 0 {
 				lines = append(lines, fmt.Sprintf("[pcp] dropped %d lines (rate limit %d/s)", dropped, opts.Rate))
 			}
-			if len(lines) == 0 {
+			if len(lines) == 0 && time.Since(lastSend) < opts.Idle {
 				continue
 			}
 			if err := send(lines); err != nil {
 				return err
 			}
+			lastSend = time.Now()
 		}
 	}
 }

@@ -1464,18 +1464,63 @@ paths:
         '202': { $ref: '#/components/responses/Accepted' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/agents/{id}/log-sources:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listLogSources
+      tags: [logs]
+      summary: Log sources the agent allows
+      description: The applied packs' log sources plus the system journal; only these IDs can be tailed. Requires `agent.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sources]
+                properties:
+                  sources:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, label]
+                      properties:
+                        id: { type: string, example: redis.server }
+                        label: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M11
   /api/v1/agents/{id}/logs/tail:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: tailLogs
       tags: [logs]
-      summary: Live log tail (WebSocket upgrade)
-      description: Live log tail (WebSocket upgrade).
+      summary: Live log tail (server-sent events)
+      description: >-
+        Streams new lines of one allowlisted source, masked on the host and never stored.
+        Events: `ready` ({sessionId, source}), `lines` ({sequence, lines}), then `end` or `error` ({message});
+        a heartbeat comment every 15 s. The stream ends after 15 min. Closing the connection closes the session.
+        At most 2 streams per agent and 5 per organization. Requires `logs.tail`.
       security: [{ sessionCookie: [] }]
+      parameters:
+        - name: source
+          in: query
+          required: true
+          description: A source ID from log-sources; paths are never accepted.
+          schema: { type: string }
       responses:
-        '101': { $ref: '#/components/responses/SwitchingProtocols' }
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+      x-implemented-in: M11
   /api/v1/agents/{id}/inspections:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:

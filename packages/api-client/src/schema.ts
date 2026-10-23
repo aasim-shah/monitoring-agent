@@ -1311,6 +1311,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{id}/log-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Log sources the agent allows
+         * @description The applied packs' log sources plus the system journal; only these IDs can be tailed. Requires `agent.view`.
+         */
+        get: operations["listLogSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{id}/logs/tail": {
         parameters: {
             query?: never;
@@ -1322,8 +1345,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Live log tail (WebSocket upgrade)
-         * @description Live log tail (WebSocket upgrade).
+         * Live log tail (server-sent events)
+         * @description Streams new lines of one allowlisted source, masked on the host and never stored. Events: `ready` ({sessionId, source}), `lines` ({sequence, lines}), then `end` or `error` ({message}); a heartbeat comment every 15 s. The stream ends after 15 min. Closing the connection closes the session. At most 2 streams per agent and 5 per organization. Requires `logs.tail`.
          */
         get: operations["tailLogs"];
         put?: never;
@@ -5273,7 +5296,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    tailLogs: {
+    listLogSources: {
         parameters: {
             query?: never;
             header?: never;
@@ -5285,9 +5308,53 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            101: components["responses"]["SwitchingProtocols"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sources: {
+                            /** @example redis.server */
+                            id: string;
+                            label: string;
+                        }[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    tailLogs: {
+        parameters: {
+            query: {
+                /** @description A source ID from log-sources; paths are never accepted. */
+                source: string;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     createInspection: {

@@ -20,6 +20,11 @@ export interface NewTask {
   ttlSeconds?: number;
   maxRuntimeSeconds?: number;
   maxResponseBytes?: number;
+  /**
+   * Opens a stream session with this ID in the same transaction, before the agent is woken,
+   * so its first chunk always finds the session (log tail).
+   */
+  streamSessionId?: string;
 }
 
 type TaskRow = Prisma.AgentTaskGetPayload<object>;
@@ -98,7 +103,7 @@ export class TasksService implements OnApplicationShutdown {
       const agent = await tx.agent.findUnique({ where: { id: agentId }, select: { status: true } });
       if (!agent) throw notFound();
       if (agent.status === 'revoked') throw new ApiException(409, 'agent_revoked', 'This agent is revoked');
-      return tx.agentTask.create({
+      const task = await tx.agentTask.create({
         data: {
           id: unsigned.id,
           organizationId: ctx.organizationId,
@@ -113,6 +118,17 @@ export class TasksService implements OnApplicationShutdown {
           createdByUserId: ctx.actor.kind === 'user' ? ctx.actor.userId : null,
         },
       });
+      if (input.streamSessionId)
+        await tx.agentStreamSession.create({
+          data: {
+            id: input.streamSessionId,
+            organizationId: ctx.organizationId,
+            agentId,
+            taskId: task.id,
+            expiresAt: task.expiresAt,
+          },
+        });
+      return task;
     });
     await this.notifier.notify(agentId);
     return wireTask(row);
@@ -236,7 +252,17 @@ export class TasksService implements OnApplicationShutdown {
     });
   }
 
-  /** Relays a chunk to subscribers of `stream:<sessionId>` (browser WebSocket relay arrives in M10). */
+  /** Closes a stream session: the agent's next chunk gets 404 and it stops. */
+  async closeStream(ctx: TenantContext, sessionId: string): Promise<void> {
+    await withTenant(this.prisma, ctx, (tx) =>
+      tx.agentStreamSession.updateMany({
+        where: { id: sessionId, status: 'open' },
+        data: { status: 'closed' },
+      }),
+    );
+  }
+
+  /** Relays a chunk to subscribers of `stream:<sessionId>` (the SSE relay in the logs module). */
   async chunk(ctx: TenantContext, agent: AgentIdentity, sessionId: string, body: unknown): Promise<void> {
     const check = validateMessage('stream-chunk', body);
     if (!check.ok)

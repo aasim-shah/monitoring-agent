@@ -16,6 +16,7 @@ import { ConnectionsModule } from './modules/connections/connections.module.js';
 import { HealthController } from './health/health.controller.js';
 import { CurrentUserGuard } from './modules/identity/current-user.guard.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+import { LogsModule } from './modules/logs/logs.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
 import { MembersModule } from './modules/members/members.module.js';
 import { DiscoveryModule as AssetDiscoveryModule } from './modules/discovery/discovery.module.js';
@@ -63,6 +64,7 @@ export class AppModule {
         AgentsModule,
         TelemetryModule,
         PacksModule,
+        LogsModule,
         AssetDiscoveryModule,
         AssetsModule,
       ],

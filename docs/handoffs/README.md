@@ -89,7 +89,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M10.6 | Usage and limits UI | Not started | — |
 | M10.7 | Live boost | Not started | — |
 | M10.8 | Service dashboards | Not started | — |
-| M11.1 | Live tail | Not started | — |
+| M11.1 | Live tail | In progress | [M11-agent-tail](M11-agent-tail.md), [M11-live-tail-api](M11-live-tail-api.md) |
 | M11.2 | Log-derived metrics | Not started | — |
 | M12.1 | Alert rules and compiler | Not started | — |
 | M12.2 | Alert receiver and incident engine | Not started | — |

@@ -162,6 +162,28 @@ func TestStreamStopsWhenTheSessionCloses(t *testing.T) {
 	}
 }
 
+// A quiet source still learns that the viewer left: an empty chunk goes out after Idle
+// (Review Focus #3), so the host's tail slot is freed within seconds, not at the 15-minute TTL.
+func TestStreamStopsOnAQuietSourceWhenTheSessionCloses(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "quiet.log")
+	appendLines(t, path)
+	c := &collect{err: ErrSessionClosed}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	done := make(chan error, 1)
+	go func() {
+		done <- Stream(ctx, fileSource(path), c.send, Options{Flush: 50 * time.Millisecond, Poll: 20 * time.Millisecond, Idle: 200 * time.Millisecond})
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrSessionClosed) {
+			t.Errorf("err = %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("a quiet tail never noticed the session closed")
+	}
+}
+
 func TestSourcesComeFromAppliedPacksOnly(t *testing.T) {
 	ids := func(s []Source) []string {
 		var out []string

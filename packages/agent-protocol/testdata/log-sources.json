@@ -1,0 +1,13 @@
+{
+  "description": "Log source IDs per monitoring pack. The Go agent allowlist (internal/logs/sources.go) and the API table (apps/api/src/modules/logs/sources.ts) are both pinned to this file.",
+  "packs": {
+    "redis": ["redis.server"],
+    "postgresql": ["postgresql.main"],
+    "mysql": ["mysql.error"],
+    "mongodb": ["mongodb.main"],
+    "kafka": ["kafka.server"],
+    "nginx": ["nginx.access", "nginx.error"],
+    "nodejs": ["nodejs.journal"]
+  },
+  "always": ["host.journal"]
+}
