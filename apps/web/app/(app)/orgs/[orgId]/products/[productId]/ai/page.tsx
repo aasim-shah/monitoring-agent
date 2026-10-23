@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { unwrap } from '@pcp/api-client';
 import { Chat, type Ask, type StoredMessage } from '@/components/ai/chat';
 import { Alert } from '@/components/ui/alert';
@@ -17,7 +17,17 @@ export default function AiAssistantPage() {
   const { orgId, productId } = useParams<{ orgId: string; productId: string }>();
   const search = useSearchParams();
   const queryClient = useQueryClient();
-  const [active, setActive] = useState<string | null>(null);
+  /** The conversation picked from the list (loads its messages; remounts the chat). */
+  const [selected, setSelected] = useState<string | null>(null);
+  /** The conversation questions go to; a first question creates it without remounting the chat. */
+  const target = useRef<string | null>(null);
+  /** Bumped on every pick, so "New conversation" clears the chat even when nothing was picked before. */
+  const [session, setSession] = useState(0);
+  const select = (id: string | null) => {
+    target.current = id;
+    setSelected(id);
+    setSession((n) => n + 1);
+  };
   const settings = useApiQuery(['ai-settings', orgId], async () =>
     unwrap(await api.GET('/api/v1/organizations/{orgId}/settings/ai', { params: { path: { orgId } } })),
   );
@@ -26,9 +36,10 @@ export default function AiAssistantPage() {
     unwrap(await api.GET('/api/v1/products/{id}/ai/conversations', { params: { path: { id: productId } } })),
   );
   const conversation = useApiQuery(
-    ['ai-conversation', active],
-    async () => unwrap(await api.GET('/api/v1/ai/conversations/{id}', { params: { path: { id: active! } } })),
-    { enabled: Boolean(active) },
+    ['ai-conversation', selected],
+    async () =>
+      unwrap(await api.GET('/api/v1/ai/conversations/{id}', { params: { path: { id: selected! } } })),
+    { enabled: Boolean(selected) },
   );
 
   const ask = useCallback<Ask>(
@@ -37,7 +48,7 @@ export default function AiAssistantPage() {
       let stopped = false;
       void (async () => {
         try {
-          let id = active;
+          let id = target.current;
           if (!id) {
             id = unwrap(
               await api.POST('/api/v1/products/{id}/ai/conversations', {
@@ -45,7 +56,7 @@ export default function AiAssistantPage() {
                 body: { title: content.slice(0, 120) },
               }),
             ).id;
-            setActive(id);
+            target.current = id;
           }
           if (stopped) return;
           stop = openEventStream(`/api/v1/ai/conversations/${encodeURIComponent(id)}/messages`, {
@@ -62,7 +73,7 @@ export default function AiAssistantPage() {
         stop();
       };
     },
-    [active, productId],
+    [productId],
   );
 
   const s = settings.data;
@@ -80,7 +91,7 @@ export default function AiAssistantPage() {
       {s && !s.available ? <Alert tone="info">No AI provider is configured on this platform.</Alert> : null}
       <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
         <aside className="space-y-2">
-          <Button size="sm" variant="outline" className="w-full" onClick={() => setActive(null)}>
+          <Button size="sm" variant="outline" className="w-full" onClick={() => select(null)}>
             New conversation
           </Button>
           <QueryState query={conversations} label="Loading conversations">
@@ -89,10 +100,10 @@ export default function AiAssistantPage() {
                 <li key={c.id}>
                   <button
                     type="button"
-                    onClick={() => setActive(c.id)}
+                    onClick={() => select(c.id)}
                     className={cn(
                       'w-full truncate rounded px-2 py-1 text-left hover:bg-muted',
-                      active === c.id && 'bg-muted font-medium',
+                      (selected ?? target.current) === c.id && 'bg-muted font-medium',
                     )}
                   >
                     {c.title}
@@ -103,10 +114,10 @@ export default function AiAssistantPage() {
           </QueryState>
         </aside>
         <Chat
-          key={active ?? 'new'}
+          key={`${selected ?? 'new'}-${session}`}
           messages={(conversation.data?.messages ?? []) as StoredMessage[]}
           ask={ask}
-          initialQuestion={active ? '' : (search.get('q') ?? '')}
+          initialQuestion={selected ? '' : (search.get('q') ?? '')}
           onDone={() => void queryClient.invalidateQueries({ queryKey: listKey })}
         />
       </div>
