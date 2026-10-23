@@ -1,0 +1,27 @@
+{
+  "object": "chat.completion",
+  "created": 1792760014,
+  "model": "openai/gpt-oss-120b",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "reasoning": "We need to use getInfrastructureMetrics for host vps-1 and range \"1h\". Probably returns CPU and memory, etc. We need to extract CPU. Let's call function.",
+        "tool_calls": [
+          {
+            "id": "fc_fadacbfd-15c6-4e72-9c18-79c88660934d",
+            "type": "function",
+            "function": {
+              "name": "getInfrastructureMetrics",
+              "arguments": "{\"host\":\"vps-1\",\"range\":\"1h\"}"
+            }
+          }
+        ]
+      },
+      "logprobs": null,
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "service_tier": "on_demand"
+}

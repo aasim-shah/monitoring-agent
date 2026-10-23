@@ -1,0 +1,24 @@
+{
+  "choices": [
+    {
+      "finish_reason": "tool_calls",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": "{\"host\":\"vps-1\",\"range\":\"1h\"}",
+              "name": "getInfrastructureMetrics"
+            },
+            "id": "function-call-16187361673089037853",
+            "type": "function"
+          }
+        ]
+      }
+    }
+  ],
+  "created": 1792760013,
+  "model": "gemini-2.5-flash",
+  "object": "chat.completion"
+}
