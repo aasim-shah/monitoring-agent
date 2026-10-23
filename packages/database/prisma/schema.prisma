@@ -227,6 +227,8 @@ model Product {
   websites        WebsiteMonitor[]
   reportSchedules ReportSchedule[]
   reports         GeneratedReport[]
+  actionPolicies  ActionPolicy[]
+  actionRequests  ActionRequest[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -243,6 +245,8 @@ model Environment {
   product          Product           @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
   agentEnrollments AgentEnrollment[]
   agents           Agent[]
+  actionPolicies   ActionPolicy[]
+  actionRequests   ActionRequest[]
 
   @@unique([organizationId, id])
   @@unique([productId, name])
@@ -1308,4 +1312,125 @@ model ReportDelivery {
   @@unique([reportId, target])
   @@index([organizationId])
   @@map("report_deliveries")
+}
+
+enum ActionRequestStatus {
+  proposed
+  rejected_policy
+  pending_approval
+  approved
+  executing
+  succeeded
+  failed
+  rejected
+  expired
+
+  @@map("action_request_status")
+}
+
+enum ActionExecutionStatus {
+  running
+  succeeded
+  failed
+  expired
+
+  @@map("action_execution_status")
+}
+
+/// Which operational action may run where, approved by whom (WB-16 UC-16-01). Disabled by default (BR-16-01).
+model ActionPolicy {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  productId       String   @map("product_id") @db.Uuid
+  environmentId   String   @map("environment_id") @db.Uuid
+  capability      String
+  enabled         Boolean  @default(false)
+  approverRoles   String[] @default([]) @map("approver_roles")
+  requireApproval Boolean  @default(true) @map("require_approval")
+  /// Allowlists for the capability: units, workflows with refs, zones.
+  settings        Json     @default("{}")
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product     Product     @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  environment Environment @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([productId, environmentId, capability])
+  @@map("action_policies")
+}
+
+/// One proposed operational action and its lifecycle (spec §13.5).
+model ActionRequest {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String              @map("organization_id") @db.Uuid
+  productId         String              @map("product_id") @db.Uuid
+  environmentId     String              @map("environment_id") @db.Uuid
+  capability        String
+  target            Json
+  /// One action per target at a time (BR-16-06), e.g. host.restart_service:<agentId>:<unit>.
+  targetKey         String              @map("target_key")
+  params            Json                @default("{}")
+  status            ActionRequestStatus @default(proposed)
+  reason            String?
+  impact            Json                @default("{}")
+  proposedByAi      Boolean             @default(false) @map("proposed_by_ai")
+  requestedByUserId String?             @map("requested_by_user_id") @db.Uuid
+  idempotencyKey    String              @map("idempotency_key")
+  incidentId        String?             @map("incident_id") @db.Uuid
+  expiresAt         DateTime            @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product     Product           @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  environment Environment       @relation(fields: [organizationId, environmentId], references: [organizationId, id], onDelete: Cascade)
+  approvals   ActionApproval[]
+  executions  ActionExecution[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, productId, createdAt])
+  @@index([status, expiresAt])
+  @@map("action_requests")
+}
+
+model ActionApproval {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  requestId      String   @map("request_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  /// approve or reject.
+  decision       String
+  note           String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  request ActionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId, userId])
+  @@map("action_approvals")
+}
+
+/// One attempt to carry out an approved request, with its verification (BR-16-08).
+model ActionExecution {
+  id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String                @map("organization_id") @db.Uuid
+  requestId      String                @map("request_id") @db.Uuid
+  targetKey      String                @map("target_key")
+  /// Set to target_key while running, cleared when finished: one running execution per target (BR-16-06).
+  runningKey     String?               @unique @map("running_key")
+  /// agent (through pcp-helper) or platform (provider API).
+  location       String
+  adapter        String
+  adapterVersion String                @map("adapter_version")
+  agentTaskId    String?               @map("agent_task_id") @db.Uuid
+  status         ActionExecutionStatus @default(running)
+  startedAt      DateTime              @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt     DateTime?             @map("finished_at") @db.Timestamptz(6)
+  result         Json?
+  verification   Json?
+  error          String?
+
+  request ActionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, requestId])
+  @@map("action_executions")
 }

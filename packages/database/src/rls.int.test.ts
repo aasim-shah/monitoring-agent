@@ -238,6 +238,30 @@ beforeAll(async () => {
         `INSERT INTO report_deliveries (id, organization_id, report_id, kind, target) VALUES ($1, $2, $3, 'email', 'ops@example.com')`,
         [randomUUID(), org, report],
       );
+      const [env, actionRequest] = [randomUUID(), randomUUID()];
+      await c.query(
+        `INSERT INTO environments (id, organization_id, product_id, name) VALUES ($1, $2, $3, 'staging')`,
+        [env, org, product],
+      );
+      await c.query(
+        `INSERT INTO action_policies (organization_id, product_id, environment_id, capability, updated_at)
+         VALUES ($1, $2, $3, 'host.restart_service', now())`,
+        [org, product, env],
+      );
+      await c.query(
+        `INSERT INTO action_requests (id, organization_id, product_id, environment_id, capability, target, target_key, idempotency_key, expires_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'host.restart_service', '{}', 'k', 'idem', now(), now())`,
+        [actionRequest, org, product, env],
+      );
+      await c.query(
+        `INSERT INTO action_approvals (organization_id, request_id, user_id, decision) VALUES ($1, $2, $3, 'approve')`,
+        [org, actionRequest, randomUUID()],
+      );
+      await c.query(
+        `INSERT INTO action_executions (organization_id, request_id, target_key, location, adapter, adapter_version)
+         VALUES ($1, $2, 'k', 'agent', 'host.restart_service', '0.3.0')`,
+        [org, actionRequest],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,
