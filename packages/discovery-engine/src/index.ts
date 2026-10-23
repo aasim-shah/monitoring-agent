@@ -16,3 +16,4 @@ export {
   type Verification,
 } from './edges.js';
 export { MISSING_AFTER_RUNS, completeRun, startRun } from './lifecycle.js';
+export { computeImpact, type ImpactClass, type ImpactedAsset } from './impact.js';
