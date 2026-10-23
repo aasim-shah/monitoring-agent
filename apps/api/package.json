@@ -18,6 +18,7 @@
     "@nestjs/platform-fastify": "11.2.7",
     "@node-rs/argon2": "2.2.2",
     "@pcp/agent-protocol": "workspace:*",
+    "@pcp/ai-orchestrator": "workspace:*",
     "@pcp/alerting": "workspace:*",
     "@pcp/connector-runtime": "workspace:*",
     "@pcp/connector-sdk": "workspace:*",

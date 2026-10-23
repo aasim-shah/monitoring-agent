@@ -105,6 +105,9 @@ importers:
       '@pcp/agent-protocol':
         specifier: workspace:*
         version: link:../../packages/agent-protocol
+      '@pcp/ai-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/ai-orchestrator
       '@pcp/alerting':
         specifier: workspace:*
         version: link:../../packages/alerting

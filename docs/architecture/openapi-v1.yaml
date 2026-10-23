@@ -352,16 +352,41 @@ paths:
               $ref: '#/components/schemas/UpdateSettingsRequest'
   /api/v1/organizations/{orgId}/settings/ai:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
+    get:
+      operationId: getAiSettings
+      tags: [ai]
+      summary: AI settings
+      description: Whether AI is on for the organization and which platform provider answers. Requires `org.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M14
     patch:
       operationId: updateAiSettings
       tags: [ai]
-      summary: Configure AI provider, model, or disable AI
-      description: Configure AI provider, model, or disable AI.
+      summary: Turn the AI assistant on or off
+      description: With AI off, AI endpoints answer 409 and dashboards, alerts, and reports keep working. Requires `org.settings.manage`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [disabled], properties: { disabled: { type: boolean } } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AiSettings' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M14
   /api/v1/organizations/{orgId}/invitations:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
@@ -2770,40 +2795,112 @@ paths:
       x-implemented-in: M12
   /api/v1/products/{id}/ai/conversations:
     parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listConversations
+      tags: [ai]
+      summary: My conversations in this product
+      description: The caller's conversations from the last 90 days, newest first. Requires `ai.use`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [conversations]
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title, updatedAt]
+                      properties:
+                        id: { type: string, format: uuid }
+                        title: { type: string }
+                        updatedAt: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M14
     post:
       operationId: createConversation
       tags: [ai]
       summary: Start conversation
-      description: Start conversation.
+      description: Requires `ai.use`; 409 `ai_disabled` or `ai_unavailable` when AI is off or not configured.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { title: { type: string, maxLength: 500 } } }
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                {
+                  type: object,
+                  required: [id, title],
+                  properties: { id: { type: string, format: uuid }, title: { type: string } },
+                }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M14
   /api/v1/ai/conversations/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getConversation
       tags: [ai]
       summary: Conversation
-      description: Conversation.
+      description: Messages with evidence, missing evidence, confidence, and validation. Requires `ai.use`.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, title, productId, messages]
+                properties:
+                  id: { type: string, format: uuid }
+                  title: { type: string }
+                  productId: { type: string, format: uuid }
+                  messages: { type: array, items: { $ref: '#/components/schemas/AiMessage' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M14
   /api/v1/ai/conversations/{id}/messages:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
       operationId: sendMessage
       tags: [ai]
-      summary: Send message (SSE stream)
-      description: Send message (SSE stream).
+      summary: Ask a question (server-sent events)
+      description: >-
+        Runs an investigation and streams `started`, `tool` (each tool's start and end), `answer` ({text, evidence,
+        missing, confidence, validation, problems}), and `done`. Limits: 12 tool calls, 120 s. Requires `ai.use`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [content],
+                properties: { content: { type: string, maxLength: 4000 } },
+              }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M14
   /api/v1/ai/runs/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
@@ -3052,6 +3149,40 @@ components:
         schema: { type: string },
       }
   schemas:
+    AiSettings:
+      type: object
+      required: [disabled, available]
+      properties:
+        disabled: { type: boolean }
+        available: { type: boolean, description: A platform provider is configured. }
+        provider: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+    AiMessage:
+      type: object
+      required: [id, role, content, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        role: { type: string, enum: [user, assistant] }
+        content: { type: string }
+        evidence:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              tool: { type: string }
+              status: { type: string, enum: [ok, denied, error, truncated] }
+              gaps: { type: array, items: { type: string } }
+              sources:
+                {
+                  type: array,
+                  items: { type: object, properties: { label: { type: string }, href: { type: string } } },
+                }
+              data: {}
+        missing: { type: array, items: { type: string } }
+        confidence: { type: string, nullable: true, enum: [high, medium, low] }
+        validation: { type: string, nullable: true, enum: [verified, unverified, partial] }
+        createdAt: { type: string, format: date-time }
     AlertTemplate:
       type: object
       required: [id, label, description, kind, params, defaultSeverity]

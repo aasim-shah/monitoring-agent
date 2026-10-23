@@ -21,7 +21,8 @@ export type TenantResource =
   | 'asset_alias'
   | 'alert_rule'
   | 'incident'
-  | 'notification_channel';
+  | 'notification_channel'
+  | 'ai_conversation';
 
 /** Route parameter that identifies the tenant resource; `orgId`, `productId`, `environmentId` imply theirs. */
 export type TenantScopeOptions =

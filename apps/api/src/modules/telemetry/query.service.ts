@@ -99,10 +99,11 @@ export class TelemetryQueryService {
     ctx: TenantContext,
     promql: string,
     scope: QueryScope,
+    at?: Date,
   ): Promise<Array<{ labels: Record<string, string>; value: number | null }>> {
     const params = this.params(ctx, scope);
     params.set('query', promql);
-    params.set('time', String(Math.floor(this.now().getTime() / 1000)));
+    params.set('time', String(Math.floor((at ?? this.now()).getTime() / 1000)));
     const result = await this.call<{ metric: Record<string, string>; value: [number, string] }>(
       '/api/v1/query',
       params,

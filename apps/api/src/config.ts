@@ -39,6 +39,17 @@ const schema = z
     /** Where tenant vmalert rule files are written (a volume vmalert reads), and vmalert's URL. */
     ALERT_RULES_DIR: z.string().min(1).optional(),
     VMALERT_URL: z.string().url().optional(),
+    /** AI assistant (M14): platform providers; keys never reach the browser or the model. */
+    AI_PROVIDER: z.enum(['gemini', 'groq', 'openrouter', 'openai']).optional(),
+    AI_MODEL: z.string().min(1).optional(),
+    AI_FALLBACK_PROVIDER: z.enum(['gemini', 'groq', 'openrouter', 'openai']).optional(),
+    AI_FALLBACK_MODEL: z.string().min(1).optional(),
+    GEMINI_API_KEY: z.string().min(10).optional(),
+    GROQ_API_KEY: z.string().min(10).optional(),
+    OPENROUTER_API_KEY: z.string().min(10).optional(),
+    OPENAI_API_KEY: z.string().min(10).optional(),
+    /** Tests and the e2e stack: a scripted provider instead of a real one. */
+    PCP_AI_FAKE: z.enum(['0', '1']).optional(),
   })
   .refine(
     (c) =>
@@ -55,6 +66,18 @@ const schema = z
     for (const k of AGENT_KEYS.filter((k) => c[k] === undefined))
       issues.addIssue({ code: 'custom', path: [k], message: 'agent settings must be set together' });
   });
+
+export interface AiProviderConfig {
+  provider: 'gemini' | 'groq' | 'openrouter' | 'openai';
+  model: string;
+  apiKey: string;
+}
+
+export interface AiConfig {
+  /** Primary first; empty when no provider is configured (AI endpoints answer 409). */
+  providers: AiProviderConfig[];
+  fake: boolean;
+}
 
 export interface GoogleConfig {
   clientId: string;
@@ -93,6 +116,7 @@ export interface AppConfig {
   vmQueryUrl?: string;
   alertRulesDir?: string;
   vmalertUrl?: string;
+  ai: AiConfig;
 }
 
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
@@ -124,6 +148,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     internalToken: c.INTERNAL_TOKEN,
     vmQueryUrl: c.VM_QUERY_URL?.replace(/\/+$/, ''),
     alertRulesDir: c.ALERT_RULES_DIR,
+    ai: aiConfig(c),
     vmalertUrl: c.VMALERT_URL?.replace(/\/+$/, ''),
     agents: c.AGENT_CA_CERT
       ? {
@@ -145,3 +170,39 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
 
 /** PEM values travel base64-encoded so they fit one environment-variable line. */
 const fromBase64 = (v: string) => Buffer.from(v, 'base64').toString('utf8');
+
+const AI_DEFAULT_MODEL = {
+  gemini: 'gemini-2.5-flash',
+  groq: 'openai/gpt-oss-120b',
+  openrouter: 'openai/gpt-oss-120b',
+  openai: 'gpt-4.1-mini',
+};
+
+function aiConfig(c: {
+  AI_PROVIDER?: AiProviderConfig['provider'];
+  AI_MODEL?: string;
+  AI_FALLBACK_PROVIDER?: AiProviderConfig['provider'];
+  AI_FALLBACK_MODEL?: string;
+  GEMINI_API_KEY?: string;
+  GROQ_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  PCP_AI_FAKE?: '0' | '1';
+}): AiConfig {
+  const key = {
+    gemini: c.GEMINI_API_KEY,
+    groq: c.GROQ_API_KEY,
+    openrouter: c.OPENROUTER_API_KEY,
+    openai: c.OPENAI_API_KEY,
+  };
+  const providers: AiProviderConfig[] = [];
+  for (const [provider, model] of [
+    [c.AI_PROVIDER, c.AI_MODEL],
+    [c.AI_FALLBACK_PROVIDER, c.AI_FALLBACK_MODEL],
+  ] as const) {
+    if (!provider) continue;
+    const apiKey = key[provider];
+    if (apiKey) providers.push({ provider, model: model ?? AI_DEFAULT_MODEL[provider], apiKey });
+  }
+  return { providers, fake: c.PCP_AI_FAKE === '1' };
+}

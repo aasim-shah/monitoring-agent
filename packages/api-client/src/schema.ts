@@ -347,15 +347,19 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * AI settings
+         * @description Whether AI is on for the organization and which platform provider answers. Requires `org.view`.
+         */
+        get: operations["getAiSettings"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         /**
-         * Configure AI provider, model, or disable AI
-         * @description Configure AI provider, model, or disable AI.
+         * Turn the AI assistant on or off
+         * @description With AI off, AI endpoints answer 409 and dashboards, alerts, and reports keep working. Requires `org.settings.manage`.
          */
         patch: operations["updateAiSettings"];
         trace?: never;
@@ -2557,11 +2561,15 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * My conversations in this product
+         * @description The caller's conversations from the last 90 days, newest first. Requires `ai.use`.
+         */
+        get: operations["listConversations"];
         put?: never;
         /**
          * Start conversation
-         * @description Start conversation.
+         * @description Requires `ai.use`; 409 `ai_disabled` or `ai_unavailable` when AI is off or not configured.
          */
         post: operations["createConversation"];
         delete?: never;
@@ -2582,7 +2590,7 @@ export interface paths {
         };
         /**
          * Conversation
-         * @description Conversation.
+         * @description Messages with evidence, missing evidence, confidence, and validation. Requires `ai.use`.
          */
         get: operations["getConversation"];
         put?: never;
@@ -2606,8 +2614,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Send message (SSE stream)
-         * @description Send message (SSE stream).
+         * Ask a question (server-sent events)
+         * @description Runs an investigation and streams `started`, `tool` (each tool's start and end), `answer` ({text, evidence, missing, confidence, validation, problems}), and `done`. Limits: 12 tool calls, 120 s. Requires `ai.use`.
          */
         post: operations["sendMessage"];
         delete?: never;
@@ -2942,6 +2950,39 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AiSettings: {
+            disabled: boolean;
+            /** @description A platform provider is configured. */
+            available: boolean;
+            provider?: string | null;
+            model?: string | null;
+        };
+        AiMessage: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            role: "user" | "assistant";
+            content: string;
+            evidence?: {
+                id?: string;
+                tool?: string;
+                /** @enum {string} */
+                status?: "ok" | "denied" | "error" | "truncated";
+                gaps?: string[];
+                sources?: {
+                    label?: string;
+                    href?: string;
+                }[];
+                data?: unknown;
+            }[];
+            missing?: string[];
+            /** @enum {string|null} */
+            confidence?: "high" | "medium" | "low" | null;
+            /** @enum {string|null} */
+            validation?: "verified" | "unverified" | "partial" | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
         AlertTemplate: {
             id: string;
             label: string;
@@ -4078,7 +4119,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    updateAiSettings: {
+    getAiSettings: {
         parameters: {
             query?: never;
             header?: never;
@@ -4090,7 +4131,46 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateAiSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    disabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSettings"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -7067,7 +7147,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    createConversation: {
+    listConversations: {
         parameters: {
             query?: never;
             header?: never;
@@ -7079,9 +7159,61 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            201: components["responses"]["Created"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        conversations: {
+                            /** Format: uuid */
+                            id: string;
+                            title: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    createConversation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    title?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        title: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getConversation: {
@@ -7096,7 +7228,22 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        title: string;
+                        /** Format: uuid */
+                        productId: string;
+                        messages: components["schemas"]["AiMessage"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -7111,11 +7258,26 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    content: string;
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Event stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getAiRun: {
