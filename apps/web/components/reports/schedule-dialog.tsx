@@ -65,7 +65,16 @@ export function ScheduleDialog({
   const [preview, setPreview] = useState<SchedulePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const zones = useMemo(() => timezones(defaultTimezone), [defaultTimezone]);
+  // About 400 options: built once, not on every keystroke.
+  const zoneOptions = useMemo(
+    () =>
+      timezones(defaultTimezone).map((z) => (
+        <option key={z} value={z}>
+          {z}
+        </option>
+      )),
+    [defaultTimezone],
+  );
 
   useEffect(() => {
     if (!open || !TIME.test(localTime)) return setPreview(null);
@@ -141,11 +150,7 @@ export function ScheduleDialog({
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
               >
-                {zones.map((z) => (
-                  <option key={z} value={z}>
-                    {z}
-                  </option>
-                ))}
+                {zoneOptions}
               </select>
             </Field>
             <Field id="schedule-time" label="Local time" hint="24-hour, e.g. 08:00">

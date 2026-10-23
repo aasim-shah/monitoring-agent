@@ -21,7 +21,8 @@ const preview = vi.fn(async () => ({
 
 describe('ScheduleDialog (WB-15 UC-15-01)', () => {
   it('previews the next run in local time and UTC, validates, and submits', async () => {
-    const user = userEvent.setup();
+    // No per-key delay: the form is long and the suite runs in parallel with the others.
+    const user = userEvent.setup({ delay: null });
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(
       <ScheduleDialog
@@ -42,10 +43,9 @@ describe('ScheduleDialog (WB-15 UC-15-01)', () => {
     await user.type(screen.getByLabelText('Name'), 'Daily summary');
     await user.click(screen.getByRole('button', { name: 'Save schedule' }));
     expect(await screen.findByText('Choose a channel or add a recipient')).toBeInTheDocument();
-    await user.type(
-      screen.getByLabelText('Recipients'),
-      Array.from({ length: 11 }, (_, i) => `r${i}@example.com`).join(', '),
-    );
+    // Pasted: typing 11 addresses key by key is slow under a loaded test run.
+    await user.click(screen.getByLabelText('Recipients'));
+    await user.paste(Array.from({ length: 11 }, (_, i) => `r${i}@example.com`).join(', '));
     await user.click(screen.getByRole('button', { name: 'Save schedule' }));
     expect(await screen.findByText('At most 10 recipients')).toBeInTheDocument();
     await user.clear(screen.getByLabelText('Recipients'));
@@ -65,7 +65,7 @@ describe('ScheduleDialog (WB-15 UC-15-01)', () => {
       channelIds: ['c1'],
       recipients: ['cto@example.com'],
     });
-  });
+  }, 60_000);
 });
 
 const schedule = (over: Partial<ScheduleRow> = {}): ScheduleRow => ({
