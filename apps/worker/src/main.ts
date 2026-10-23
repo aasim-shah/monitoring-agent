@@ -4,7 +4,7 @@ import { postgresCheck, redisCheck } from '@pcp/health';
 import { createQueues, reconcileSchedules, startProcessors } from '@pcp/jobs';
 import { loadKeyRing } from '@pcp/secrets';
 import nodemailer from 'nodemailer';
-import { resolveTxt } from 'node:dns/promises';
+import { authoritativeTxt, nodeDns } from '@pcp/website-probe';
 import { alertingHandlers } from './alerting-handlers.js';
 import { websiteProbeHandler } from './website-handler.js';
 import { loadConfig } from './config.js';
@@ -39,7 +39,8 @@ const handlers = alertingHandlers({
 const probeWebsite = websiteProbeHandler({
   prisma,
   now: () => new Date(),
-  resolveTxt,
+  // The zone's own nameservers: a record added minutes ago is not hidden by resolver caches.
+  resolveTxt: authoritativeTxt(nodeDns),
   // Public addresses only; the allowlist exists for test stacks (PCP_PROBE_ALLOWLIST).
   destination: config.probeAllowlist.length
     ? { allowPrivate: true, allowlist: config.probeAllowlist }

@@ -52,6 +52,12 @@ function normalize(address: string): { address: string; family: 4 | 6 } {
 const inList = (list: BlockList, a: { address: string; family: 4 | 6 }) =>
   list.check(a.address, a.family === 6 ? 'ipv6' : 'ipv4');
 
+/** True for an address central execution may contact (not private, loopback, or link-local). */
+export function isPublicAddress(address: string): boolean {
+  const a = normalize(address);
+  return isIP(a.address) !== 0 && !inList(ALWAYS, a) && !inList(PRIVATE, a);
+}
+
 const defaultLookup: LookupFn = async (hostname) =>
   (await dnsLookup(hostname, { all: true, verbatim: true })).map((r) => ({
     address: r.address,
