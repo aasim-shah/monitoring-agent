@@ -392,11 +392,59 @@ export const AI_TOOLS: Tool[] = [
       };
     },
   }),
-  unavailable(
-    'getWebsiteAvailability',
-    'Website probe results and TLS status',
-    'Website availability: source not connected',
-  ),
+  defineTool<{ range: keyof typeof RANGE_SECONDS }, AiDeps>({
+    name: 'getWebsiteAvailability',
+    description:
+      'Monitored websites and APIs of this product: verification state, last probe (up, status code, response time), consecutive failures, TLS expiry, and uptime percent over the window.',
+    permission: 'telemetry.query',
+    input: z.object({ range: RANGE }),
+    run: async (ctx, input, d) => {
+      const monitors = await withTenant(d.prisma, ctx, (tx) =>
+        tx.websiteMonitor.findMany({
+          where: { productId: d.productId },
+          orderBy: { createdAt: 'asc' },
+          take: 50,
+        }),
+      );
+      const gaps: string[] = [];
+      let uptime = new Map<string, number | null>();
+      if (monitors.some((m) => m.status === 'active')) {
+        try {
+          const rows = await d.telemetry.instant(
+            ctx,
+            `100 * avg by (monitor_id) (avg_over_time(website_up[${input.range}]))`,
+            { productId: d.productId },
+          );
+          uptime = new Map(rows.map((r) => [r.labels.monitor_id ?? '', round(r.value)]));
+        } catch {
+          gaps.push('Website uptime history: telemetry storage unavailable');
+        }
+      }
+      const now = d.now().getTime();
+      return {
+        data: {
+          range: input.range,
+          monitors: monitors.map((m) => ({
+            url: m.url,
+            status: m.status,
+            pausedReason: m.pausedReason,
+            up: m.lastUp,
+            statusCode: m.lastStatusCode,
+            responseMs: m.lastTotalMs,
+            error: m.lastError,
+            consecutiveFailures: m.consecutiveFailures,
+            lastCheckedAt: m.lastCheckedAt,
+            tlsExpiresInDays: m.tlsExpiresAt
+              ? Math.floor((m.tlsExpiresAt.getTime() - now) / 86400_000)
+              : null,
+            uptimePercent: uptime.get(m.id) ?? null,
+          })),
+        },
+        gaps: monitors.length ? gaps : ['Website availability: no websites are monitored for this product'],
+        sources: [{ label: 'Websites & APIs', href: `${base(d)}/websites` }],
+      };
+    },
+  }),
   unavailable('getAnalyticsReport', 'GA4 and Firebase product analytics', 'Analytics: source not connected'),
   unavailable('getAdPerformance', 'Ads spend, clicks, conversions', 'Ads: source not connected'),
   unavailable('getDeployments', 'Deployments and code changes', 'Deployments: source not connected'),

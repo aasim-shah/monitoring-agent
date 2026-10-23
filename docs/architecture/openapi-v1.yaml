@@ -18,6 +18,7 @@ tags:
   - name: agents
   - name: packs
   - name: logs
+  - name: websites
   - name: agent-protocol
   - name: ingest
   - name: internal
@@ -2572,6 +2573,92 @@ paths:
         '200': { $ref: '#/components/responses/Ok' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/products/{id}/website-monitors:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listWebsiteMonitors
+      tags: [websites]
+      summary: Website monitors
+      description: Monitors with verification state, last probe, and TLS expiry. Requires `telemetry.query`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [monitors]
+                properties:
+                  monitors: { type: array, items: { $ref: '#/components/schemas/WebsiteMonitor' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M13a
+    post:
+      operationId: createWebsiteMonitor
+      tags: [websites]
+      summary: Monitor a website or API
+      description: >-
+        http(s) URL with a public host; probing starts after the DNS TXT record from `verification` is found.
+        Interval 30–3600 s (default 60). At most 50 per organization. Requires `pack.manage`.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri }
+                intervalSeconds: { type: integer, minimum: 30, maximum: 3600 }
+                expectedStatus: { type: integer, nullable: true }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebsiteMonitor' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M13a
+  /api/v1/website-monitors/{id}:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    delete:
+      operationId: deleteWebsiteMonitor
+      tags: [websites]
+      summary: Stop monitoring
+      description: Requires `pack.manage`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '204': { $ref: '#/components/responses/NoContent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M13a
+  /api/v1/website-monitors/{id}/verify:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: verifyWebsiteMonitor
+      tags: [websites]
+      summary: Check the domain TXT record now
+      description: Looks for `pcp-verify=<token>` on the host and its parent domains (never a public suffix). Requires `pack.manage`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [verified, checkedNames]
+                properties:
+                  verified: { type: boolean }
+                  checkedNames: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M13a
   /api/v1/products/{id}/incidents:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
@@ -3149,6 +3236,43 @@ components:
         schema: { type: string },
       }
   schemas:
+    WebsiteMonitor:
+      type: object
+      required: [id, productId, url, host, intervalSeconds, status, verification]
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        url: { type: string }
+        host: { type: string }
+        intervalSeconds: { type: integer }
+        expectedStatus: { type: integer, nullable: true }
+        status: { type: string, enum: [pending_verification, active, paused] }
+        pausedReason: { type: string, nullable: true }
+        verifiedAt: { type: string, format: date-time, nullable: true }
+        verification:
+          type: object
+          required: [record, name, value]
+          properties:
+            record: { type: string, enum: [TXT] }
+            name: { type: string }
+            value: { type: string }
+        last:
+          type: object
+          nullable: true
+          properties:
+            checkedAt: { type: string, format: date-time }
+            up: { type: boolean, nullable: true }
+            statusCode: { type: integer, nullable: true }
+            error: { type: string, nullable: true }
+            totalMs: { type: integer, nullable: true }
+            consecutiveFailures: { type: integer }
+        tls:
+          type: object
+          nullable: true
+          properties:
+            expiresAt: { type: string, format: date-time }
+            issuer: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
     AiSettings:
       type: object
       required: [disabled, available]

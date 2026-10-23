@@ -141,6 +141,9 @@ importers:
       '@pcp/tenant-security':
         specifier: workspace:*
         version: link:../../packages/tenant-security
+      '@pcp/website-probe':
+        specifier: workspace:*
+        version: link:../../packages/website-probe
       '@peculiar/x509':
         specifier: 2.1.0
         version: 2.1.0

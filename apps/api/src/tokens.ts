@@ -8,3 +8,6 @@ export const CLOCK = Symbol('CLOCK');
 
 /** `(hostname) => Promise<string[]>`: A/AAAA records for discovery's dns-to-host rule (tests inject a fake). */
 export const DNS_RESOLVER = Symbol('DNS_RESOLVER');
+
+/** DNS TXT lookups (website domain verification); tests replace it. */
+export const TXT_RESOLVER = Symbol('TXT_RESOLVER');

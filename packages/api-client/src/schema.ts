@@ -2359,6 +2359,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/{id}/website-monitors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Website monitors
+         * @description Monitors with verification state, last probe, and TLS expiry. Requires `telemetry.query`.
+         */
+        get: operations["listWebsiteMonitors"];
+        put?: never;
+        /**
+         * Monitor a website or API
+         * @description http(s) URL with a public host; probing starts after the DNS TXT record from `verification` is found. Interval 30–3600 s (default 60). At most 50 per organization. Requires `pack.manage`.
+         */
+        post: operations["createWebsiteMonitor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/website-monitors/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop monitoring
+         * @description Requires `pack.manage`.
+         */
+        delete: operations["deleteWebsiteMonitor"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/website-monitors/{id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check the domain TXT record now
+         * @description Looks for `pcp-verify=<token>` on the host and its parent domains (never a public suffix). Requires `pack.manage`.
+         */
+        post: operations["verifyWebsiteMonitor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/{id}/incidents": {
         parameters: {
             query?: never;
@@ -2950,6 +3023,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        WebsiteMonitor: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            productId: string;
+            url: string;
+            host: string;
+            intervalSeconds: number;
+            expectedStatus?: number | null;
+            /** @enum {string} */
+            status: "pending_verification" | "active" | "paused";
+            pausedReason?: string | null;
+            /** Format: date-time */
+            verifiedAt?: string | null;
+            verification: {
+                /** @enum {string} */
+                record: "TXT";
+                name: string;
+                value: string;
+            };
+            last?: {
+                /** Format: date-time */
+                checkedAt?: string;
+                up?: boolean | null;
+                statusCode?: number | null;
+                error?: string | null;
+                totalMs?: number | null;
+                consecutiveFailures?: number;
+            } | null;
+            tls?: {
+                /** Format: date-time */
+                expiresAt?: string;
+                issuer?: string | null;
+            } | null;
+            /** Format: date-time */
+            createdAt?: string;
+        };
         AiSettings: {
             disabled: boolean;
             /** @description A platform provider is configured. */
@@ -6852,6 +6962,114 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Ok"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listWebsiteMonitors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        monitors: components["schemas"]["WebsiteMonitor"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createWebsiteMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    url: string;
+                    intervalSeconds?: number;
+                    expectedStatus?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebsiteMonitor"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    deleteWebsiteMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: components["responses"]["NoContent"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    verifyWebsiteMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        verified: boolean;
+                        checkedNames: string[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
