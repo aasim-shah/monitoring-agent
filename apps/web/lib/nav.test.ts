@@ -10,7 +10,12 @@ describe('organization navigation', () => {
       'Members & Roles',
       'Audit Log',
       'Settings',
+      'Notifications',
     ]);
+    expect(buildOrgNav('o', 'owner').at(-1)).toEqual({
+      label: 'Notifications',
+      href: '/orgs/o/settings/notifications',
+    });
   });
 
   it('hides audit log and settings from viewers (UI only; the API also refuses)', () => {
@@ -53,8 +58,13 @@ describe('product navigation (spec §21)', () => {
       'Assets',
       'Infrastructure',
       'Databases',
+      'Incidents & Alerts',
       'Audit Log',
     ]);
+    expect(items.find((i) => i.label === 'Incidents & Alerts')).toEqual({
+      label: 'Incidents & Alerts',
+      href: '/orgs/o/products/p/incidents',
+    });
   });
 
   it('omits the audit log for roles without audit.view', () => {

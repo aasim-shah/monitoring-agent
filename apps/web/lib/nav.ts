@@ -26,6 +26,7 @@ export function buildOrgNav(orgId: string, role: Role): NavItem[] {
     { label: 'Members & Roles', href: `${base}/members`, permission: 'org.view' },
     { label: 'Audit Log', href: `${base}/audit`, permission: 'audit.view' },
     { label: 'Settings', href: `${base}/settings`, permission: 'org.settings.manage' },
+    { label: 'Notifications', href: `${base}/settings/notifications`, permission: 'org.settings.manage' },
   ];
   return items.filter((i) => allowed(role, i.permission)).map(({ permission: _p, ...item }) => item);
 }
@@ -50,7 +51,11 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
       permission: 'connection.view',
     },
     { label: 'Analytics & Ads', milestone: 'M13' },
-    { label: 'Incidents & Alerts', milestone: 'M12' },
+    {
+      label: 'Incidents & Alerts',
+      href: `/orgs/${orgId}/products/${productId}/incidents`,
+      permission: 'incident.view',
+    },
     { label: 'AI Assistant', milestone: 'M14' },
     { label: 'Reports & Schedules', milestone: 'M15' },
     { label: 'Automations & Approvals', milestone: 'M16' },
