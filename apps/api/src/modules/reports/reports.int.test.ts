@@ -158,6 +158,15 @@ describe('report schedules (WB-15 UC-15-01)', () => {
     );
   });
 
+  it('resuming a long-paused schedule starts from the next run, not every missed day', async () => {
+    const { owner, productId, channelId } = await setup();
+    const s = (await create(owner.cookie, productId, daily(channelId))).json();
+    await call(owner.cookie, 'PATCH', `/api/v1/report-schedules/${s.id}`, { enabled: false });
+    await sql(`UPDATE report_schedules SET next_run_at = '2026-09-01T06:00:00Z' WHERE id = $1`, [s.id]);
+    const resumed = await call(owner.cookie, 'PATCH', `/api/v1/report-schedules/${s.id}`, { enabled: true });
+    expect(resumed.json().nextRunAt).toBe('2026-10-26T07:00:00.000Z');
+  });
+
   it('previews the next run and the window length (Review Focus #1)', async () => {
     const { owner, productId } = await setup();
     const res = await call(

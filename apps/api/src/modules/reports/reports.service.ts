@@ -122,7 +122,11 @@ export class ReportsService implements OnApplicationShutdown {
       this.checkTime(next.timezone, next.localTime);
       if (input.channelIds || input.recipients)
         await this.checkDestinations(tx, next.channelIds, next.recipients);
-      const moved = next.timezone !== current.timezone || next.localTime !== current.localTime;
+      // A resumed schedule starts from its next run; missed days while paused are not caught up.
+      const moved =
+        next.timezone !== current.timezone ||
+        next.localTime !== current.localTime ||
+        (input.enabled === true && !current.enabled);
       const s = await tx.reportSchedule.update({
         where: { id },
         data: {
