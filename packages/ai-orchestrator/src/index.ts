@@ -11,3 +11,11 @@ export { executeTool, TOOL_MAX_BYTES, TOOL_TIMEOUT_MS, type Evidence, type ToolS
 export { validateAnswer } from './validate.js';
 export { systemPrompt } from './prompt.js';
 export { runInvestigation, RUN_LIMITS, type RunEvent, type RunInput, type RunResult } from './run.js';
+export {
+  aiConfigFromEnv,
+  providerFromConfig,
+  AI_DEFAULT_MODEL,
+  type AiConfig,
+  type AiProviderConfig,
+  type AiProviderName,
+} from './env.js';

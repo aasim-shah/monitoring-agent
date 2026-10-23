@@ -1,7 +1,5 @@
 import {
-  chain,
-  openAiCompatible,
-  PROVIDER_BASE_URLS,
+  providerFromConfig,
   scripted,
   type ChatProvider,
   type ChatRequest,
@@ -46,14 +44,5 @@ function fakeStep(req: ChatRequest): ScriptStep {
 /** Primary then fallback from the platform config; null when no provider is configured. */
 export function buildProvider(config: AppConfig): ChatProvider | null {
   if (config.ai.fake) return { ...scripted('scripted', (req) => fakeStep(req)), id: 'scripted' };
-  const providers = config.ai.providers.map((p) =>
-    openAiCompatible({
-      id: p.provider,
-      baseUrl: PROVIDER_BASE_URLS[p.provider]!,
-      apiKey: p.apiKey,
-      model: p.model,
-    }),
-  );
-  if (providers.length === 0) return null;
-  return providers.length === 1 ? providers[0]! : chain(providers);
+  return providerFromConfig(config.ai.providers);
 }

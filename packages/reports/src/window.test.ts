@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { isValidLocalTime, isValidTimezone, nextRunAt, previousWindow, reportWindow } from './window.js';
+import {
+  isValidLocalTime,
+  isValidTimezone,
+  localDayWindow,
+  nextRunAt,
+  previousWindow,
+  reportWindow,
+} from './window.js';
 
 const iso = (d: Date) => d.toISOString();
 
@@ -59,6 +66,15 @@ describe('report windows (D21, WB-15 UC-15-07, Review Focus #1)', () => {
       '2026-10-23T22:00:00.000Z',
       '2026-10-24T22:00:00.000Z',
       24,
+    ]);
+  });
+
+  it('rebuilds a window from its local date (retries and regeneration)', () => {
+    const w = localDayWindow('Europe/Berlin', '2026-10-25');
+    expect([iso(w.start), iso(w.end), w.hours]).toEqual([
+      '2026-10-24T22:00:00.000Z',
+      '2026-10-25T23:00:00.000Z',
+      25,
     ]);
   });
 

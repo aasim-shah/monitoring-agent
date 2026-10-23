@@ -32,6 +32,11 @@ export function reportWindow(timezone: string, runAt: Date): ReportWindow {
   return windowFor(timezone, DateTime.fromJSDate(runAt, { zone: timezone }).minus({ days: 1 }));
 }
 
+/** The window of one local calendar day (YYYY-MM-DD), for retries and regeneration. */
+export function localDayWindow(timezone: string, localDate: string): ReportWindow {
+  return windowFor(timezone, DateTime.fromISO(localDate, { zone: timezone }));
+}
+
 /** The local day before a window, for period comparisons. */
 export function previousWindow(w: ReportWindow): ReportWindow {
   return windowFor(w.timezone, DateTime.fromJSDate(w.start, { zone: w.timezone }).minus({ days: 1 }));

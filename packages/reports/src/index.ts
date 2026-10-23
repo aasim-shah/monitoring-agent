@@ -1,6 +1,7 @@
 export {
   reportWindow,
   previousWindow,
+  localDayWindow,
   nextRunAt,
   isValidTimezone,
   isValidLocalTime,

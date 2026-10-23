@@ -53,4 +53,22 @@ describe('worker config', () => {
       }),
     ).toMatchObject({ vmImportUrl: 'http://victoriametrics:8428', probeAllowlist: ['web:3000', 'api:3000'] });
   });
+  it('reads the telemetry query URL and the AI providers for report narratives (M15)', () => {
+    expect(loadConfig(base)).toMatchObject({ vmQueryUrl: undefined, ai: { providers: [], fake: false } });
+    expect(
+      loadConfig({
+        ...base,
+        VM_QUERY_URL: 'http://victoriametrics:8428/',
+        AI_PROVIDER: 'gemini',
+        GEMINI_API_KEY: 'g-key-123456',
+        PCP_AI_FAKE: '',
+      }),
+    ).toMatchObject({
+      vmQueryUrl: 'http://victoriametrics:8428',
+      ai: {
+        providers: [{ provider: 'gemini', model: 'gemini-2.5-flash', apiKey: 'g-key-123456' }],
+        fake: false,
+      },
+    });
+  });
 });

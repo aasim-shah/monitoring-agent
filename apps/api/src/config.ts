@@ -1,3 +1,4 @@
+import { aiConfigFromEnv, type AiConfig } from '@pcp/ai-orchestrator';
 import { z } from 'zod';
 
 /** Agent enrollment needs all of these, or none (enrollment is then unavailable). */
@@ -67,17 +68,7 @@ const schema = z
       issues.addIssue({ code: 'custom', path: [k], message: 'agent settings must be set together' });
   });
 
-export interface AiProviderConfig {
-  provider: 'gemini' | 'groq' | 'openrouter' | 'openai';
-  model: string;
-  apiKey: string;
-}
-
-export interface AiConfig {
-  /** Primary first; empty when no provider is configured (AI endpoints answer 409). */
-  providers: AiProviderConfig[];
-  fake: boolean;
-}
+export type { AiConfig, AiProviderConfig } from '@pcp/ai-orchestrator';
 
 export interface GoogleConfig {
   clientId: string;
@@ -171,38 +162,8 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
 /** PEM values travel base64-encoded so they fit one environment-variable line. */
 const fromBase64 = (v: string) => Buffer.from(v, 'base64').toString('utf8');
 
-const AI_DEFAULT_MODEL = {
-  gemini: 'gemini-2.5-flash',
-  groq: 'openai/gpt-oss-120b',
-  openrouter: 'openai/gpt-oss-120b',
-  openai: 'gpt-4.1-mini',
-};
-
-function aiConfig(c: {
-  AI_PROVIDER?: AiProviderConfig['provider'];
-  AI_MODEL?: string;
-  AI_FALLBACK_PROVIDER?: AiProviderConfig['provider'];
-  AI_FALLBACK_MODEL?: string;
-  GEMINI_API_KEY?: string;
-  GROQ_API_KEY?: string;
-  OPENROUTER_API_KEY?: string;
-  OPENAI_API_KEY?: string;
-  PCP_AI_FAKE?: '0' | '1';
-}): AiConfig {
-  const key = {
-    gemini: c.GEMINI_API_KEY,
-    groq: c.GROQ_API_KEY,
-    openrouter: c.OPENROUTER_API_KEY,
-    openai: c.OPENAI_API_KEY,
-  };
-  const providers: AiProviderConfig[] = [];
-  for (const [provider, model] of [
-    [c.AI_PROVIDER, c.AI_MODEL],
-    [c.AI_FALLBACK_PROVIDER, c.AI_FALLBACK_MODEL],
-  ] as const) {
-    if (!provider) continue;
-    const apiKey = key[provider];
-    if (apiKey) providers.push({ provider, model: model ?? AI_DEFAULT_MODEL[provider], apiKey });
-  }
-  return { providers, fake: c.PCP_AI_FAKE === '1' };
-}
+/** Shared with the worker (reports): primary and fallback providers with their keys. */
+const aiConfig = (c: Record<string, unknown>): AiConfig =>
+  aiConfigFromEnv(
+    Object.fromEntries(Object.entries(c).map(([k, v]) => [k, typeof v === 'string' ? v : undefined])),
+  );

@@ -35,11 +35,35 @@ test('vmalert is capped on a shared VPS', () => {
 
 test('the api receives the AI provider settings from the environment (M14)', () => {
   const env = base.services.api.environment;
-  for (const k of ['AI_PROVIDER', 'AI_MODEL', 'AI_FALLBACK_PROVIDER', 'AI_FALLBACK_MODEL', 'GEMINI_API_KEY', 'GROQ_API_KEY'])
+  for (const k of [
+    'AI_PROVIDER',
+    'AI_MODEL',
+    'AI_FALLBACK_PROVIDER',
+    'AI_FALLBACK_MODEL',
+    'GEMINI_API_KEY',
+    'GROQ_API_KEY',
+  ])
     assert.ok(k in env, k);
 });
 
 test('the worker writes website probe samples to VictoriaMetrics (M13a)', () => {
   assert.equal(base.services.worker.environment.VM_IMPORT_URL, 'http://victoriametrics:8428');
-  assert.ok(!('PCP_PROBE_ALLOWLIST' in base.services.worker.environment), 'allowlist is for test stacks only');
+  assert.ok(
+    !('PCP_PROBE_ALLOWLIST' in base.services.worker.environment),
+    'allowlist is for test stacks only',
+  );
+});
+
+test('the worker queries telemetry and the AI providers for daily reports (M15)', () => {
+  const env = base.services.worker.environment;
+  assert.equal(env.VM_QUERY_URL, 'http://victoriametrics:8428');
+  for (const key of [
+    'AI_PROVIDER',
+    'AI_MODEL',
+    'AI_FALLBACK_PROVIDER',
+    'AI_FALLBACK_MODEL',
+    'GEMINI_API_KEY',
+    'GROQ_API_KEY',
+  ])
+    assert.ok(key in env, `${key} reaches the worker`);
 });

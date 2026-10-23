@@ -1,3 +1,4 @@
+import { providerFromConfig, scripted } from '@pcp/ai-orchestrator';
 import { ConnectorRuntime, buildRegistry } from '@pcp/connector-runtime';
 import { createPrismaClient } from '@pcp/database';
 import { postgresCheck, redisCheck } from '@pcp/health';
@@ -6,6 +7,9 @@ import { loadKeyRing } from '@pcp/secrets';
 import nodemailer from 'nodemailer';
 import { authoritativeTxt, nodeDns } from '@pcp/website-probe';
 import { alertingHandlers } from './alerting-handlers.js';
+import { dispatchDueReports } from './report-dispatcher.js';
+import { reportHandlers } from './report-handlers.js';
+import { createReportSources } from './report-sources.js';
 import { websiteProbeHandler } from './website-handler.js';
 import { loadConfig } from './config.js';
 import { createHealthServer } from './health-server.js';
@@ -24,17 +28,28 @@ const mailer = config.smtpUrl
       socketTimeout: 10_000,
     })
   : null;
-const handlers = alertingHandlers({
-  prisma,
-  queues,
+const delivery = {
   keyRing: keyRing.ring,
   appOrigin: config.appOrigin,
   now: () => new Date(),
-  sendMail: async (mail) => {
+  sendMail: async (mail: { to: string[]; subject: string; text: string; html: string }) => {
     // Without SMTP the delivery fails visibly (and dead-letters) instead of pretending to send.
     if (!mailer) throw new Error('SMTP_URL is not configured on the worker');
     await mailer.sendMail({ from: config.mailFrom, ...mail });
   },
+};
+const handlers = alertingHandlers({ prisma, queues, ...delivery });
+const reports = reportHandlers({
+  prisma,
+  queues,
+  now: () => new Date(),
+  // The e2e stack's scripted narrator cites a section and states no numbers of its own.
+  provider: config.ai.fake
+    ? scripted('scripted', () => ({ text: 'The scripted summary covers this report day [S1].' }))
+    : providerFromConfig(config.ai.providers),
+  appOrigin: config.appOrigin,
+  sources: createReportSources({ prisma, vmQueryUrl: config.vmQueryUrl }),
+  delivery,
 });
 const probeWebsite = websiteProbeHandler({
   prisma,
@@ -51,7 +66,7 @@ const processors = startProcessors({
   redisUrl: config.redisUrl,
   prisma,
   runtime,
-  handlers: { ...handlers, 'website-probe': (ctx, id) => probeWebsite(ctx, id) },
+  handlers: { ...handlers, ...reports, 'website-probe': (ctx, id) => probeWebsite(ctx, id) },
 });
 
 // PostgreSQL holds the schedules; reconcile Redis at startup and periodically after config changes.
@@ -61,6 +76,13 @@ const reconcile = () =>
   );
 await reconcile();
 const timer = setInterval(reconcile, config.reconcileEverySeconds * 1000);
+// Daily reports (M15): due schedules every minute, through pcp_scheduler functions only.
+const dispatch = () =>
+  dispatchDueReports({ scheduler, prisma, queues, now: () => new Date() }).catch((err) =>
+    console.error(`report dispatch failed: ${String(err)}`),
+  );
+await dispatch();
+const reportTimer = setInterval(dispatch, 60_000);
 
 const server = createHealthServer({
   service: 'worker',
@@ -72,6 +94,7 @@ server.listen(config.healthPort, '0.0.0.0');
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.on(signal, async () => {
     clearInterval(timer);
+    clearInterval(reportTimer);
     server.close();
     await processors.close();
     await queues.close();

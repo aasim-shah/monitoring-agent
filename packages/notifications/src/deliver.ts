@@ -3,7 +3,7 @@ import type { PrismaClient } from '@pcp/database';
 import { decryptSecret, deserializeSecret } from '@pcp/secrets';
 import type { TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
-import { render, type DeliveryEvent, type IncidentForMessage } from './render.js';
+import { render, type DeliveryEvent, type IncidentForMessage, type Message } from './render.js';
 import { sign } from './sign.js';
 
 /** Dead deliveries in a row after which a Slack or webhook channel is marked broken (WB-13 §9). */
@@ -16,6 +16,52 @@ export interface DeliveryDeps {
   sendMail(mail: { to: string[]; subject: string; text: string; html: string }): Promise<void>;
   /** SSRF policy for Slack and webhook URLs; public addresses only in production. */
   destination?: DestinationOptions;
+}
+
+/** What sending needs from a channel row; secrets stay encrypted until this call. */
+export interface ChannelForSend {
+  id: string;
+  kind: 'email' | 'slack' | 'webhook';
+  config: unknown;
+  secret: string | null;
+}
+
+/**
+ * One message to one channel (incidents and reports): email to the configured recipients, a
+ * Slack incoming webhook, or a signed JSON webhook. Throws on failure; callers record and retry.
+ */
+export async function sendToChannel(
+  channel: ChannelForSend,
+  message: Message,
+  deps: DeliveryDeps,
+): Promise<void> {
+  if (channel.kind === 'email') {
+    const recipients = (channel.config as { recipients?: string[] }).recipients ?? [];
+    await deps.sendMail({ to: recipients, subject: message.subject, text: message.text, html: message.html });
+    return;
+  }
+  const target = JSON.parse(
+    decryptSecret(
+      deserializeSecret(channel.secret ?? ''),
+      `notification-channel:${channel.id}`,
+      deps.keyRing,
+    ).toString(),
+  ) as { url: string; signingSecret?: string };
+  const body = JSON.stringify(channel.kind === 'slack' ? message.slack : message.json);
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    'user-agent': 'pcp-notifications/1',
+  };
+  if (channel.kind === 'webhook' && target.signingSecret)
+    headers['x-pcp-signature'] = sign(target.signingSecret, body, Math.floor(deps.now().getTime() / 1000));
+  const http = createHttpClient({
+    destination: deps.destination ?? { allowPrivate: false },
+    retries: 0,
+    timeoutMs: 10_000,
+    maxBytes: 64 * 1024,
+  });
+  const res = await http.request(target.url, { method: 'POST', headers, body });
+  if (res.status < 200 || res.status >= 300) throw new Error(`receiver answered HTTP ${res.status}`);
 }
 
 /**
@@ -44,42 +90,7 @@ export async function processDelivery(
     : deps.appOrigin;
   const message = render(loaded.event as DeliveryEvent, incident as IncidentForMessage | null, link);
   try {
-    if (channel.kind === 'email') {
-      const recipients = (channel.config as { recipients?: string[] }).recipients ?? [];
-      await deps.sendMail({
-        to: recipients,
-        subject: message.subject,
-        text: message.text,
-        html: message.html,
-      });
-    } else {
-      const target = JSON.parse(
-        decryptSecret(
-          deserializeSecret(channel.secret ?? ''),
-          `notification-channel:${channel.id}`,
-          deps.keyRing,
-        ).toString(),
-      ) as { url: string; signingSecret?: string };
-      const body = JSON.stringify(channel.kind === 'slack' ? message.slack : message.json);
-      const headers: Record<string, string> = {
-        'content-type': 'application/json',
-        'user-agent': 'pcp-notifications/1',
-      };
-      if (channel.kind === 'webhook' && target.signingSecret)
-        headers['x-pcp-signature'] = sign(
-          target.signingSecret,
-          body,
-          Math.floor(deps.now().getTime() / 1000),
-        );
-      const http = createHttpClient({
-        destination: deps.destination ?? { allowPrivate: false },
-        retries: 0,
-        timeoutMs: 10_000,
-        maxBytes: 64 * 1024,
-      });
-      const res = await http.request(target.url, { method: 'POST', headers, body });
-      if (res.status < 200 || res.status >= 300) throw new Error(`receiver answered HTTP ${res.status}`);
-    }
+    await sendToChannel(channel, message, deps);
   } catch (err) {
     const error = (err instanceof Error ? err.message : String(err)).slice(0, 500);
     await withTenant(prisma, ctx, async (tx) => {

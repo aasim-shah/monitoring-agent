@@ -27,6 +27,8 @@ services:
       PCP_PROBE_ALLOWLIST: web:3001
       # New website schedules are picked up within seconds, not the production minute.
       RECONCILE_EVERY_SECONDS: '10'
+      # Report narratives come from the scripted provider, as the assistant's do.
+      PCP_AI_FAKE: '1'
     # Mailpit sits on the edge network; production mail goes out over egress.
     networks: [internal, egress, edge]
     depends_on:

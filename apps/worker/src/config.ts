@@ -1,3 +1,4 @@
+import { aiConfigFromEnv, type AiConfig } from '@pcp/ai-orchestrator';
 import { z } from 'zod';
 
 const schema = z.object({
@@ -17,6 +18,8 @@ const schema = z.object({
   VM_IMPORT_URL: z.string().url().optional(),
   /** Test stacks only: private host:port targets the probe may reach (comma-separated). */
   PCP_PROBE_ALLOWLIST: z.string().optional(),
+  /** Daily report numbers (M15): tenant-scoped instant queries. */
+  VM_QUERY_URL: z.string().url().optional(),
 });
 
 export interface WorkerConfig {
@@ -31,6 +34,9 @@ export interface WorkerConfig {
   appOrigin: string;
   vmImportUrl?: string;
   probeAllowlist: string[];
+  vmQueryUrl?: string;
+  /** Report narratives (M15): the same providers as the AI assistant. */
+  ai: AiConfig;
 }
 
 export function loadConfig(env: Record<string, string | undefined>): WorkerConfig {
@@ -57,5 +63,7 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
+    vmQueryUrl: c.VM_QUERY_URL?.replace(/\/+$/, ''),
+    ai: aiConfigFromEnv(cleaned),
   };
 }

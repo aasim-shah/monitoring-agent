@@ -305,6 +305,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@pcp/ai-orchestrator':
+        specifier: workspace:*
+        version: link:../../packages/ai-orchestrator
       '@pcp/alerting':
         specifier: workspace:*
         version: link:../../packages/alerting
@@ -326,6 +329,9 @@ importers:
       '@pcp/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
+      '@pcp/reports':
+        specifier: workspace:*
+        version: link:../../packages/reports
       '@pcp/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
