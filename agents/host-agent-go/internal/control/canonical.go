@@ -164,3 +164,25 @@ func verifyTask(raw []byte, key ed25519.PublicKey) (bool, []byte, error) {
 	}
 	return ed25519.Verify(key, canonical, sig), canonical, nil
 }
+
+// VerifyTask reports whether a raw task carries a valid Ed25519 signature from key. pcp-helper
+// uses it with its own root-owned copy of the platform key (D20).
+func VerifyTask(raw []byte, key ed25519.PublicKey) (bool, error) {
+	ok, _, err := verifyTask(raw, key)
+	return ok, err
+}
+
+// CanonicalTask returns the bytes a task's signature covers: its canonical JSON without the
+// "signature" field.
+func CanonicalTask(raw []byte) ([]byte, error) {
+	v, err := decodeNumbers(raw)
+	if err != nil {
+		return nil, err
+	}
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("task is not an object")
+	}
+	delete(obj, "signature")
+	return canonicalJSON(obj)
+}

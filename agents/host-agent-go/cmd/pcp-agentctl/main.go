@@ -29,7 +29,7 @@ import (
 )
 
 // Set at build time with -ldflags "-X main.version=…".
-var version = "0.2.0"
+var version = "0.3.0"
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
@@ -46,6 +46,8 @@ func main() {
 		err = status(os.Args[2:])
 	case "collector-config":
 		err = printCollectorConfig(os.Args[2:])
+	case "task-key":
+		err = printTaskKey(os.Args[2:])
 	default:
 		usage()
 	}
@@ -59,7 +61,8 @@ func usage() {
   pcp-agentctl enroll --token TOKEN --control-url URL [--state-dir DIR] [--server-name NAME] [--ca-file FILE] [--force]
   pcp-agentctl run    [--state-dir DIR]
   pcp-agentctl status [--state-dir DIR]
-  pcp-agentctl collector-config [--state-dir DIR]   print the collector configuration`)
+  pcp-agentctl collector-config [--state-dir DIR]   print the collector configuration
+  pcp-agentctl task-key [--state-dir DIR]           print the platform task-signing public key`)
 	os.Exit(2)
 }
 
@@ -211,6 +214,7 @@ func run(args []string) error {
 	}()
 	go reportInventory(ctx, &client)
 	tails := make(chan struct{}, 2)
+	actions := make(chan struct{}, 1)
 	for ctx.Err() == nil {
 		c := client.Load()
 		if rotated, err := rotateIfDue(ctx, c, id, st, *dir); err != nil {
@@ -233,6 +237,20 @@ func run(args []string) error {
 			log.Printf("dropped %d task(s) with a bad signature or past expiry", rejected)
 		}
 		for _, t := range tasks {
+			if t.Type == "action" {
+				// Actions (service restarts) go to pcp-helper one at a time; the loop keeps polling.
+				go func(t proto.AgentTask) {
+					actions <- struct{}{}
+					defer func() { <-actions }()
+					res := forwardAction(ctx, helperSocket, t, 90*time.Second)
+					if err := client.Load().PostResult(ctx, t.Id, res); err != nil {
+						log.Printf("result for action %s: %v", t.Id, err)
+					} else {
+						log.Printf("action %s → %s %s", t.Id, res.Status, res.Error)
+					}
+				}(t)
+				continue
+			}
 			if t.Type == "log_tail" {
 				// Live tails run beside the loop (at most 2 at once); the loop keeps polling.
 				select {
@@ -519,4 +537,21 @@ func osName() string {
 		return runtime.GOOS
 	}
 	return strings.TrimSuffix(id+"-"+ver, "-")
+}
+
+// printTaskKey prints the platform's task-signing public key (base64). The installer copies it,
+// as root, to /etc/pcp-agent/task-signing.pub for pcp-helper, which never reads agent state.
+func printTaskKey(args []string) error {
+	fs := flag.NewFlagSet("task-key", flag.ExitOnError)
+	dir := stateDirFlag(fs)
+	_ = fs.Parse(args)
+	st, err := control.LoadState(*dir)
+	if err != nil {
+		return err
+	}
+	if st.TaskSigningPublicKey == "" {
+		return errors.New("this agent is not enrolled")
+	}
+	fmt.Println(st.TaskSigningPublicKey)
+	return nil
 }

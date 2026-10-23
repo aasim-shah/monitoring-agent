@@ -9,12 +9,14 @@
 # unprivileged pcp-agent user, enrolls this host, and starts the pcp-agent systemd service.
 # The agent only makes outbound HTTPS connections; no port is opened on this host.
 # Re-running upgrades the binaries and keeps the enrolled identity; --force re-enrolls.
+#   --enable-helper  also install pcp-helper (opt-in, root): restarts only the systemd units you
+#                    list in /etc/pcp-agent/helper.yaml, for signed and approved actions (D20)
 #   --uninstall      stop the service and remove the agent, its user, and its data
 set -euo pipefail
 
-TOKEN="" CONTROL_URL="" DOWNLOAD_URL="" FORCE=0 UNINSTALL=0 CA_FILE="" SERVER_NAME="" INGEST_URL=""
+TOKEN="" CONTROL_URL="" DOWNLOAD_URL="" FORCE=0 UNINSTALL=0 CA_FILE="" SERVER_NAME="" INGEST_URL="" ENABLE_HELPER=0
 STATE_DIR=/var/lib/pcp-agent CONF_DIR=/etc/pcp-agent BIN_DIR=/usr/local/bin
-UNIT=/etc/systemd/system/pcp-agent.service
+UNIT=/etc/systemd/system/pcp-agent.service HELPER_UNIT=/etc/systemd/system/pcp-helper.service
 
 die() { echo "pcp-agent install: $*" >&2; exit 1; }
 say() { echo "pcp-agent install: $*"; }
@@ -26,6 +28,7 @@ while [ $# -gt 0 ]; do
     --download-url) DOWNLOAD_URL="${2:-}"; shift 2 ;;
     --force) FORCE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
+    --enable-helper) ENABLE_HELPER=1; shift ;;
     # Development stacks only: private TLS root, TLS name when connecting by IP, ingest override.
     --ca-file) CA_FILE="${2:-}"; shift 2 ;;
     --server-name) SERVER_NAME="${2:-}"; shift 2 ;;
@@ -39,6 +42,9 @@ command -v systemctl >/dev/null || die "systemd is required"
 
 if [ "$UNINSTALL" -eq 1 ]; then
   systemctl disable --now pcp-agent >/dev/null 2>&1 || true
+  systemctl disable --now pcp-helper >/dev/null 2>&1 || true
+  rm -f "$HELPER_UNIT" "$BIN_DIR/pcp-helper"
+  rm -rf /var/lib/pcp-helper
   rm -f "$UNIT" "$BIN_DIR/pcp-agentctl" "$BIN_DIR/pcp-otelcol"
   systemctl daemon-reload
   rm -rf "$STATE_DIR" "$CONF_DIR"
@@ -107,3 +113,32 @@ systemctl daemon-reload
 systemctl enable pcp-agent >/dev/null 2>&1
 systemctl restart pcp-agent
 say "pcp-agent $VERSION is running; it appears in the dashboard within a minute"
+
+# pcp-helper (opt-in): installed with --enable-helper, upgraded when already present.
+if [ "$ENABLE_HELPER" -eq 1 ] || [ -f "$HELPER_UNIT" ]; then
+  install -m 0755 "$WORK/pcp-helper" "$BIN_DIR/pcp-helper"
+  # The helper trusts only this root-owned copy of the platform key, never the agent's state.
+  "$BIN_DIR/pcp-agentctl" task-key --state-dir "$STATE_DIR" > "$WORK/task-signing.pub" \
+    || die "cannot read the task-signing key; is this host enrolled?"
+  install -m 0644 -o root -g root "$WORK/task-signing.pub" "$CONF_DIR/task-signing.pub"
+  if [ ! -f "$CONF_DIR/helper.yaml" ]; then
+    cat > "$CONF_DIR/helper.yaml" <<'ALLOW_EOF'
+# pcp-helper allowlist: only these systemd units can be restarted, and only after an approved,
+# signed action. You own this file; the platform cannot change it.
+capabilities:
+  service_restart:
+    units: []
+  pack_install:
+    enabled: false
+ALLOW_EOF
+    chown root:root "$CONF_DIR/helper.yaml"
+    chmod 0644 "$CONF_DIR/helper.yaml"
+  fi
+  cat > "$HELPER_UNIT" <<'HELPER_UNIT_EOF'
+@@HELPER_UNIT@@
+HELPER_UNIT_EOF
+  systemctl daemon-reload
+  systemctl enable pcp-helper >/dev/null 2>&1
+  systemctl restart pcp-helper
+  say "pcp-helper is running; list the units it may restart in $CONF_DIR/helper.yaml"
+fi

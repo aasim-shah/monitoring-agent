@@ -1,0 +1,26 @@
+[Unit]
+Description=Product Control Plane helper (signed, allowlisted service restarts; opt-in)
+Documentation=https://github.com/aasim-shah/monitoring-agent
+After=network-online.target
+
+[Service]
+Type=simple
+# Root, because restarting a system service needs it. The helper only restarts units listed in
+# /etc/pcp-agent/helper.yaml (owned by root, edited by you) and only for signed, unexpired,
+# single-use tasks (D20). It never runs a shell.
+ExecStart=/usr/local/bin/pcp-helper --socket /run/pcp-helper/helper.sock --key /etc/pcp-agent/task-signing.pub --allowlist /etc/pcp-agent/helper.yaml --state /var/lib/pcp-helper
+Group=pcp-agent
+RuntimeDirectory=pcp-helper
+RuntimeDirectoryMode=0750
+StateDirectory=pcp-helper
+StateDirectoryMode=0700
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectHome=yes
+PrivateTmp=yes
+ProtectSystem=full
+ReadWritePaths=/var/lib/pcp-helper /run/pcp-helper
+
+[Install]
+WantedBy=multi-user.target
