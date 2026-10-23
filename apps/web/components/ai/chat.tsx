@@ -78,7 +78,13 @@ export function Chat({
               : [...t.steps, s],
           }));
         } else if (event === 'answer') update((t) => ({ ...t, answer: data as AnswerData }));
-        else if (event === 'done') {
+        else if (event === 'error') {
+          update((t) => ({
+            ...t,
+            error: (data as { message?: string }).message ?? 'The investigation failed.',
+          }));
+          setBusy(false);
+        } else if (event === 'done') {
           setBusy(false);
           onDone();
         }

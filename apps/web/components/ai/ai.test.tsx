@@ -110,6 +110,19 @@ describe('Chat (UC-14-01)', () => {
   });
 });
 
+describe('Chat stream errors', () => {
+  it('shows an error event from the server and ends the turn', async () => {
+    const user = userEvent.setup();
+    const f = fakeAsk();
+    render(<Chat messages={[]} ask={f.ask} onDone={vi.fn()} />);
+    await user.type(screen.getByLabelText('Ask about this product'), 'Hi');
+    await user.click(screen.getByRole('button', { name: 'Ask' }));
+    f.emit('error', { message: 'The investigation failed; please try again.' });
+    expect(screen.getByRole('alert')).toHaveTextContent('The investigation failed');
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeEnabled();
+  });
+});
+
 describe('AiSettingsCard (UC-14-06)', () => {
   it('shows the provider and turns AI off', async () => {
     const user = userEvent.setup();

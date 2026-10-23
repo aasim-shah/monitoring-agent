@@ -117,8 +117,9 @@ export class AiService {
 
   async conversation(ctx: TenantContext, id: string) {
     return withTenant(this.prisma, ctx, async (tx) => {
-      const c = await tx.aiConversation.findUnique({
-        where: { id },
+      // Conversations are private to the member who started them.
+      const c = await tx.aiConversation.findFirst({
+        where: { id, createdByUserId: this.userId(ctx) },
         select: { id: true, title: true, productId: true },
       });
       if (!c) throw notFound();
@@ -147,8 +148,8 @@ export class AiService {
   async ask(ctx: TenantContext, conversationId: string, content: string, reply: FastifyReply) {
     const provider = await this.requireEnabled(ctx);
     const setup = await withTenant(this.prisma, ctx, async (tx) => {
-      const c = await tx.aiConversation.findUnique({
-        where: { id: conversationId },
+      const c = await tx.aiConversation.findFirst({
+        where: { id: conversationId, createdByUserId: this.userId(ctx) },
         select: { productId: true, product: { select: { name: true } } },
       });
       if (!c) throw notFound();
@@ -190,88 +191,103 @@ export class AiService {
       { event: 'started', data: { runId: setup.runId } },
     );
 
-    const result = await runInvestigation({
-      provider,
-      tools: AI_TOOLS,
-      ctx,
-      question: content,
-      history: setup.previous.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
-      productName: setup.product.name,
-      timezone: setup.timezone,
-      now: this.now(),
-      deps: {
-        prisma: this.prisma,
-        assets: this.assets,
-        telemetry: this.telemetry,
-        productId: setup.productId,
-        orgId: ctx.organizationId,
-        now: this.now,
-      },
-      onEvent: (e) => {
-        if (e.type === 'tool_started')
-          out.event('tool', { tool: e.tool, evidenceId: e.evidenceId, status: 'running' });
-        if (e.type === 'tool_finished')
-          out.event('tool', { tool: e.evidence.tool, evidenceId: e.evidence.id, status: e.evidence.status });
-      },
-    });
+    try {
+      const result = await runInvestigation({
+        provider,
+        tools: AI_TOOLS,
+        ctx,
+        question: content,
+        history: setup.previous.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
+        productName: setup.product.name,
+        timezone: setup.timezone,
+        now: this.now(),
+        deps: {
+          prisma: this.prisma,
+          assets: this.assets,
+          telemetry: this.telemetry,
+          productId: setup.productId,
+          orgId: ctx.organizationId,
+          now: this.now,
+        },
+        onEvent: (e) => {
+          if (e.type === 'tool_started')
+            out.event('tool', { tool: e.tool, evidenceId: e.evidenceId, status: 'running' });
+          if (e.type === 'tool_finished')
+            out.event('tool', {
+              tool: e.evidence.tool,
+              evidenceId: e.evidence.id,
+              status: e.evidence.status,
+            });
+        },
+      });
 
-    const evidence = result.evidence.map(evidenceView);
-    await withTenant(this.prisma, ctx, async (tx) => {
-      for (const e of result.evidence) {
-        await tx.aiToolExecution.create({
+      const evidence = result.evidence.map(evidenceView);
+      await withTenant(this.prisma, ctx, async (tx) => {
+        for (const e of result.evidence) {
+          await tx.aiToolExecution.create({
+            data: {
+              organizationId: ctx.organizationId,
+              runId: setup.runId,
+              tool: e.tool,
+              input: e.input as Prisma.InputJsonValue,
+              status: e.status,
+              evidenceId: e.id,
+              durationMs: e.durationMs,
+              bytes: e.bytes,
+            },
+          });
+          if (e.status === 'denied')
+            await this.audit.record(tx, ctx, {
+              action: 'ai.tool_denied',
+              targetType: 'ai_run',
+              targetId: setup.runId,
+              metadata: { tool: e.tool, input: e.input as Prisma.InputJsonValue },
+            });
+        }
+        await tx.aiMessage.create({
           data: {
             organizationId: ctx.organizationId,
+            conversationId,
+            role: 'assistant',
+            content: result.text,
+            evidence: evidence as Prisma.InputJsonValue,
+            missing: result.missing,
+            confidence: result.confidence,
+            validation: result.validation,
             runId: setup.runId,
-            tool: e.tool,
-            input: e.input as Prisma.InputJsonValue,
-            status: e.status,
-            evidenceId: e.id,
-            durationMs: e.durationMs,
-            bytes: e.bytes,
           },
         });
-        if (e.status === 'denied')
-          await this.audit.record(tx, ctx, {
-            action: 'ai.tool_denied',
-            targetType: 'ai_run',
-            targetId: setup.runId,
-            metadata: { tool: e.tool, input: e.input as Prisma.InputJsonValue },
-          });
-      }
-      await tx.aiMessage.create({
-        data: {
-          organizationId: ctx.organizationId,
-          conversationId,
-          role: 'assistant',
-          content: result.text,
-          evidence: evidence as Prisma.InputJsonValue,
-          missing: result.missing,
-          confidence: result.confidence,
-          validation: result.validation,
-          runId: setup.runId,
-        },
+        await tx.aiRun.update({
+          where: { id: setup.runId },
+          data: {
+            status: result.validation === 'partial' ? 'partial' : 'completed',
+            provider: result.provider ?? provider.id,
+            toolCalls: result.toolCalls,
+            finishedAt: this.now(),
+          },
+        });
+        await tx.aiConversation.update({ where: { id: conversationId }, data: { updatedAt: this.now() } });
       });
-      await tx.aiRun.update({
-        where: { id: setup.runId },
-        data: {
-          status: result.validation === 'partial' ? 'partial' : 'completed',
-          provider: result.provider ?? provider.id,
-          toolCalls: result.toolCalls,
-          finishedAt: this.now(),
-        },
-      });
-      await tx.aiConversation.update({ where: { id: conversationId }, data: { updatedAt: this.now() } });
-    });
 
-    out.event('answer', {
-      text: result.text,
-      evidence,
-      missing: result.missing,
-      confidence: result.confidence,
-      validation: result.validation,
-      problems: result.problems,
-    });
-    out.close({ event: 'done', data: { runId: setup.runId } });
+      out.event('answer', {
+        text: result.text,
+        evidence,
+        missing: result.missing,
+        confidence: result.confidence,
+        validation: result.validation,
+        problems: result.problems,
+      });
+      out.close({ event: 'done', data: { runId: setup.runId } });
+    } catch (err) {
+      // Never leave the stream open or the run "running" after an unexpected failure.
+      out.close({ event: 'error', data: { message: 'The investigation failed; please try again.' } });
+      await withTenant(this.prisma, ctx, (tx) =>
+        tx.aiRun.update({
+          where: { id: setup.runId },
+          data: { status: 'failed', error: String(err).slice(0, 500), finishedAt: this.now() },
+        }),
+      ).catch(() => {});
+    }
   }
 
   private userId(ctx: TenantContext): string | null {

@@ -142,6 +142,17 @@ describe('AI assistant (WB-14 UC-14-01)', () => {
     ).toBe(404);
   });
 
+  it("keeps a member's conversation private from other members", async () => {
+    const { owner, productId } = await setup();
+    const { conversationId } = await ask(owner.cookie, productId, 'Private question');
+    const other = await member(owner, 'analyst', 'all');
+    expect((await call(other, 'GET', `/api/v1/ai/conversations/${conversationId}`)).statusCode).toBe(404);
+    expect(
+      (await call(other, 'POST', `/api/v1/ai/conversations/${conversationId}/messages`, { content: 'hi' }))
+        .statusCode,
+    ).toBe(404);
+  });
+
   it('is off for viewers (no ai.use) and when the organization disables AI (TC-14-06)', async () => {
     const { owner, productId } = await setup();
     const viewer = await member(owner, 'viewer', 'all');
