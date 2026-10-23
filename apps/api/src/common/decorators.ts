@@ -23,12 +23,16 @@ export type TenantResource =
   | 'incident'
   | 'notification_channel'
   | 'ai_conversation'
-  | 'website_monitor';
+  | 'website_monitor'
+  | 'report_schedule'
+  | 'report';
 
 /** Route parameter that identifies the tenant resource; `orgId`, `productId`, `environmentId` imply theirs. */
 export type TenantScopeOptions =
   | { param: 'orgId' | 'productId' | 'environmentId' }
-  | { param: string; resource: TenantResource };
+  | { param: string; resource: TenantResource }
+  /** Create routes named by the spec without a path parameter (`POST /report-schedules`). */
+  | { body: 'productId' };
 
 /** No session required. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);

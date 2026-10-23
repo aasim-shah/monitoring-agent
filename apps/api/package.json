@@ -27,6 +27,7 @@
     "@pcp/discovery-engine": "workspace:*",
     "@pcp/health": "workspace:*",
     "@pcp/jobs": "workspace:*",
+    "@pcp/reports": "workspace:*",
     "@pcp/secrets": "workspace:*",
     "@pcp/shared-contracts": "workspace:*",
     "@pcp/tenant-security": "workspace:*",

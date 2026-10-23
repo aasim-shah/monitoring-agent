@@ -2754,7 +2754,7 @@ export interface paths {
         put?: never;
         /**
          * Create report schedule
-         * @description Create report schedule.
+         * @description A daily report at `localTime` in the IANA `timezone`, covering the prior complete local day (23, 24, or 25 h). Delivered to organization notification channels and up to 10 recipient emails (at least one destination). Requires `report.manage` on `productId`.
          */
         post: operations["createReportSchedule"];
         delete?: never;
@@ -2778,16 +2778,39 @@ export interface paths {
         post?: never;
         /**
          * Delete schedule
-         * @description Delete schedule.
+         * @description Reports already generated are kept. Requires `report.manage`.
          */
         delete: operations["deleteReportSchedule"];
         options?: never;
         head?: never;
         /**
          * Update schedule
-         * @description Update schedule.
+         * @description Any create field except `productId`. A changed timezone or time recomputes `nextRunAt`. Requires `report.manage`.
          */
         patch: operations["updateReportSchedule"];
+        trace?: never;
+    };
+    "/api/v1/report-schedules/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run now
+         * @description Generates the prior complete local day now, as the next version for that date. Requires `report.manage`.
+         */
+        post: operations["runReportSchedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/products/{id}/report-schedules": {
@@ -2802,9 +2825,32 @@ export interface paths {
         };
         /**
          * Report schedules
-         * @description Report schedules.
+         * @description Requires `report.view`.
          */
         get: operations["listReportSchedules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/products/{id}/report-schedules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Next run preview
+         * @description The next run for a timezone and local time, and the local day it covers. Requires `report.view`.
+         */
+        get: operations["previewReportSchedule"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2825,7 +2871,7 @@ export interface paths {
         };
         /**
          * Report history
-         * @description Report history.
+         * @description Up to 100, newest local date and version first. Requires `report.view`.
          */
         get: operations["listReports"];
         put?: never;
@@ -2848,7 +2894,7 @@ export interface paths {
         };
         /**
          * Report
-         * @description Report.
+         * @description The deterministic snapshot (12 sections, coverage), the narrative and its validation, and the delivery log. Requires `report.view`.
          */
         get: operations["getReport"];
         put?: never;
@@ -2873,7 +2919,7 @@ export interface paths {
         put?: never;
         /**
          * Regenerate (new version)
-         * @description Regenerate (new version).
+         * @description Queues the next version for the same local date; earlier versions are kept. 409 when the schedule was deleted. Requires `report.manage`.
          */
         post: operations["regenerateReport"];
         delete?: never;
@@ -3046,6 +3092,100 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ReportSchedule: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            productId: string;
+            /** Format: uuid */
+            environmentId?: string | null;
+            name: string;
+            /** @enum {string} */
+            template?: "daily";
+            timezone: string;
+            localTime: string;
+            channelIds: string[];
+            recipients: string[];
+            enabled: boolean;
+            /** Format: date-time */
+            nextRunAt: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        ReportSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            productId: string;
+            /** Format: uuid */
+            scheduleId?: string | null;
+            scheduleName?: string | null;
+            /** Format: date */
+            localDate: string;
+            version: number;
+            /** @enum {string} */
+            narrativeStatus: "verified" | "deferred" | "disabled";
+            late: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReportSection: {
+            /** @description Citation ID, S1–S12 */
+            id: string;
+            key: string;
+            title: string;
+            /** @enum {string} */
+            status: "ok" | "missing";
+            data?: unknown;
+            reason?: string;
+        };
+        Report: components["schemas"]["ReportSummary"] & {
+            timezone: string;
+            /** Format: date-time */
+            windowStart: string;
+            /** Format: date-time */
+            windowEnd: string;
+            narrative?: string | null;
+            problems?: string[];
+            snapshot: {
+                window: {
+                    timezone: string;
+                    localDate: string;
+                    start: string;
+                    end: string;
+                    hours: number;
+                };
+                sections: components["schemas"]["ReportSection"][];
+                anomalies: {
+                    metric: string;
+                    previous: number;
+                    current: number;
+                    changePercent: number;
+                }[];
+                actions: string[];
+                coverage: {
+                    source: string;
+                    /** @enum {string} */
+                    status: "ok" | "partial" | "missing";
+                    reason?: string;
+                }[];
+            };
+            deliveries: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "email" | "slack" | "webhook";
+                target: string;
+                /** Format: uuid */
+                channelId?: string | null;
+                /** @enum {string} */
+                status: "pending" | "sent" | "failed" | "dead";
+                attempts: number;
+                lastError?: string | null;
+                /** Format: date-time */
+                sentAt?: string | null;
+            }[];
+        };
         WebsiteMonitor: {
             /** Format: uuid */
             id: string;
@@ -7585,9 +7725,35 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    productId: string;
+                    name: string;
+                    /** @example Europe/Berlin */
+                    timezone: string;
+                    /** @example 08:00 */
+                    localTime: string;
+                    channelIds: string[];
+                    recipients: string[];
+                    /** Format: uuid */
+                    environmentId?: string | null;
+                    enabled?: boolean;
+                };
+            };
+        };
         responses: {
-            201: components["responses"]["Created"];
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSchedule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -7619,9 +7785,60 @@ export interface operations {
             };
             cookie?: never;
         };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    timezone?: string;
+                    localTime?: string;
+                    channelIds?: string[];
+                    recipients?: string[];
+                    /** Format: uuid */
+                    environmentId?: string | null;
+                    enabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSchedule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    runReportSchedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date */
+                        localDate: string;
+                        version: number;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -7638,7 +7855,52 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        schedules: components["schemas"]["ReportSchedule"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    previewReportSchedule: {
+        parameters: {
+            query: {
+                timezone: string;
+                localTime: string;
+            };
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        nextRunAt: string;
+                        /** Format: date */
+                        localDate: string;
+                        windowHours: number;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -7655,7 +7917,17 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        reports: components["schemas"]["ReportSummary"][];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -7672,7 +7944,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Report"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -7689,9 +7969,20 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     listActionPolicies: {

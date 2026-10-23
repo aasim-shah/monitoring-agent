@@ -132,6 +132,9 @@ importers:
       '@pcp/jobs':
         specifier: workspace:*
         version: link:../../packages/jobs
+      '@pcp/reports':
+        specifier: workspace:*
+        version: link:../../packages/reports
       '@pcp/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets

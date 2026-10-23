@@ -11,6 +11,7 @@ import { DatabaseModule } from './database/database.module.js';
 import { AgentAuthGuard } from './modules/agents/agent-auth.guard.js';
 import { AgentsModule } from './modules/agents/agents.module.js';
 import { AiModule } from './modules/ai/ai.module.js';
+import { ReportsModule } from './modules/reports/reports.module.js';
 import { WebsitesModule } from './modules/websites/websites.module.js';
 import { AlertingModule } from './modules/alerting/alerting.module.js';
 import { AssetsModule } from './modules/assets/assets.module.js';
@@ -71,6 +72,7 @@ export class AppModule {
         AlertingModule,
         AiModule,
         WebsitesModule,
+        ReportsModule,
         AssetDiscoveryModule,
         AssetsModule,
       ],

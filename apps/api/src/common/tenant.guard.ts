@@ -56,10 +56,15 @@ export class TenantGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<ApiRequest>();
     const { user } = requireAuth(req);
-    const id = (req.params as Record<string, string | undefined>)[scope.param];
+    const raw =
+      'body' in scope
+        ? (req.body as Record<string, unknown> | undefined)?.[scope.body]
+        : (req.params as Record<string, string | undefined>)[scope.param];
+    const id = typeof raw === 'string' ? raw : undefined;
     if (!id || !UUID.test(id)) throw notFound();
 
-    const resource = 'resource' in scope ? scope.resource : IMPLIED[scope.param]!;
+    const resource =
+      'body' in scope ? 'product' : 'resource' in scope ? scope.resource : IMPLIED[scope.param]!;
     const resolved = await this.resolve(resource, id, user.id);
     if (!resolved) throw notFound();
 
@@ -137,6 +142,12 @@ export class TenantGuard implements CanActivate {
           : await this.prisma.$queryRaw<{ org: string; product: string }[]>`
               SELECT organization_id::text AS org, product_id::text AS product
               FROM pcp_resolve_website_monitor(${id}::uuid, ${userId}::uuid)`;
+      return row ? { organizationId: row.org, productId: row.product } : null;
+    }
+    if (resource === 'report_schedule' || resource === 'report') {
+      const [row] = await this.prisma.$queryRaw<{ org: string; product: string }[]>`
+        SELECT organization_id::text AS org, product_id::text AS product
+        FROM pcp_resolve_report_object(${resource}, ${id}::uuid, ${userId}::uuid)`;
       return row ? { organizationId: row.org, productId: row.product } : null;
     }
     if (resource === 'product') {
