@@ -10,8 +10,12 @@ const EXCLUDE = [
 
 const NUMBER = /-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/g;
 
+/** Models write typographic hyphens, minus signs, and narrow spaces; read them as plain ones. */
+const normalize = (text: string) =>
+  text.replace(/[\u2010-\u2015\u2212]/g, '-').replace(/[\u00a0\u2009\u202f]/g, ' ');
+
 function numbersIn(text: string): Array<{ value: number; decimals: number; raw: string }> {
-  let t = text;
+  let t = normalize(text);
   for (const re of EXCLUDE) t = t.replace(re, ' ');
   return [...t.matchAll(NUMBER)].map((m) => {
     const raw = m[0].replace(/,/g, '');

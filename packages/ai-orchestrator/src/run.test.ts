@@ -234,6 +234,15 @@ describe('validateAnswer (BR-14-06)', () => {
     expect(r).toEqual({ ok: true, problems: [] });
   });
 
+  it('reads dates and numbers written with typographic hyphens and spaces (real Groq output)', () => {
+    const r = validateAnswer(
+      'Incident started at **2026\u201110\u201122T14:05:00Z** on 2026\u201110\u201122 and CPU reached 97.3\u202f% [E1].',
+      evidence,
+      '',
+    );
+    expect(r).toEqual({ ok: true, problems: [] });
+  });
+
   it('rejects unknown citations and unsupported numbers; small counts are allowed', () => {
     const r = validateAnswer('Finding 1: 2 hosts, CPU 88 % [E1] [E3].', evidence, '');
     expect(r.ok).toBe(false);
