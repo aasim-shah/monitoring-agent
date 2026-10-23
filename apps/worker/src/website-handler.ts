@@ -82,6 +82,8 @@ export function websiteProbeHandler(deps: WebsiteDeps) {
       lastTotalMs: r.totalMs,
       consecutiveFailures: r.up ? 0 : m.consecutiveFailures + 1,
       ...(r.tls ? { tlsExpiresAt: r.tls.expiresAt, tlsIssuer: r.tls.issuer } : {}),
+      // Another host's certificate: forget the stored expiry rather than show that host's.
+      ...(r.wrongCertificate ? { tlsExpiresAt: null, tlsIssuer: null } : {}),
     });
     if (deps.vmImportUrl) {
       const body = samples(

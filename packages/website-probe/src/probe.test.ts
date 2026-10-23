@@ -141,10 +141,22 @@ describe('probe (WB-09 UC-09-03)', () => {
     expect(r.error).toMatch(/private address/);
   });
 
+  it("names a certificate issued to another host, and does not report its expiry as the site's", async () => {
+    const r = await probe(`https://wrong.test:${httpsPort}/ok`, {
+      destination: { ...destination(), allowlist: [`wrong.test:${httpsPort}`] },
+      ca,
+      now,
+    });
+    expect(r.up).toBe(false);
+    expect(r.error).toBe('TLS certificate is not valid for wrong.test (issued to localhost)');
+    expect(r.tls).toBeNull();
+    expect(r.wrongCertificate).toBe('localhost');
+  });
+
   it('is down on a certificate it does not trust', async () => {
     const r = await probe(`https://localhost:${httpsPort}/ok`, { destination: destination(), now });
     expect(r.up).toBe(false);
-    expect(r.error).toMatch(/certificate/i);
+    expect(r.error).toBe('TLS certificate is not trusted (self-signed)');
   });
 });
 
