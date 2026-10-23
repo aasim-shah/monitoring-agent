@@ -16,3 +16,12 @@ services:
       SMTP_URL: smtp://mailpit:1025
     depends_on:
       mailpit: { condition: service_healthy }
+
+  # Incident notifications are sent by the worker (M12.3).
+  worker:
+    environment:
+      SMTP_URL: smtp://mailpit:1025
+    # Mailpit sits on the edge network; production mail goes out over egress.
+    networks: [internal, egress, edge]
+    depends_on:
+      mailpit: { condition: service_healthy }
