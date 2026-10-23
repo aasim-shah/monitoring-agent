@@ -16,6 +16,8 @@ RUN apk add --no-cache openssl
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=node:node /out .
+# Tenant vmalert rule files (named volume; a new volume takes this directory's owner).
+RUN mkdir -p /var/lib/pcp/alert-rules && chown node:node /var/lib/pcp/alert-rules
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

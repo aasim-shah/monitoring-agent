@@ -3,7 +3,7 @@
 # - Agents on 8443 (TLS + client certificates terminate in Caddy).
 # - Hard memory caps so the platform cannot take memory from other apps on the host.
 # Start with: docker compose -p pcp -f compose.yaml -f deploy/vps/compose.vps.yaml --env-file .env \
-#   up -d --no-build caddy ingest-gateway mailpit worker
+#   up -d --no-build caddy ingest-gateway mailpit worker vmalert
 services:
   caddy:
     ports: !override
@@ -37,6 +37,10 @@ services:
     deploy: { resources: { limits: { memory: 384m } } }
 
   ingest-gateway:
+    deploy: { resources: { limits: { memory: 64m } } }
+
+  # Evaluates tenant metric alert rules (M12); notifies the api's internal receiver.
+  vmalert:
     deploy: { resources: { limits: { memory: 64m } } }
 
   downloads:

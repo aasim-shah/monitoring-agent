@@ -97,6 +97,8 @@ services:
       AGENT_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN must be set (see .env.example)}
       VM_QUERY_URL: http://victoriametrics:8428
+      ALERT_RULES_DIR: /var/lib/pcp/alert-rules
+      VMALERT_URL: http://vmalert:8880
       AGENT_CA_CERT: ${AGENT_CA_CERT:-}
       AGENT_CA_KEY: ${AGENT_CA_KEY:-}
       AGENT_CA_CHAIN: ${AGENT_CA_CHAIN:-}
@@ -104,6 +106,7 @@ services:
       AGENT_CONTROL_URL: ${AGENT_CONTROL_URL:-}
       AGENT_INGEST_URL: ${AGENT_INGEST_URL:-}
       AGENT_OPAMP_URL: ${AGENT_OPAMP_URL:-}
+    volumes: ['alert-rules:/var/lib/pcp/alert-rules']
     networks: [edge, internal]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -125,6 +128,10 @@ services:
       SCHEDULER_DATABASE_URL: postgres://pcp_scheduler:${PCP_SCHEDULER_PASSWORD:?PCP_SCHEDULER_PASSWORD must be set (see .env.example)}@postgres:5432/pcp
       REDIS_URL: *redis-url
       MASTER_KEY: ${MASTER_KEY:?MASTER_KEY must be set (see .env.example)}
+      # Incident notifications (M12.3).
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-Product Control Plane <no-reply@localhost>}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
     # egress: managed databases and provider APIs are on the internet; internal has no route out.
     networks: [internal, egress]
     depends_on:
@@ -200,10 +207,18 @@ services:
     command:
       - -datasource.url=http://victoriametrics:8428
       - -rule=/etc/vmalert/rules/*.yaml
+      # Tenant groups compiled by the api (M12.1, D17); re-read every minute and on /-/reload.
+      - -rule=/etc/vmalert/tenants/*.yaml
+      - -configCheckInterval=1m
       - -evaluationInterval=1m
-      - -notifier.blackhole
+      # Firing and resolved alerts go to the api's internal Alertmanager-compatible receiver (M12.2).
+      - -notifier.url=http://api:3000/internal/alertmanager
+      - -notifier.headers=X-Internal-Token:${INTERNAL_TOKEN:?INTERNAL_TOKEN must be set (see .env.example)}
+      - -external.url=${APP_ORIGIN:-http://localhost:8080}
       - -httpListenAddr=:8880
-    volumes: [./infrastructure/telemetry/rules:/etc/vmalert/rules:ro]
+    volumes:
+      - ./infrastructure/telemetry/rules:/etc/vmalert/rules:ro
+      - alert-rules:/etc/vmalert/tenants:ro
     networks: [internal]
     depends_on:
       victoriametrics: { condition: service_healthy }
@@ -269,6 +284,8 @@ networks:
   egress: {}
 
 volumes:
+  # Tenant vmalert rule files: the api writes them, vmalert reads them (M12.1).
+  alert-rules: {}
   caddy-data: {}
   caddy-config: {}
   pg-data: {}

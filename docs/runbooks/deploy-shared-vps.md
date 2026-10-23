@@ -22,7 +22,8 @@ Let's Encrypt HTTP-01 for agent./ingest. ──80──▶ nginx ──▶ 172.1
 | Agent/ingest certificates | issued by the platform's Caddy (stored in the `pcp_caddy-data` volume) |
 | Public ports added | `8443/tcp` only |
 | Memory | every platform container is capped (`compose.vps.yaml`), ~1.6 GB worst case, ~0.6 GB typical |
-| Not started on small hosts | `worker`, `vmalert`, `opamp-server` (not needed for server monitoring yet) |
+| Started | `caddy`, `ingest-gateway`, `mailpit`, `worker` (managed databases, alert tick, notifications), `vmalert` (tenant alert rules, 64 MB) |
+| Not started on small hosts | `opamp-server` (not needed for server monitoring yet) |
 
 ## DNS
 
@@ -41,7 +42,7 @@ Three A records to the VPS IP, for example `monitor`, `agent.monitor`, `ingest.m
 3. Start:
    ```bash
    cd /opt/pcp && docker compose -p pcp -f compose.yaml -f deploy/vps/compose.vps.yaml --env-file .env \
-     up -d --no-build --wait caddy ingest-gateway mailpit
+     up -d --no-build --wait caddy ingest-gateway mailpit worker vmalert
    ```
 4. nginx: add the port-80 blocks, `nginx -t`, reload; issue the dashboard certificate; add the 443 block, `nginx -t`, reload.
 
@@ -51,6 +52,7 @@ Three A records to the VPS IP, for example `monitor`, `agent.monitor`, `ingest.m
 |---|---|
 | Status | `docker compose -p pcp ps` |
 | Logs | `docker compose -p pcp logs -f api` |
+| Alert rules | Tenant vmalert files are in the `pcp_alert-rules` volume (written by the api). vmalert re-reads them every minute; `docker compose -p pcp logs vmalert` shows evaluation errors. |
 | Real email | `SMTP_URL=smtp://resend:<key>@smtp.resend.com:587` (STARTTLS; many VPS providers block outbound 465), `MAIL_FROM="Product Control Plane <alerts@<domain>>"` |
 | Private worker image | `docker save pcp-private-worker:0.1.0 \| gzip > /opt/pcp/worker-image/pcp-private-worker.tar.gz` (amd64 build); served at `/downloads/worker/` |
 | Back up before an upgrade | `docker compose -p pcp exec -T postgres pg_dump -U postgres -Fc pcp > backups/pcp-$(date -u +%Y%m%dT%H%M%SZ).dump` |
