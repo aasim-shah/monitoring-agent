@@ -24,7 +24,9 @@ const bodies: string[] = [];
 
 beforeAll(async () => {
   t = await createTestApp();
+  // Connection jobs only: other test files queue report and action jobs on the same Redis.
   processors = startProcessors({
+    kinds: ['connection-validate', 'connection-discover', 'connection-health'],
     redisUrl: inject('redisUrl'),
     prisma: t.prisma,
     runtime: new ConnectorRuntime(

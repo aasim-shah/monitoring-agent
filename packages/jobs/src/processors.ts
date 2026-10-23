@@ -12,6 +12,8 @@ export interface ProcessorDeps {
   runtime: ConnectorRuntime;
   concurrency?: number;
   now?: () => Date;
+  /** Which queues to consume; all kinds by default (the worker). */
+  kinds?: readonly JobKind[];
   /** Handlers for kinds that are not connection jobs (alert-tick, notification-deliver). */
   handlers?: Partial<Record<JobKind, (ctx: TenantContext, entityId: string, job: Job) => Promise<unknown>>>;
 }
@@ -127,7 +129,7 @@ export function startProcessors(deps: ProcessorDeps): Processors {
     );
   };
 
-  const workers = JOB_KINDS.map((kind) => {
+  const workers = (deps.kinds ?? JOB_KINDS).map((kind) => {
     const worker = new Worker<ConnectionJobPayload>(kind, process(kind), {
       connection,
       concurrency: deps.concurrency ?? 5,
