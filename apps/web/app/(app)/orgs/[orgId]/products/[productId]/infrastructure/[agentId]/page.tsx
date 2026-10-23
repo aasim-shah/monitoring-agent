@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { unwrap } from '@pcp/api-client';
 import type { Role } from '@pcp/shared-contracts';
 import { AgentStatusBadge } from '@/components/agents/agent-status-badge';
+import { LogsSection } from '@/components/logs/logs-section';
 import { ServicesSection } from '@/components/services/services-section';
 import { MetricChart, type Point } from '@/components/telemetry/metric-chart';
 import { StaleBanner } from '@/components/telemetry/stale-banner';
@@ -131,6 +132,7 @@ export default function HostMetricsPage() {
           range={range}
         />
       ) : null}
+      {agent.data ? <LogsSection agentId={agentId} canTail={roleCan(role, 'logs.tail')} /> : null}
     </div>
   );
 }
