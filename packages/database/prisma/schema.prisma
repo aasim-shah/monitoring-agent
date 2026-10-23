@@ -161,6 +161,8 @@ model Organization {
   connections    Connection[]
   jobDefinitions JobDefinition[]
   jobExecutions  JobExecution[]
+  alertRules     AlertRule[]
+  channels       NotificationChannel[]
 
   @@map("organizations")
 }
@@ -219,6 +221,7 @@ model Product {
   resourceScopes ConnectionResourceScope[]
   assets         ProductAsset[]
   discoveryRuns  DiscoveryRun[]
+  alertRules     AlertRule[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -866,4 +869,185 @@ model DiscoveryRun {
 
   @@index([productId, source, startedAt(sort: Desc)])
   @@map("discovery_runs")
+}
+
+// ===== M12: alerting, incidents, notifications (spec §13, WB-13) =====
+
+enum AlertSeverity {
+  critical
+  warning
+  info
+
+  @@map("alert_severity")
+}
+
+enum IncidentStatus {
+  open
+  acknowledged
+  resolved
+
+  @@map("incident_status")
+}
+
+enum IncidentEventKind {
+  fired
+  refired
+  reopened
+  acknowledged
+  resolved
+  notified
+  suppressed
+  escalated
+  note
+
+  @@map("incident_event_kind")
+}
+
+enum ChannelKind {
+  email
+  slack
+  webhook
+
+  @@map("channel_kind")
+}
+
+enum ChannelStatus {
+  active
+  broken
+
+  @@map("channel_status")
+}
+
+enum DeliveryEvent {
+  opened
+  escalated
+  resolved
+  test
+
+  @@map("delivery_event")
+}
+
+enum DeliveryStatus {
+  pending
+  sent
+  failed
+  dead
+
+  @@map("delivery_status")
+}
+
+/// A rule built from a template (users never write PromQL); metric rules compile to vmalert.
+model AlertRule {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  /// Null: organization-wide.
+  productId       String?       @map("product_id") @db.Uuid
+  name            String
+  template        String
+  params          Json          @default("{}")
+  severity        AlertSeverity
+  enabled         Boolean       @default(true)
+  createdByUserId String?       @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product?        @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  incidents    AlertIncident[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, productId])
+  @@map("alert_rules")
+}
+
+model AlertIncident {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String         @map("organization_id") @db.Uuid
+  productId            String?        @map("product_id") @db.Uuid
+  ruleId               String         @map("rule_id") @db.Uuid
+  fingerprint          String
+  /// Equals fingerprint while unresolved, null once resolved: one open incident per fingerprint.
+  openFingerprint      String?        @map("open_fingerprint")
+  title                String
+  severity             AlertSeverity
+  status               IncidentStatus @default(open)
+  labels               Json           @default("{}")
+  correlation          Json           @default("{}")
+  summary              String         @default("")
+  startedAt            DateTime       @map("started_at") @db.Timestamptz(6)
+  lastFiredAt          DateTime       @default(now()) @map("last_fired_at") @db.Timestamptz(6)
+  acknowledgedAt       DateTime?      @map("acknowledged_at") @db.Timestamptz(6)
+  acknowledgedByUserId String?        @map("acknowledged_by_user_id") @db.Uuid
+  resolvedAt           DateTime?      @map("resolved_at") @db.Timestamptz(6)
+  resolutionNote       String?        @map("resolution_note")
+  lastNotifiedAt       DateTime?      @map("last_notified_at") @db.Timestamptz(6)
+  escalatedAt          DateTime?      @map("escalated_at") @db.Timestamptz(6)
+  postmortem           Json?
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  rule       AlertRule              @relation(fields: [organizationId, ruleId], references: [organizationId, id], onDelete: Cascade)
+  events     IncidentEvent[]
+  deliveries NotificationDelivery[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, openFingerprint])
+  @@index([organizationId, fingerprint, resolvedAt(sort: Desc)])
+  @@index([organizationId, productId, status])
+  @@map("alert_incidents")
+}
+
+model IncidentEvent {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  incidentId     String            @map("incident_id") @db.Uuid
+  kind           IncidentEventKind
+  detail         Json              @default("{}")
+  at             DateTime          @default(now()) @db.Timestamptz(6)
+
+  incident AlertIncident @relation(fields: [organizationId, incidentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([incidentId, at])
+  @@map("incident_events")
+}
+
+model NotificationChannel {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId      String        @map("organization_id") @db.Uuid
+  name                String
+  kind                ChannelKind
+  /// Non-secret settings (email recipients, host of a webhook URL for display).
+  config              Json          @default("{}")
+  /// Envelope-encrypted webhook URL or signing secret (AAD notification-channel:<id>).
+  secret              String?
+  escalation          Boolean       @default(false)
+  status              ChannelStatus @default(active)
+  consecutiveFailures Int           @default(0) @map("consecutive_failures")
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries   NotificationDelivery[]
+
+  @@unique([organizationId, id])
+  @@map("notification_channels")
+}
+
+model NotificationDelivery {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  channelId      String         @map("channel_id") @db.Uuid
+  /// Null for test deliveries.
+  incidentId     String?        @map("incident_id") @db.Uuid
+  event          DeliveryEvent
+  status         DeliveryStatus @default(pending)
+  attempts       Int            @default(0)
+  lastError      String?        @map("last_error")
+  sentAt         DateTime?      @map("sent_at") @db.Timestamptz(6)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  channel  NotificationChannel @relation(fields: [organizationId, channelId], references: [organizationId, id], onDelete: Cascade)
+  incident AlertIncident?      @relation(fields: [organizationId, incidentId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([channelId, createdAt(sort: Desc)])
+  @@map("notification_deliveries")
 }

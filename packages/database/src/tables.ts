@@ -31,6 +31,11 @@ export const TENANT_TABLES = [
   'asset_relationships',
   'relationship_evidence',
   'discovery_runs',
+  'alert_rules',
+  'alert_incidents',
+  'incident_events',
+  'notification_channels',
+  'notification_deliveries',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];

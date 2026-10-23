@@ -175,6 +175,31 @@ beforeAll(async () => {
         `INSERT INTO discovery_runs (id, organization_id, product_id, source) VALUES ($1, $2, $3, 'agent')`,
         [randomUUID(), org, product],
       );
+      const [rule, incident, channel] = [randomUUID(), randomUUID(), randomUUID()];
+      await c.query(
+        `INSERT INTO alert_rules (id, organization_id, product_id, name, template, params, severity, updated_at)
+         VALUES ($1, $2, $3, 'CPU high', 'host_cpu_high', '{}', 'warning', now())`,
+        [rule, org, product],
+      );
+      await c.query(
+        `INSERT INTO alert_incidents (id, organization_id, product_id, rule_id, fingerprint, title, severity, started_at)
+         VALUES ($1, $2, $3, $4, 'fp', 'CPU high on vps-1', 'warning', now())`,
+        [incident, org, product, rule],
+      );
+      await c.query(
+        `INSERT INTO incident_events (id, organization_id, incident_id, kind) VALUES ($1, $2, $3, 'fired')`,
+        [randomUUID(), org, incident],
+      );
+      await c.query(
+        `INSERT INTO notification_channels (id, organization_id, name, kind, config, updated_at)
+         VALUES ($1, $2, 'Ops email', 'email', '{"recipients":["ops@example.com"]}', now())`,
+        [channel, org],
+      );
+      await c.query(
+        `INSERT INTO notification_deliveries (id, organization_id, channel_id, incident_id, event)
+         VALUES ($1, $2, $3, $4, 'opened')`,
+        [randomUUID(), org, channel, incident],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,
