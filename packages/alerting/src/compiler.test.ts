@@ -73,6 +73,16 @@ describe('compileTenant (D17, BR-13-06)', () => {
   });
 });
 
+describe('website templates', () => {
+  it('are worker-evaluated and recommended', async () => {
+    const { RECOMMENDED } = await import('./templates.js');
+    expect(TEMPLATES.website_down).toMatchObject({ kind: 'website', defaultSeverity: 'critical' });
+    expect(validateParams('website_down', {})).toEqual({ failures: 2 });
+    expect(validateParams('website_tls_expiring', {})).toEqual({ days: 14 });
+    expect(RECOMMENDED).toEqual(expect.arrayContaining(['website_down', 'website_tls_expiring']));
+  });
+});
+
 describe('validateParams', () => {
   it('fills defaults, clamps ranges, and rejects unknown params', () => {
     expect(validateParams('host_cpu_high', {})).toEqual({ threshold: 90, forMinutes: 10 });
@@ -88,7 +98,7 @@ describe('validateParams', () => {
   it('has a label, kind, and default severity for every template', () => {
     for (const t of Object.values(TEMPLATES)) {
       expect(t.label.length).toBeGreaterThan(3);
-      expect(['metric', 'heartbeat', 'connection']).toContain(t.kind);
+      expect(['metric', 'heartbeat', 'connection', 'website']).toContain(t.kind);
       expect(t.kind === 'metric').toBe(typeof t.expr === 'function');
     }
   });

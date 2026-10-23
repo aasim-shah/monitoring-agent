@@ -63,7 +63,14 @@ async function tenant() {
         id,
         org,
         product,
-        template === 'agent_heartbeat_missing' ? 'Agent heartbeat missing' : 'Integration failing',
+        (
+          {
+            agent_heartbeat_missing: 'Agent heartbeat missing',
+            connection_degraded: 'Integration failing',
+            website_down: 'Website down',
+            website_tls_expiring: 'TLS certificate expiring',
+          } as Record<string, string>
+        )[template],
         template,
         params,
         severity,
@@ -157,5 +164,48 @@ describe('alert tick: escalation (TC-13-06)', () => {
     expect((await run(t.org, min(10))).map((n) => n.event)).toEqual([]);
     expect((await run(t.org, min(16))).map((n) => n.event)).toEqual(['escalated']);
     expect((await run(t.org, min(30))).map((n) => n.event)).toEqual([]);
+  });
+});
+
+describe('alert tick: websites (TC-09-02, TC-09-03, Review Focus #4)', () => {
+  async function monitor(org: string, product: string, over: Record<string, unknown>) {
+    const id = randomUUID();
+    const cols = { status: 'active', consecutive_failures: 0, tls_expires_at: null, ...over };
+    await sql(
+      `INSERT INTO website_monitors (id, organization_id, product_id, url, host, verify_token, verified_at, status, consecutive_failures, tls_expires_at, updated_at)
+       VALUES ($1, $2, $3, 'https://shop.example.com', 'shop.example.com', 't', now(), $4, $5, $6, now())`,
+      [id, org, product, cols.status, cols.consecutive_failures, cols.tls_expires_at],
+    );
+    return id;
+  }
+
+  it('opens "website down" only after 2 failed probes and resolves on recovery', async () => {
+    const t = await tenant();
+    await t.rule('website_down', { failures: 2 });
+    const id = await monitor(t.org, t.product, { consecutive_failures: 1 });
+    expect(await run(t.org, T0)).toEqual([]);
+    await sql(`UPDATE website_monitors SET consecutive_failures = 2 WHERE id = $1`, [id]);
+    expect((await run(t.org, min(1))).map((n) => n.event)).toEqual(['opened']);
+    expect((await open(t.org))[0]).toMatchObject({
+      title: 'Website down on shop.example.com',
+      status: 'open',
+    });
+    await sql(`UPDATE website_monitors SET consecutive_failures = 0 WHERE id = $1`, [id]);
+    expect((await run(t.org, min(2))).map((n) => n.event)).toEqual(['resolved']);
+  });
+
+  it('warns when the certificate expires within 14 days', async () => {
+    const t = await tenant();
+    await t.rule('website_tls_expiring', { days: 14 }, 'warning');
+    await monitor(t.org, t.product, { tls_expires_at: new Date(T0.getTime() + 13 * 86400_000) });
+    expect((await run(t.org, T0)).map((n) => n.event)).toEqual(['opened']);
+    expect((await open(t.org))[0]).toMatchObject({ title: 'TLS certificate expiring on shop.example.com' });
+  });
+
+  it('ignores monitors that are not verified or are paused', async () => {
+    const t = await tenant();
+    await t.rule('website_down', { failures: 2 });
+    await monitor(t.org, t.product, { status: 'pending_verification', consecutive_failures: 5 });
+    expect(await run(t.org, T0)).toEqual([]);
   });
 });

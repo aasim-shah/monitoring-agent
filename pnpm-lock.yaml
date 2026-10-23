@@ -308,6 +308,9 @@ importers:
       '@pcp/connector-runtime':
         specifier: workspace:*
         version: link:../../packages/connector-runtime
+      '@pcp/connector-sdk':
+        specifier: workspace:*
+        version: link:../../packages/connector-sdk
       '@pcp/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -329,6 +332,9 @@ importers:
       '@pcp/tenant-security':
         specifier: workspace:*
         version: link:../../packages/tenant-security
+      '@pcp/website-probe':
+        specifier: workspace:*
+        version: link:../../packages/website-probe
       nodemailer:
         specifier: 10.2.0
         version: 10.2.0

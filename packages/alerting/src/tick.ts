@@ -10,7 +10,13 @@ type Tx = Prisma.TransactionClient;
  */
 export async function tick(tx: Tx, organizationId: string, now: Date): Promise<NotifyRequest[]> {
   const rules = await tx.alertRule.findMany({
-    where: { enabled: true, archivedAt: null, template: { in: ['agent_heartbeat_missing', 'connection_degraded'] } },
+    where: {
+      enabled: true,
+      archivedAt: null,
+      template: {
+        in: ['agent_heartbeat_missing', 'connection_degraded', 'website_down', 'website_tls_expiring'],
+      },
+    },
   });
   const alerts: NormalizedAlert[] = [];
   for (const rule of rules) {
@@ -30,6 +36,36 @@ export async function tick(tx: Tx, organizationId: string, now: Date): Promise<N
           status: silent ? 'firing' : 'resolved',
           startsAt: now,
           ...(silent ? {} : { endsAt: now }),
+        });
+      }
+    } else if (rule.template === 'website_down' || rule.template === 'website_tls_expiring') {
+      const monitors = await tx.websiteMonitor.findMany({
+        where: rule.productId ? { productId: rule.productId } : {},
+        select: {
+          id: true,
+          url: true,
+          host: true,
+          status: true,
+          consecutiveFailures: true,
+          tlsExpiresAt: true,
+        },
+      });
+      const params = rule.params as Record<string, number>;
+      for (const m of monitors) {
+        // Only verified, running monitors can fire; a paused or unverified one resolves what is open.
+        const active = m.status === 'active';
+        const firing =
+          active &&
+          (rule.template === 'website_down'
+            ? m.consecutiveFailures >= (params.failures ?? 2)
+            : m.tlsExpiresAt !== null &&
+              m.tlsExpiresAt.getTime() - now.getTime() < (params.days ?? 14) * 86400_000);
+        alerts.push({
+          ruleId: rule.id,
+          labels: { monitor_id: m.id, url: m.url, hostname: m.host },
+          status: firing ? 'firing' : 'resolved',
+          startsAt: now,
+          ...(firing ? {} : { endsAt: now }),
         });
       }
     } else {

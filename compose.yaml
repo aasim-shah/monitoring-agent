@@ -141,6 +141,8 @@ services:
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-Product Control Plane <no-reply@localhost>}
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      # Website probe samples (M13a).
+      VM_IMPORT_URL: http://victoriametrics:8428
     # egress: managed databases and provider APIs are on the internet; internal has no route out.
     networks: [internal, egress]
     depends_on:

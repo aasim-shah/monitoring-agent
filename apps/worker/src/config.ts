@@ -13,6 +13,10 @@ const schema = z.object({
   MAIL_FROM: z.string().min(3).default('Product Control Plane <alerts@localhost>'),
   /** Links in notifications point here. */
   APP_ORIGIN: z.string().url().default('http://localhost:8080'),
+  /** Website probe samples (M13a). */
+  VM_IMPORT_URL: z.string().url().optional(),
+  /** Test stacks only: private host:port targets the probe may reach (comma-separated). */
+  PCP_PROBE_ALLOWLIST: z.string().optional(),
 });
 
 export interface WorkerConfig {
@@ -25,6 +29,8 @@ export interface WorkerConfig {
   smtpUrl?: string;
   mailFrom: string;
   appOrigin: string;
+  vmImportUrl?: string;
+  probeAllowlist: string[];
 }
 
 export function loadConfig(env: Record<string, string | undefined>): WorkerConfig {
@@ -46,5 +52,10 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
     smtpUrl: c.SMTP_URL,
     mailFrom: c.MAIL_FROM,
     appOrigin: new URL(c.APP_ORIGIN).origin,
+    vmImportUrl: c.VM_IMPORT_URL?.replace(/\/+$/, ''),
+    probeAllowlist: (c.PCP_PROBE_ALLOWLIST ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
   };
 }

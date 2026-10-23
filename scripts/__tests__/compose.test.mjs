@@ -38,3 +38,8 @@ test('the api receives the AI provider settings from the environment (M14)', () 
   for (const k of ['AI_PROVIDER', 'AI_MODEL', 'AI_FALLBACK_PROVIDER', 'AI_FALLBACK_MODEL', 'GEMINI_API_KEY', 'GROQ_API_KEY'])
     assert.ok(k in env, k);
 });
+
+test('the worker writes website probe samples to VictoriaMetrics (M13a)', () => {
+  assert.equal(base.services.worker.environment.VM_IMPORT_URL, 'http://victoriametrics:8428');
+  assert.ok(!('PCP_PROBE_ALLOWLIST' in base.services.worker.environment), 'allowlist is for test stacks only');
+});

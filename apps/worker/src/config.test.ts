@@ -43,4 +43,14 @@ describe('worker config', () => {
       appOrigin: 'https://monitor.example.com',
     });
   });
+  it('reads the VictoriaMetrics import URL and the probe allowlist (M13a)', () => {
+    expect(loadConfig(base)).toMatchObject({ vmImportUrl: undefined, probeAllowlist: [] });
+    expect(
+      loadConfig({
+        ...base,
+        VM_IMPORT_URL: 'http://victoriametrics:8428/',
+        PCP_PROBE_ALLOWLIST: 'web:3000, api:3000',
+      }),
+    ).toMatchObject({ vmImportUrl: 'http://victoriametrics:8428', probeAllowlist: ['web:3000', 'api:3000'] });
+  });
 });

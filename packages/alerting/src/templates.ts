@@ -8,7 +8,9 @@ export type TemplateId =
   | 'host_disk_full'
   | 'log_error_spike'
   | 'agent_heartbeat_missing'
-  | 'connection_degraded';
+  | 'connection_degraded'
+  | 'website_down'
+  | 'website_tls_expiring';
 
 export type Severity = 'critical' | 'warning' | 'info';
 export type Params = Record<string, number>;
@@ -26,7 +28,7 @@ export interface Template {
   id: TemplateId;
   label: string;
   description: string;
-  kind: 'metric' | 'heartbeat' | 'connection';
+  kind: 'metric' | 'heartbeat' | 'connection' | 'website';
   params: ParamSpec[];
   defaultSeverity: Severity;
   /** PromQL for metric templates; `> threshold` included. Scope comes from vmalert group params. */
@@ -109,6 +111,24 @@ export const TEMPLATES: Record<TemplateId, Template> = {
     params: [{ name: 'minutes', label: 'Failing for', unit: 'min', min: 1, max: 1440, default: 15 }],
     defaultSeverity: 'warning',
   },
+  website_down: {
+    id: 'website_down',
+    label: 'Website down',
+    description: 'A monitored website or API fails its probe several times in a row.',
+    kind: 'website',
+    params: [
+      { name: 'failures', label: 'Failed checks in a row', unit: 'probes', min: 2, max: 10, default: 2 },
+    ],
+    defaultSeverity: 'critical',
+  },
+  website_tls_expiring: {
+    id: 'website_tls_expiring',
+    label: 'TLS certificate expiring',
+    description: 'The TLS certificate of a monitored website expires soon.',
+    kind: 'website',
+    params: [{ name: 'days', label: 'Expires within', unit: 'days', min: 1, max: 90, default: 14 }],
+    defaultSeverity: 'warning',
+  },
 };
 
 /** Added by "Add recommended rules"; connection_degraded only when the product has connections. */
@@ -118,6 +138,8 @@ export const RECOMMENDED: TemplateId[] = [
   'host_disk_full',
   'log_error_spike',
   'agent_heartbeat_missing',
+  'website_down',
+  'website_tls_expiring',
 ];
 
 export function isTemplateId(id: string): id is TemplateId {

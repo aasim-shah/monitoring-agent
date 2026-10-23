@@ -13,6 +13,7 @@
   "dependencies": {
     "@pcp/alerting": "workspace:*",
     "@pcp/connector-runtime": "workspace:*",
+    "@pcp/connector-sdk": "workspace:*",
     "@pcp/database": "workspace:*",
     "@pcp/health": "workspace:*",
     "@pcp/jobs": "workspace:*",
@@ -20,6 +21,7 @@
     "@pcp/secrets": "workspace:*",
     "@pcp/shared-contracts": "workspace:*",
     "@pcp/tenant-security": "workspace:*",
+    "@pcp/website-probe": "workspace:*",
     "nodemailer": "10.2.0",
     "zod": "3.25.76"
   },

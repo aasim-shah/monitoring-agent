@@ -4,7 +4,9 @@ import { postgresCheck, redisCheck } from '@pcp/health';
 import { createQueues, reconcileSchedules, startProcessors } from '@pcp/jobs';
 import { loadKeyRing } from '@pcp/secrets';
 import nodemailer from 'nodemailer';
+import { resolveTxt } from 'node:dns/promises';
 import { alertingHandlers } from './alerting-handlers.js';
+import { websiteProbeHandler } from './website-handler.js';
 import { loadConfig } from './config.js';
 import { createHealthServer } from './health-server.js';
 
@@ -34,7 +36,22 @@ const handlers = alertingHandlers({
     await mailer.sendMail({ from: config.mailFrom, ...mail });
   },
 });
-const processors = startProcessors({ redisUrl: config.redisUrl, prisma, runtime, handlers });
+const probeWebsite = websiteProbeHandler({
+  prisma,
+  now: () => new Date(),
+  resolveTxt,
+  // Public addresses only; the allowlist exists for test stacks (PCP_PROBE_ALLOWLIST).
+  destination: config.probeAllowlist.length
+    ? { allowPrivate: true, allowlist: config.probeAllowlist }
+    : { allowPrivate: false },
+  vmImportUrl: config.vmImportUrl,
+});
+const processors = startProcessors({
+  redisUrl: config.redisUrl,
+  prisma,
+  runtime,
+  handlers: { ...handlers, 'website-probe': (ctx, id) => probeWebsite(ctx, id) },
+});
 
 // PostgreSQL holds the schedules; reconcile Redis at startup and periodically after config changes.
 const reconcile = () =>

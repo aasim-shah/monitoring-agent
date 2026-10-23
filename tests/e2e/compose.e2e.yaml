@@ -23,6 +23,8 @@ services:
   worker:
     environment:
       SMTP_URL: smtp://mailpit:1025
+      # Website probes may reach the stack's own web container (M13a exit gate only).
+      PCP_PROBE_ALLOWLIST: web:3000
     # Mailpit sits on the edge network; production mail goes out over egress.
     networks: [internal, egress, edge]
     depends_on:
