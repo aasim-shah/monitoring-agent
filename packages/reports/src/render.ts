@@ -10,6 +10,8 @@ import type {
   WebsiteStats,
 } from './snapshot.js';
 
+export type { Section, Snapshot } from './snapshot.js';
+
 /** The same shape as an incident notification, so reports use the same channels (UC-15-03). */
 export interface ReportMessage {
   subject: string;
@@ -32,8 +34,8 @@ const escape = (s: string) =>
 
 const pct = (v: number | null) => (v === null ? 'no data' : `${v.toFixed(1)} %`);
 
-/** Plain lines for one section; numbers come straight from the snapshot. */
-function lines(s: Section): string[] {
+/** Plain lines for one section; numbers come straight from the snapshot (emails and the web view). */
+export function sectionLines(s: Section): string[] {
   if (s.status === 'missing') return [`No data: ${s.reason}`];
   switch (s.key) {
     case 'summary': {
@@ -104,8 +106,8 @@ export function renderReport(r: RenderableReport, link: string): ReportMessage {
   const header = `${w.localDate} (${w.timezone}, ${w.hours} h) · ${w.start} to ${w.end}${r.late ? ' · Generated late' : ''}`;
   const body = snapshot.sections.map((s) =>
     s.key === 'summary'
-      ? { title: s.title, lines: [narrativeText(r), ...lines(s)] }
-      : { title: s.title, lines: lines(s) },
+      ? { title: s.title, lines: [narrativeText(r), ...sectionLines(s)] }
+      : { title: s.title, lines: sectionLines(s) },
   );
   const text = [
     subject,

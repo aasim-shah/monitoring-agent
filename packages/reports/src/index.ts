@@ -21,4 +21,4 @@ export {
   type WebsiteStats,
 } from './snapshot.js';
 export { narrate, summarize, type NarrativeStatus } from './narrative.js';
-export { renderReport, type ReportMessage, type RenderableReport } from './render.js';
+export { renderReport, sectionLines, type ReportMessage, type RenderableReport } from './render.js';

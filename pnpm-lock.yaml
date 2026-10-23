@@ -214,6 +214,9 @@ importers:
       '@pcp/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@pcp/reports':
+        specifier: workspace:*
+        version: link:../../packages/reports
       '@pcp/shared-contracts':
         specifier: workspace:*
         version: link:../../packages/shared-contracts

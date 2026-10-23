@@ -61,7 +61,11 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
       permission: 'incident.view',
     },
     { label: 'AI Assistant', href: `/orgs/${orgId}/products/${productId}/ai`, permission: 'ai.use' },
-    { label: 'Reports & Schedules', milestone: 'M15' },
+    {
+      label: 'Reports & Schedules',
+      href: `/orgs/${orgId}/products/${productId}/reports`,
+      permission: 'report.view',
+    },
     { label: 'Automations & Approvals', milestone: 'M16' },
     { label: 'Audit Log', href: `/orgs/${orgId}/audit`, permission: 'audit.view' },
   ];
