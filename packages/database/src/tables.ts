@@ -36,6 +36,11 @@ export const TENANT_TABLES = [
   'incident_events',
   'notification_channels',
   'notification_deliveries',
+  'ai_settings',
+  'ai_conversations',
+  'ai_messages',
+  'ai_runs',
+  'ai_tool_executions',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];

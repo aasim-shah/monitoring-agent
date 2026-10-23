@@ -163,6 +163,7 @@ model Organization {
   jobExecutions  JobExecution[]
   alertRules     AlertRule[]
   channels       NotificationChannel[]
+  aiSettings     AiSettings?
 
   @@map("organizations")
 }
@@ -222,6 +223,7 @@ model Product {
   assets         ProductAsset[]
   discoveryRuns  DiscoveryRun[]
   alertRules     AlertRule[]
+  conversations  AiConversation[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, name])
@@ -1052,4 +1054,127 @@ model NotificationDelivery {
 
   @@index([channelId, createdAt(sort: Desc)])
   @@map("notification_deliveries")
+}
+
+// ===== M14: AI assistant (spec §12, WB-14) =====
+
+enum AiMessageRole {
+  user
+  assistant
+
+  @@map("ai_message_role")
+}
+
+enum AiValidation {
+  verified
+  unverified
+  partial
+
+  @@map("ai_validation")
+}
+
+enum AiRunStatus {
+  running
+  completed
+  partial
+  failed
+
+  @@map("ai_run_status")
+}
+
+enum AiToolStatus {
+  ok
+  denied
+  error
+  truncated
+
+  @@map("ai_tool_status")
+}
+
+/// Organization AI switch (BR-14-09); provider null means the platform default.
+model AiSettings {
+  organizationId  String   @id @map("organization_id") @db.Uuid
+  disabled        Boolean  @default(false)
+  provider        String?
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_settings")
+}
+
+model AiConversation {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  productId       String   @map("product_id") @db.Uuid
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  title           String
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  product  Product     @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  messages AiMessage[]
+  runs     AiRun[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, productId, updatedAt(sort: Desc)])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String        @map("organization_id") @db.Uuid
+  conversationId String        @map("conversation_id") @db.Uuid
+  role           AiMessageRole
+  content        String
+  evidence       Json          @default("[]")
+  missing        Json          @default("[]")
+  confidence     String?
+  validation     AiValidation?
+  runId          String?       @map("run_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation AiConversation @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+model AiRun {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  conversationId String      @map("conversation_id") @db.Uuid
+  status         AiRunStatus @default(running)
+  provider       String
+  model          String
+  toolCalls      Int         @default(0) @map("tool_calls")
+  startedAt      DateTime    @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt     DateTime?   @map("finished_at") @db.Timestamptz(6)
+  error          String?
+
+  conversation AiConversation    @relation(fields: [organizationId, conversationId], references: [organizationId, id], onDelete: Cascade)
+  tools        AiToolExecution[]
+
+  @@unique([organizationId, id])
+  @@map("ai_runs")
+}
+
+/// One tool call in a run: what was asked and how it ended; outputs stay in the message evidence.
+model AiToolExecution {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  runId          String       @map("run_id") @db.Uuid
+  tool           String
+  input          Json
+  status         AiToolStatus
+  evidenceId     String?      @map("evidence_id")
+  durationMs     Int          @default(0) @map("duration_ms")
+  bytes          Int          @default(0)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  run AiRun @relation(fields: [organizationId, runId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("ai_tool_executions")
 }

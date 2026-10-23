@@ -200,6 +200,24 @@ beforeAll(async () => {
          VALUES ($1, $2, $3, $4, 'opened')`,
         [randomUUID(), org, channel, incident],
       );
+      await c.query(`INSERT INTO ai_settings (organization_id, updated_at) VALUES ($1, now())`, [org]);
+      const [conversation, run] = [randomUUID(), randomUUID()];
+      await c.query(
+        `INSERT INTO ai_conversations (id, organization_id, product_id, title, updated_at) VALUES ($1, $2, $3, 'Why slow?', now())`,
+        [conversation, org, product],
+      );
+      await c.query(
+        `INSERT INTO ai_runs (id, organization_id, conversation_id, provider, model) VALUES ($1, $2, $3, 'gemini', 'gemini-2.5-flash')`,
+        [run, org, conversation],
+      );
+      await c.query(
+        `INSERT INTO ai_messages (id, organization_id, conversation_id, role, content) VALUES ($1, $2, $3, 'user', 'Why slow?')`,
+        [randomUUID(), org, conversation],
+      );
+      await c.query(
+        `INSERT INTO ai_tool_executions (id, organization_id, run_id, tool, input, status) VALUES ($1, $2, $3, 'listAssets', '{}', 'ok')`,
+        [randomUUID(), org, run],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

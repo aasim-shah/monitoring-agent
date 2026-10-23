@@ -106,4 +106,27 @@ describe('alerting cross-tenant functions', () => {
     expect(await q('alert_rule', ruleA, randomUUID())).toEqual([]);
     expect(await q('incident', ruleA, user)).toEqual([]);
   });
+
+  it('pcp_resolve_ai_conversation answers members only, with the product', async () => {
+    const user = randomUUID();
+    await run(db.superuserUrl, `INSERT INTO users (id, email) VALUES ($1, $2)`, [
+      user,
+      `${user}@example.com`,
+    ]);
+    await run(
+      db.superuserUrl,
+      `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'analyst')`,
+      [randomUUID(), orgA, user],
+    );
+    const conv = randomUUID();
+    await run(
+      db.superuserUrl,
+      `INSERT INTO ai_conversations (id, organization_id, product_id, title, updated_at) VALUES ($1, $2, $3, 'Q', now())`,
+      [conv, orgA, productA],
+    );
+    const q = (id: string, u: string) =>
+      run(db.appUrl, `SELECT organization_id, product_id FROM pcp_resolve_ai_conversation($1, $2)`, [id, u]);
+    expect(await q(conv, user)).toEqual([{ organization_id: orgA, product_id: productA }]);
+    expect(await q(conv, randomUUID())).toEqual([]);
+  });
 });
