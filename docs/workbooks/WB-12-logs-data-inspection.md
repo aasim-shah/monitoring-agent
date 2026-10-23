@@ -149,8 +149,8 @@ Service page → Logs tab (live viewer: pause, filter, level highlight, download
 
 ## 11. Task checklist
 
-- [ ] M11.1 Live tail
-- [ ] M11.2 Log-derived metrics
+- [x] M11.1 Live tail ([M11-agent-tail](../handoffs/M11-agent-tail.md), [M11-live-tail-api](../handoffs/M11-live-tail-api.md), [M11-logs-ui](../handoffs/M11-logs-ui.md))
+- [x] M11.2 Log-derived metrics ([M11-log-metrics](../handoffs/M11-log-metrics.md))
 - [ ] M18.1 Retained logs
 - [ ] M18.2 Data inspection
 
