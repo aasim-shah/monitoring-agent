@@ -62,6 +62,7 @@ describe('product navigation (spec §21)', () => {
       'Incidents & Alerts',
       'AI Assistant',
       'Reports & Schedules',
+      'Automations & Approvals',
       'Audit Log',
     ]);
     expect(items.find((i) => i.label === 'Websites & APIs')).toEqual({
@@ -78,6 +79,10 @@ describe('product navigation (spec §21)', () => {
       href: '/orgs/o/products/p/reports',
     });
     expect(labels(buildProductNav('o', 'p', 'viewer'))).toContain('Reports & Schedules');
+    expect(items.find((i) => i.label === 'Automations & Approvals')).toEqual({
+      label: 'Automations & Approvals',
+      href: '/orgs/o/products/p/automations',
+    });
     expect(items.find((i) => i.label === 'Incidents & Alerts')).toEqual({
       label: 'Incidents & Alerts',
       href: '/orgs/o/products/p/incidents',

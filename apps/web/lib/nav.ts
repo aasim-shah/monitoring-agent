@@ -66,7 +66,11 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
       href: `/orgs/${orgId}/products/${productId}/reports`,
       permission: 'report.view',
     },
-    { label: 'Automations & Approvals', milestone: 'M16' },
+    {
+      label: 'Automations & Approvals',
+      href: `/orgs/${orgId}/products/${productId}/automations`,
+      permission: 'incident.view',
+    },
     { label: 'Audit Log', href: `/orgs/${orgId}/audit`, permission: 'audit.view' },
   ];
   return items.filter((i) => allowed(role, i.permission)).map(({ permission: _p, ...item }) => item);
