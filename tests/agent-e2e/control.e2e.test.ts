@@ -584,3 +584,140 @@ describe('private connector worker (M8 exit gate)', () => {
     await run('docker', ['rm', '-f', MONGO, WORKER]);
   });
 });
+
+/** An SSE connection to the live tail through Caddy; collects `event`/`data` pairs. */
+async function openTail(agentId: string, source: string) {
+  const ctrl = new AbortController();
+  const res = await fetch(`${BASE}/api/v1/agents/${agentId}/logs/tail?source=${source}`, {
+    headers: { cookie, origin: ORIGIN, accept: 'text/event-stream' },
+    signal: ctrl.signal,
+  });
+  const events: Array<{ event: string; data: Json }> = [];
+  const pump = (async () => {
+    let text = '';
+    try {
+      for await (const part of res.body as unknown as AsyncIterable<Uint8Array>) {
+        text += Buffer.from(part).toString('utf8');
+        let cut: number;
+        while ((cut = text.indexOf('\n\n')) >= 0) {
+          const block = text.slice(0, cut);
+          text = text.slice(cut + 2);
+          const event = /^event: (.*)$/m.exec(block)?.[1];
+          const data = /^data: (.*)$/m.exec(block)?.[1];
+          if (event) events.push({ event, data: data ? JSON.parse(data) : {} });
+        }
+      }
+    } catch {
+      // aborted
+    }
+  })();
+  const lines = () => events.filter((e) => e.event === 'lines').flatMap((e) => e.data.lines as string[]);
+  return {
+    res,
+    events,
+    lines,
+    sessionId: async () =>
+      (await until('ready event', async () => events.find((e) => e.event === 'ready'))).data
+        .sessionId as string,
+    close: async () => {
+      ctrl.abort();
+      await pump;
+    },
+  };
+}
+
+describe('live log tail and log-derived metrics (M11 exit gate)', () => {
+  it('tails Redis and the journal masked on the host, stops on close, and counts error lines', async () => {
+    // Reuses the systemd host and agent from the packs test; the Redis pack was disabled there.
+    const agentId = JSON.parse((await inHost('cat /var/lib/pcp-agent/state.json')).stdout).agentId as string;
+    expect((await inHost('id -nG pcp-agent')).stdout).toMatch(/\badm\b/);
+    expect(
+      (
+        await api('POST', `/api/v1/agents/${agentId}/packs`, {
+          packId: 'redis',
+          settings: { endpoint: '127.0.0.1:6379' },
+        })
+      ).status,
+    ).toBe(201);
+    await until('redis pack applied', async () => {
+      const list = (await api('GET', `/api/v1/agents/${agentId}/packs`)).json.packs as Json[];
+      return list.find((p) => p.packId === 'redis' && p.status === 'applied');
+    });
+    const sources = (await api('GET', `/api/v1/agents/${agentId}/log-sources`)).json.sources as Json[];
+    expect(sources.map((s) => s.id)).toEqual(['redis.server', 'postgresql.main', 'host.journal']);
+
+    // UC-12-01/02: a new Redis log line arrives masked.
+    const tail = await openTail(agentId, 'redis.server');
+    expect(tail.res.status).toBe(200);
+    const sessionId = await tail.sessionId();
+    await new Promise((r) => setTimeout(r, 3000)); // the agent picks the task up and seeks to the end
+    const log = '/var/log/redis/redis-server.log';
+    expect(
+      (
+        await inHost(
+          `echo "1:M 23 Oct 2026 10:00:00.000 * pcp-e2e login password=hunter2 by ops@example.com" >> ${log}`,
+        )
+      ).status,
+    ).toBe(0);
+    const line = await until(
+      'redacted Redis line',
+      async () => tail.lines().find((l) => l.includes('pcp-e2e login')),
+      60_000,
+    );
+    expect(line).toContain('password=[REDACTED]');
+    expect(line).toContain('[EMAIL]');
+    expect(line).not.toContain('hunter2');
+    expect(line).not.toContain('ops@example.com');
+
+    // Review Focus #3: closing the stream closes the session and the agent stops its tail.
+    await tail.close();
+    const sql = (q: string) =>
+      compose(['exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'pcp', '-tAc', q]);
+    await until('session closed', async () =>
+      (await sql(`SELECT status FROM agent_stream_sessions WHERE id = '${sessionId}'`)).stdout.trim() ===
+      'closed'
+        ? true
+        : undefined,
+    );
+    await until(
+      'log_tail task finished',
+      async () => {
+        const status = (
+          await sql(`SELECT status FROM agent_tasks WHERE payload->>'sessionId' = '${sessionId}'`)
+        ).stdout.trim();
+        return status === 'succeeded' ? true : undefined;
+      },
+      60_000,
+    );
+
+    // The system journal is always available.
+    const journal = await openTail(agentId, 'host.journal');
+    await journal.sessionId();
+    await new Promise((r) => setTimeout(r, 3000));
+    await inHost(`logger "pcp-e2e journal token=abc123secret"`);
+    const jline = await until(
+      'journal line',
+      async () => journal.lines().find((l) => l.includes('pcp-e2e journal')),
+      60_000,
+    );
+    expect(jline).toContain('token=[REDACTED]');
+    await journal.close();
+
+    // M11.2: error lines in the Redis log become log_lines_total{level="error"}.
+    await inHost(
+      `for i in 1 2 3; do echo "1:M 23 Oct 2026 10:00:0$i.000 # Error accepting a client connection: pcp-e2e $i" >> ${log}; done`,
+    );
+    await until(
+      'log errors chart',
+      async () => {
+        const body = (await api('GET', `/api/v1/agents/${agentId}/services/redis/metrics?range=15m`)).json;
+        const chart = (body.charts as Json[]).find((c) => c.key === 'logErrors');
+        const values = ((chart?.series as Json[] | undefined) ?? []).flatMap((s) =>
+          (s.points as Array<[number, number | null]>).map(([, v]) => v ?? 0),
+        );
+        return values.some((v) => v > 0) ? true : undefined;
+      },
+      240_000,
+    );
+  });
+});
