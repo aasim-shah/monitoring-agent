@@ -834,14 +834,19 @@ describe('approved service restart through pcp-helper (M16 exit gate)', () => {
     );
     expect(approved.status, JSON.stringify(approved.json)).toBe(200);
 
+    let last: Json = {};
     const done = await until(
       'restart verified',
       async () => {
         const r = (await api('GET', `/api/v1/actions/${req.id}`)).json;
+        last = r;
         return ['succeeded', 'failed', 'expired'].includes(r.status as string) ? r : undefined;
       },
       180_000,
-    );
+    ).catch((e: Error) => {
+      // Say where it stopped: the request, its executions, and the agent task state.
+      throw new Error(`${e.message}; last: ${JSON.stringify(last)}`);
+    });
     expect(done.status, JSON.stringify(done)).toBe('succeeded');
     expect((done.executions as Json[])[0]!.verification).toEqual({ activeState: 'active', verified: true });
     const restarted = (
