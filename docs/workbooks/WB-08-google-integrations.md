@@ -149,9 +149,9 @@ Integrations → Google (scope explanations, consent, "Connected as", per-servic
 
 ## 10. Task checklist
 
-- [ ] M13.1 Google OAuth framework
-- [ ] M13.2 GA4 connector
-- [ ] M13.3 Firebase, Play, Search Console, BigQuery exports
+- [x] M13.1 Google OAuth framework
+- [x] M13.2 GA4 connector
+- [x] M13.3 Firebase, Play, Search Console, BigQuery exports (BigQuery exports: not read yet)
 - [ ] M13.4 Google Ads connector (gated on developer token)
 
 ## 11. Acceptance criteria

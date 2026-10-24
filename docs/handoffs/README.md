@@ -23,12 +23,13 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M9 Discovery, graph, topology | Done | Branch `feat/m9-discovery-graph`; deployed; [execution log](M9-execution-log.md) |
 | M11 Logs (live tail, log-derived metrics) | Done | Branch `feat/m11-logs`; deployed; [execution log](M11-execution-log.md) |
 | M12 Alerts, incidents, notifications | Done | Branch `feat/m12-alerts`; deployed; [execution log](M12-execution-log.md) |
-| M13a Website monitoring | Done | Branch `feat/m13a-websites`; deployed; [execution log](M13a-execution-log.md). M13b (Google sources, KPIs) not started |
+| M13a Website monitoring | Done | Branch `feat/m13a-websites`; deployed; [execution log](M13a-execution-log.md) |
+| M13b Google sources and KPIs | Done | Branch `feat/m13b-google`; deployed; GA4, Search Console, Firebase, Play vitals; [execution log](M13b-execution-log.md), [setup](M13b-google.md) |
 | M16 Operational actions and approvals | Done | Branch `feat/m16-actions`; deployed; agent 0.3.0 with opt-in pcp-helper; [execution log](M16-execution-log.md) |
 | M15 Reports and schedules | Done | Branch `feat/m15-reports`; deployed; [execution log](M15-execution-log.md) |
 | M14 AI assistant | Done | Branch `feat/m14-ai`; deployed; [execution log](M14-execution-log.md) |
 | M7 SaaS integrations and webhooks | Done | Branch `feat/m7-integrations`; deployed; Cloudflare, GitHub, Prometheus, Grafana; [execution log](M7-execution-log.md) |
-| M10–M19 (except M13a–M16) | Not started | M10 partly delivered in M6b |
+| M10, M17–M19 | Not started | M10 partly delivered in M6b; M13.4 Google Ads gated on a developer token |
 
 ## Maintenance
 

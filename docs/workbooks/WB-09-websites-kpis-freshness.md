@@ -108,7 +108,7 @@ Websites & APIs (monitors, uptime, latency, TLS), Domain verification, KPI catal
 ## 10. Task checklist
 
 - [x] M13.5 Website monitoring ([M13a-schema](../handoffs/M13a-schema.md), [M13a-probe](../handoffs/M13a-probe.md), [M13a-worker-alerts](../handoffs/M13a-worker-alerts.md), [M13a-api](../handoffs/M13a-api.md), [M13a-web](../handoffs/M13a-web.md))
-- [ ] M13.6 KPI definitions and freshness
+- [x] M13.6 KPI definitions and freshness
 - [ ] M13.7 Analytics, ads, website, mobile screens
 
 ## 11. Acceptance criteria
