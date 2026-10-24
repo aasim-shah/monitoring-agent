@@ -1,8 +1,11 @@
-go 1.23
+go 1.23.0
+
+toolchain go1.23.12
 
 use (
 	./agents/host-agent-go
 	./apps/ingest-gateway
+	./apps/installer-runner
 	./apps/opamp-server
 	./packages/agent-protocol/go
 	./packages/go-platform

@@ -11,6 +11,10 @@ services:
       timeout: 3s
       retries: 12
 
+  # Assisted-install targets are test hosts on the edge network (M17.3).
+  installer-runner:
+    networks: [internal, egress, edge]
+
   # Stand-in for api.github.com (M7 exit gate): the e2e stack has no internet.
   fake-github:
     image: node:22.20.0-alpine

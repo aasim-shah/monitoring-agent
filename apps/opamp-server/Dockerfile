@@ -11,6 +11,7 @@ COPY packages/agent-protocol/go packages/agent-protocol/go
 COPY agents/host-agent-go agents/host-agent-go
 COPY apps/opamp-server apps/opamp-server
 COPY apps/ingest-gateway apps/ingest-gateway
+COPY apps/installer-runner apps/installer-runner
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/service ./apps/opamp-server
 
 FROM alpine:3.22
