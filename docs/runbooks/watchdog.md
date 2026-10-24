@@ -8,7 +8,7 @@ The checks are listed in `infrastructure/monitoring/checks`, one `name=command` 
 
 | Check | Healthy when |
 |---|---|
-| `api` | The API's `/healthz` answers inside its container |
+| `api` | The API's `/readyz` answers inside its container (database and Redis reachable) |
 | `worker` | The worker's `/readyz` answers (PostgreSQL and Redis reachable) |
 | `victoriametrics` | `/health` answers |
 | `public` | `https://monitor.aasimshah.com/healthz` answers through nginx and Caddy |
