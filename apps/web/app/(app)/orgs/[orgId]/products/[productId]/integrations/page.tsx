@@ -91,7 +91,11 @@ export default function IntegrationsPage() {
                 </div>
                 {canConfigure ? (
                   <div>
-                    <ConnectDialog spec={spec} credentialFields={entry.credentialFields ?? []} onSubmit={connect} />
+                    <ConnectDialog
+                      spec={spec}
+                      credentialFields={entry.credentialFields ?? []}
+                      onSubmit={connect}
+                    />
                   </div>
                 ) : null}
               </Card>

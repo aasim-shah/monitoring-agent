@@ -2,7 +2,7 @@
   "name": "@pcp/alerting",
   "version": "0.0.0",
   "private": true,
-  "description": "Alert rule templates, the vmalert compiler, and the incident engine (M12, spec \u00a713).",
+  "description": "Alert rule templates, the vmalert compiler, and the incident engine (M12, spec §13).",
   "type": "module",
   "exports": {
     ".": {

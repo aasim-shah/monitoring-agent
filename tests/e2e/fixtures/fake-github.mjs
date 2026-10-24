@@ -1,6 +1,7 @@
 // A stand-in for api.github.com in the e2e stack, which has no internet (M7 exit gate).
 // Answers only the read paths the GitHub connector calls, for owner "acme".
 import { createServer } from 'node:http';
+import { URL } from 'node:url';
 
 const repo = (id, name) => ({
   id,
