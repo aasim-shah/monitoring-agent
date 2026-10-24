@@ -12,6 +12,7 @@ import { AgentAuthGuard } from './modules/agents/agent-auth.guard.js';
 import { AgentsModule } from './modules/agents/agents.module.js';
 import { AiModule } from './modules/ai/ai.module.js';
 import { ActionsModule } from './modules/actions/actions.module.js';
+import { WebhooksModule } from './modules/webhooks/webhooks.module.js';
 import { ReportsModule } from './modules/reports/reports.module.js';
 import { WebsitesModule } from './modules/websites/websites.module.js';
 import { AlertingModule } from './modules/alerting/alerting.module.js';
@@ -66,6 +67,7 @@ export class AppModule {
         ProductsModule,
         MembersModule,
         ConnectionsModule.register(env),
+        WebhooksModule.register(env),
         AgentsModule,
         TelemetryModule,
         PacksModule,

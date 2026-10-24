@@ -93,3 +93,15 @@ ALTER TABLE connection_inventory FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON connection_inventory
   USING (organization_id = pcp_current_org()) WITH CHECK (organization_id = pcp_current_org());
 
+-- ===== Part 3: webhook routing (no session: the connection ID in the URL is the only key) =====
+CREATE FUNCTION pcp_webhook_connection(p_id uuid)
+  RETURNS TABLE (organization_id uuid, provider text, status text)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = public, pg_temp
+  AS $$
+    SELECT c.organization_id, c.provider, c.status::text FROM connections c WHERE c.id = p_id
+  $$;
+
+ALTER FUNCTION pcp_webhook_connection(uuid) OWNER TO pcp_rls_definer;
+REVOKE ALL ON FUNCTION pcp_webhook_connection(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pcp_webhook_connection(uuid) TO pcp_app;

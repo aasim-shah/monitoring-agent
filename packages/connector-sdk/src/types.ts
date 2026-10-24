@@ -6,6 +6,7 @@ import type {
   Observation,
 } from '@pcp/shared-contracts';
 import type { ReadOnlyTemplate } from './templates.js';
+import type { WebhookCheck, WebhookRequest } from './webhooks.js';
 
 export type ExecutionLocation = 'cloud' | 'private';
 
@@ -86,7 +87,20 @@ export interface Connector {
   sync?(ctx: ExecutionContext, cursor?: string): Promise<SyncPage>;
   health?(ctx: ExecutionContext): Promise<HealthResult>;
   collect?(ctx: ExecutionContext, query: MetricQuery): Promise<MetricResult>;
-  ingestEvent?(ctx: ExecutionContext, event: Record<string, unknown>): Promise<Observation[]>;
+  /**
+   * Checks a webhook's signature with this connection's credentials (WB-06 UC-06-10). Called
+   * before anything else; a false result is answered 401 without reading the payload further.
+   */
+  verifyWebhook?(req: WebhookRequest, credentials: Record<string, string>): WebhookCheck;
+  /**
+   * Normalizes a verified event. `change_event` observations become change events
+   * (attributes: kind, title, url?, actor?, occurredAt, externalId); `connection_revoked`
+   * revokes the connection; anything else is ignored.
+   */
+  ingestEvent?(
+    ctx: ExecutionContext,
+    event: { eventType: string; headers: Record<string, string>; payload: unknown },
+  ): Promise<Observation[]>;
   registerWebhook?(ctx: ExecutionContext): Promise<{ url: string }>;
   refreshCredential?(ctx: ExecutionContext): Promise<{ credentials: Record<string, string> }>;
   executeAction?(ctx: ExecutionContext, action: Record<string, unknown>): Promise<Record<string, unknown>>;

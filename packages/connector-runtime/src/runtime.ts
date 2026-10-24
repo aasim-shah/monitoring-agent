@@ -4,10 +4,11 @@ import {
   transition,
   type ConnectorRegistry,
   type ExecutionContext,
+  type WebhookRequest,
 } from '@pcp/connector-sdk';
 import type { Prisma, PrismaClient } from '@pcp/database';
 import type { KeyRing } from '@pcp/secrets';
-import type { ConnectionStatus, DiscoveryPage, TenantContext } from '@pcp/shared-contracts';
+import type { ConnectionStatus, DiscoveryPage, Observation, TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 import { decryptCredentials } from './secrets.js';
 
@@ -111,6 +112,43 @@ export class ConnectorRuntime {
     if (!connector.discover)
       throw new ConnectorError('invalid_config', `${c.provider} does not support discovery`);
     return this.execute(ctx, c, (e) => connector.discover!(e));
+  }
+
+  /**
+   * A provider webhook for one connection (spec §7.7): only a connected or degraded connection
+   * whose connector verifies the signature with this connection's own secret gets its event
+   * normalized. Everything else looks the same to the caller: not verified.
+   */
+  async webhook(
+    ctx: TenantContext,
+    connectionId: string,
+    req: WebhookRequest,
+  ): Promise<
+    | { verified: false }
+    | { verified: true; provider: string; deliveryId: string; eventType: string; observations: Observation[] }
+  > {
+    const c = await this.load(ctx, connectionId).catch(() => null);
+    if (!c || (c.status !== 'connected' && c.status !== 'degraded')) return { verified: false };
+    const connector = this.registry.get(c.provider);
+    if (!connector.verifyWebhook || !connector.ingestEvent || !c.secret) return { verified: false };
+    let creds: Record<string, string>;
+    try {
+      creds = decryptCredentials(c.secret.ciphertext, c.organizationId, c.id, this.keys);
+    } catch {
+      return { verified: false };
+    }
+    const check = connector.verifyWebhook(req, creds);
+    if (!check.ok) return { verified: false };
+    const observations = await this.execute(ctx, c, (e) =>
+      connector.ingestEvent!(e, { eventType: check.eventType, headers: req.headers, payload: req.payload }),
+    );
+    return {
+      verified: true,
+      provider: c.provider,
+      deliveryId: check.deliveryId,
+      eventType: check.eventType,
+      observations,
+    };
   }
 
   /** Validates credentials and applies the lifecycle transition, health record, and reason. */

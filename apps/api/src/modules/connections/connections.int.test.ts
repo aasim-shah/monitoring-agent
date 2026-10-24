@@ -86,7 +86,10 @@ describe('connections API', () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: 'mock',
-          credentialFields: [{ name: 'token', label: 'Token', secret: true }],
+          credentialFields: [
+            { name: 'token', label: 'Token', secret: true },
+            { name: 'webhookSecret', label: 'Webhook secret', secret: true, required: false },
+          ],
         }),
       ]),
     );

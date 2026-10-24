@@ -2109,11 +2109,25 @@ paths:
       operationId: receiveWebhook
       tags: [webhooks]
       summary: Provider webhook (signature + replay checks)
-      description: Provider webhook (signature + replay checks).
+      description: >-
+        Verified with the connection's own secret (GitHub `X-Hub-Signature-256`, Cloudflare `cf-webhook-auth`).
+        A bad signature, an unknown or disconnected connection, and a provider mismatch all answer the same 401.
+        A repeated delivery ID answers 200 `{duplicate: true}`; payloads are not stored. Bodies over 1 MB answer 413.
       security: [{ webhookSignature: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Duplicate delivery (no-op)
+          content:
+            application/json:
+              schema: { type: object, properties: { duplicate: { type: boolean } } }
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema: { type: object, properties: { accepted: { type: boolean }, changeEvents: { type: integer } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { description: Body over 1 MB }
+      x-implemented-in: M7
   /api/v1/products/{id}/assets:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:

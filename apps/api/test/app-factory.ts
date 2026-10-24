@@ -58,6 +58,7 @@ export async function createTestApp(
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<NestFastifyApplication>(
     new FastifyAdapter({ trustProxy: true }),
+    { rawBody: true },
   );
   await app.register(fastifyCookie);
   await app.init();

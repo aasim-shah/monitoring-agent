@@ -11,6 +11,8 @@ const config = loadConfig(process.env);
 const app = await NestFactory.create<NestFastifyApplication>(
   AppModule.register(config),
   new FastifyAdapter({ trustProxy: true }),
+  // Webhook signatures cover the exact bytes received (WB-06 UC-06-10).
+  { rawBody: true },
 );
 await app.register(fastifyCookie);
 app.enableShutdownHooks();

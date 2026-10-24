@@ -98,4 +98,13 @@ describe('integrations schema (WB-06 §6)', () => {
       ),
     ).rejects.toThrow(/duplicate key/);
   });
+
+  it('pcp_webhook_connection routes a webhook to its organization without a session', async () => {
+    expect(
+      await run(db.appUrl, `SELECT organization_id, provider, status FROM pcp_webhook_connection($1)`, [
+        connA,
+      ]),
+    ).toEqual([{ organization_id: orgA, provider: 'github', status: 'connected' }]);
+    expect(await run(db.appUrl, `SELECT * FROM pcp_webhook_connection($1)`, [randomUUID()])).toEqual([]);
+  });
 });

@@ -1,4 +1,10 @@
-import { ConnectorError, type Connector, type ExecutionContext } from '@pcp/connector-sdk';
+import {
+  ConnectorError,
+  hmacSha256Hex,
+  safeEqual,
+  type Connector,
+  type ExecutionContext,
+} from '@pcp/connector-sdk';
 
 // Test-only connector (ADR 0008): never registered in production.
 
@@ -28,8 +34,11 @@ export const mockConnector: Connector = {
   version: '1.0.0',
   displayName: 'Mock (tests only)',
   executionLocations: ['cloud', 'private'],
-  credentialFields: [{ name: 'token', label: 'Token', secret: true }],
-  capabilities: () => ['config_validation', 'validate', 'discover', 'health'],
+  credentialFields: [
+    { name: 'token', label: 'Token', secret: true },
+    { name: 'webhookSecret', label: 'Webhook secret', secret: true, required: false },
+  ],
+  capabilities: () => ['config_validation', 'validate', 'discover', 'health', 'events'],
   configSchema: () => ({
     type: 'object',
     properties: {
@@ -76,5 +85,49 @@ export const mockConnector: Connector = {
   async health(ctx) {
     await failFor(ctx);
     return { ok: true };
+  },
+  /** `x-mock-signature: sha256=<hex HMAC of the body>`, `x-mock-delivery`, `x-mock-event`. */
+  verifyWebhook(req, credentials) {
+    const secret = credentials.webhookSecret;
+    const sent = req.headers['x-mock-signature'] ?? '';
+    if (!secret || !safeEqual(sent, `sha256=${hmacSha256Hex(secret, req.rawBody)}`)) return { ok: false };
+    return {
+      ok: true,
+      deliveryId: req.headers['x-mock-delivery'] ?? '',
+      eventType: req.headers['x-mock-event'] ?? 'event',
+    };
+  },
+  async ingestEvent(ctx, event) {
+    const p = (event.payload ?? {}) as {
+      id?: string;
+      kind?: string;
+      title?: string;
+      at?: string;
+      revoke?: boolean;
+    };
+    const base = {
+      connectionId: ctx.connectionId,
+      source: 'webhook' as const,
+      provider: 'mock',
+      observedAt: new Date().toISOString(),
+      method: 'webhook',
+      confidence: 1,
+      evidence: { eventType: event.eventType },
+    };
+    if (p.revoke) return [{ ...base, resourceType: 'connection_revoked', attributes: {} }];
+    if (!p.kind) return [];
+    return [
+      {
+        ...base,
+        resourceType: 'change_event',
+        externalId: p.id,
+        attributes: {
+          kind: p.kind,
+          title: p.title ?? p.kind,
+          occurredAt: p.at ?? base.observedAt,
+          externalId: p.id,
+        },
+      },
+    ];
   },
 };
