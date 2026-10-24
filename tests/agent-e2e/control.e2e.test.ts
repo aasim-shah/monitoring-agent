@@ -431,6 +431,24 @@ describe('service discovery and monitoring packs (M6b exit gate)', () => {
     expect(redis.status).toBe('applied');
     expect(postgres.status).toBe('applied');
 
+    // M10: every config drops per-request labels at the edge (spec §11.6).
+    expect(
+      (await inHost('grep -c transform/drop_labels /var/lib/pcp-agent/collector.yaml')).stdout.trim(),
+    ).not.toBe('0');
+    // M10.7 live boost: the signed task sets Redis to 5 s on the host (BR-11-08).
+    const boost = await api('POST', `/api/v1/agents/${agentId}/live-boost`, { packId: 'redis' });
+    expect(boost.status, JSON.stringify(boost.json)).toBe(202);
+    await until(
+      'redis boosted to 5 s on the host',
+      async () =>
+        (
+          await inHost(`grep -A3 '"redis": {' /var/lib/pcp-agent/collector.yaml | grep -c '"5s"' || true`)
+        ).stdout.trim() !== '0'
+          ? true
+          : undefined,
+      90_000,
+    );
+
     // Disabling removes the receiver; the assignment disappears after the agent acknowledges.
     expect((await api('DELETE', `/api/v1/agents/${agentId}/packs/redis`)).status).toBe(202);
     await until('redis pack removed', async () => {
