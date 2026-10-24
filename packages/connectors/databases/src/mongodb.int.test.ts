@@ -80,6 +80,11 @@ describe('MongoDB connector (WB-07, FireMaps-like fixture)', () => {
       database: { name: 'firemaps', collections: 2, objects: 5002 },
     });
     expect((h.data!.database as { dataSizeBytes: number }).dataSizeBytes).toBeGreaterThan(0);
+    // Per-collection counts for the daily report (M15b), largest first.
+    expect(h.data!.collections).toEqual([
+      { name: 'incidents', documents: 5000 },
+      { name: 'stations', documents: 2 },
+    ]);
   });
 
   it('runs the documents-per-day template and caps at 1,000 rows', async () => {

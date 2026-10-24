@@ -74,7 +74,8 @@ describe('PostgreSQL connector (WB-07)', () => {
     });
     expect(
       (h.data!.databases as Array<{ name: string; bytes: number }>).find((d) => d.name === 'app')!.bytes,
-    ).toBeGreaterThan(0);
+    ).toBeGreaterThan(0); // Per-table counts for the daily report's "new records" (M15b): statistics only, no row reads.
+    expect(h.data!.tables).toEqual([{ name: 'public.signups', rows: expect.any(Number), inserted: 5000 }]);
   });
 
   it('runs a named template over a time window', async () => {

@@ -150,6 +150,13 @@ export function createMysqlConnector(templates: ReadOnlyTemplate[] = MYSQL_TEMPL
           GROUP BY table_schema ORDER BY bytes DESC LIMIT 50`)) as unknown as [
           Array<{ name: string; bytes: string }>,
         ];
+        // Per-table estimates for the daily report (M15b); InnoDB's table_rows is approximate.
+        const [tables] = (await c.query(`
+          SELECT CONCAT(table_schema, '.', table_name) AS name, COALESCE(table_rows, 0) AS \`rows\`
+          FROM information_schema.TABLES
+          WHERE table_type = 'BASE TABLE'
+            AND table_schema NOT IN ('mysql', 'sys', 'information_schema', 'performance_schema')
+          ORDER BY table_rows DESC, name LIMIT 50`)) as unknown as [Array<{ name: string; rows: string }>];
         return {
           ok: true,
           data: {
@@ -159,6 +166,8 @@ export function createMysqlConnector(templates: ReadOnlyTemplate[] = MYSQL_TEMPL
             maxConnections: Number(vars.max),
             replicationLagSeconds: lag,
             schemas: schemas.map((x) => ({ name: x.name, bytes: Number(x.bytes) })),
+            tables: tables.map((t) => ({ name: t.name, rows: Number(t.rows) })),
+            tablesApproximate: true,
             slowQueries: s.Slow_queries,
             uptimeSeconds: s.Uptime,
           },

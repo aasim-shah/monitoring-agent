@@ -172,6 +172,10 @@ export function createPostgresConnector(templates: ReadOnlyTemplate[] = POSTGRES
         } catch {
           // pg_stat_statements is optional (WB-07 §8).
         }
+        // Per-table statistics for the daily report's "new records" (M15b): counters, never row reads.
+        const { rows: tables } = await c.query(`
+          SELECT schemaname || '.' || relname AS name, n_live_tup AS rows, n_tup_ins AS inserted
+          FROM pg_stat_user_tables ORDER BY n_live_tup DESC, relname LIMIT 50`);
         const h = s[0];
         return {
           ok: true,
@@ -183,6 +187,7 @@ export function createPostgresConnector(templates: ReadOnlyTemplate[] = POSTGRES
             role: h.standby ? 'standby' : 'primary',
             replicationLagSeconds: h.lag === null ? null : Number(h.lag),
             databases: dbs.map((d) => ({ name: d.name, bytes: Number(d.bytes) })),
+            tables: tables.map((t) => ({ name: t.name, rows: Number(t.rows), inserted: Number(t.inserted) })),
             slowQueries,
           },
         };

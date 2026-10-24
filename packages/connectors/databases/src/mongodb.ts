@@ -221,6 +221,27 @@ export function createMongodbConnector(templates: ReadOnlyTemplate[] = MONGODB_T
           // Standalone server (NoReplicationEnabled).
         }
         const stats = await c.db(database).command({ dbStats: 1 });
+        // Per-collection counts for the daily report (M15b): metadata estimates, no document reads.
+        let collections: Array<{ name: string; documents: number }> | null = null;
+        try {
+          const db = c.db(database);
+          const names = (await db.listCollections({ type: 'collection' }, { nameOnly: true }).toArray())
+            .map((x) => x.name as string)
+            .filter((n) => !n.startsWith('system.'))
+            .slice(0, 200);
+          collections = (
+            await Promise.all(
+              names.map(async (name) => ({
+                name,
+                documents: await db.collection(name).estimatedDocumentCount(),
+              })),
+            )
+          )
+            .sort((a, b) => b.documents - a.documents || a.name.localeCompare(b.name))
+            .slice(0, 50);
+        } catch {
+          // A user without listCollections still gets the rest of the health check.
+        }
         return {
           ok: true,
           data: {
@@ -238,6 +259,7 @@ export function createMongodbConnector(templates: ReadOnlyTemplate[] = MONGODB_T
               storageSizeBytes: stats.storageSize,
               indexSizeBytes: stats.indexSize,
             },
+            collections,
           },
         };
       });

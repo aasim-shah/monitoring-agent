@@ -74,6 +74,9 @@ describe('MySQL connector (WB-07)', () => {
       replicationLagSeconds: null,
     });
     expect((h.data!.schemas as Array<{ name: string }>).map((s) => s.name)).toContain('app');
+    // Per-table estimates for the daily report (M15b); InnoDB counts are approximate.
+    expect(h.data!.tables).toEqual([{ name: 'app.signups', rows: expect.any(Number) }]);
+    expect(h.data!.tablesApproximate).toBe(true);
   });
 
   it('runs templates and caps rows at 1,000', async () => {
