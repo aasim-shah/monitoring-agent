@@ -1830,6 +1830,33 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M6b
+  /api/v1/agents/{id}/packs/{packId}/verification:
+    parameters:
+      - { $ref: '#/components/parameters/id' }
+      - { name: packId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: verifyPackGuide
+      tags: [packs]
+      summary: Has the Level 2 proof metric arrived from this agent in the last 15 minutes?
+      description: Read-only check for packs with a guide (nodejs, kafka, nginx). Requires `telemetry.query`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packId, status, series, proof, checkedAt]
+                properties:
+                  packId: { type: string }
+                  status: { type: string, enum: [active, not_found] }
+                  series: { type: number }
+                  proof: { type: string }
+                  checkedAt: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M10
   /api/v1/agents/{id}/packs/{packId}/inspection:
     parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/packId' }]
     patch:
@@ -5217,6 +5244,23 @@ components:
               secret: { type: boolean }
               required: { type: boolean }
         settings: { type: object, additionalProperties: true, description: JSON Schema of the pack settings }
+        guide:
+          type: object
+          description: Level 2 guided setup — changes the customer makes; the platform never runs them (BR-11-04).
+          required: [summary, steps, proof, proofLabel, troubleshooting]
+          properties:
+            summary: { type: string }
+            steps:
+              type: array
+              items:
+                type: object
+                required: [text]
+                properties:
+                  text: { type: string }
+                  command: { type: string }
+            proof: { type: string, description: Metric name pattern that proves the change works }
+            proofLabel: { type: string }
+            troubleshooting: { type: array, items: { type: string } }
     PackAssignment:
       type: object
       required: [packId, settings, status, statusMessage, policyVersion, appliedAt, updatedAt]

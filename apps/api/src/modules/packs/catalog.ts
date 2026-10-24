@@ -29,7 +29,22 @@ export interface CredentialField {
   required: boolean;
 }
 
+/**
+ * Level 2 guided setup (spec §8.9, WB-11 UC-11-04): changes the customer makes to their own software
+ * for deeper metrics. The platform shows them and checks for the proof metric; it never runs them
+ * (BR-11-04).
+ */
+export interface Guide {
+  summary: string;
+  steps: Array<{ text: string; command?: string }>;
+  /** Metric name pattern (PromQL regex) that proves the change works on this host. */
+  proof: string;
+  proofLabel: string;
+  troubleshooting: string[];
+}
+
 export interface Pack {
+  guide?: Guide;
   id: string;
   name: string;
   description: string;
@@ -101,6 +116,30 @@ export const PACKS: Pack[] = [
     defaultEndpoint: '127.0.0.1:9092',
     credentialFields: [],
     ...endpointSettings(hostPort, 'broker host:port'),
+    guide: {
+      summary:
+        'Broker internals (request rates, under-replicated partitions, controller state) through the JMX exporter.',
+      steps: [
+        {
+          text: 'Download the Prometheus JMX exporter javaagent and the Kafka rules file onto the broker host.',
+          command:
+            'sudo mkdir -p /opt/jmx && sudo curl -fsSLo /opt/jmx/jmx_prometheus_javaagent.jar https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar && sudo curl -fsSLo /opt/jmx/kafka.yml https://raw.githubusercontent.com/prometheus/jmx_exporter/release-1.0.1/example_configs/kafka-2_0_0.yml',
+        },
+        {
+          text: 'Add the javaagent to the broker, bound to loopback only, then restart the broker (one at a time in a cluster).',
+          command:
+            'export KAFKA_OPTS="$KAFKA_OPTS -javaagent:/opt/jmx/jmx_prometheus_javaagent.jar=127.0.0.1:7071:/opt/jmx/kafka.yml"',
+        },
+        { text: 'The agent already scrapes 127.0.0.1:7071 while the Kafka pack is enabled.' },
+      ],
+      proof: 'kafka_server_.+',
+      proofLabel: 'kafka_server_* metrics from the JMX exporter',
+      troubleshooting: [
+        'curl -s 127.0.0.1:7071/metrics | head shows kafka_server_ lines on the broker host.',
+        'KAFKA_OPTS is set in the environment the broker service actually starts with (systemd unit or kafka-server-start.sh).',
+        'Nothing else uses port 7071.',
+      ],
+    },
   },
   {
     id: 'nginx',
@@ -109,6 +148,27 @@ export const PACKS: Pack[] = [
     defaultEndpoint: 'http://127.0.0.1/nginx_status',
     credentialFields: [],
     ...endpointSettings(httpUrl, 'stub_status URL'),
+    guide: {
+      summary: 'Expose nginx stub_status on loopback so the agent can read requests and connections.',
+      steps: [
+        {
+          text: 'Add a loopback-only status location to a server block (for example /etc/nginx/conf.d/pcp-status.conf).',
+          command:
+            'server {\n  listen 127.0.0.1:80;\n  location = /nginx_status {\n    stub_status;\n    allow 127.0.0.1;\n    deny all;\n  }\n}',
+        },
+        {
+          text: 'Check the configuration and reload nginx (no restart, no dropped connections).',
+          command: 'sudo nginx -t && sudo nginx -s reload',
+        },
+      ],
+      proof: 'nginx_requests.*',
+      proofLabel: 'nginx request counters',
+      troubleshooting: [
+        'curl -s http://127.0.0.1/nginx_status shows "Active connections".',
+        'The pack endpoint matches that URL.',
+        'nginx -V lists --with-http_stub_status_module.',
+      ],
+    },
   },
   {
     id: 'nodejs',
@@ -118,6 +178,31 @@ export const PACKS: Pack[] = [
     credentialFields: [],
     settings: z.object({}).strict() as z.ZodType<Record<string, unknown>>,
     settingsSchema: { type: 'object', additionalProperties: false, properties: {} },
+    guide: {
+      summary:
+        'Request rates, latency, and errors per route from the OpenTelemetry Node.js SDK, sent to this agent on loopback.',
+      steps: [
+        {
+          text: 'In the app directory, add the OpenTelemetry SDK and automatic instrumentation.',
+          command:
+            'npm install @opentelemetry/api @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-metrics-otlp-http',
+        },
+        {
+          text: 'Start the app with the SDK loaded and metrics sent to the agent (systemd Environment=, PM2 env, or your shell). Use your service name.',
+          command:
+            'export NODE_OPTIONS="--require @opentelemetry/auto-instrumentations-node/register"\nexport OTEL_SERVICE_NAME=my-api\nexport OTEL_METRICS_EXPORTER=otlp\nexport OTEL_TRACES_EXPORTER=none\nexport OTEL_LOGS_EXPORTER=none\nexport OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318',
+        },
+        { text: 'Restart the app, then send it a few requests.' },
+      ],
+      proof: 'http_server_(request_)?duration.*_count',
+      proofLabel: 'HTTP server request duration from the SDK',
+      troubleshooting: [
+        'The app runs on the same host as the agent (127.0.0.1:4318 is local).',
+        'NODE_OPTIONS reaches the app process: check /proc/<pid>/environ or the PM2/systemd environment.',
+        'The agent is 0.4.0 or later with the Node.js pack applied.',
+        'The app received HTTP requests since it restarted.',
+      ],
+    },
   },
 ];
 

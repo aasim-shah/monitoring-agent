@@ -30,6 +30,7 @@ export class PacksController {
         description: p.description,
         defaultEndpoint: p.defaultEndpoint,
         credentialFields: p.credentialFields,
+        ...(p.guide ? { guide: p.guide } : {}),
         settings: p.settingsSchema,
       })),
     };

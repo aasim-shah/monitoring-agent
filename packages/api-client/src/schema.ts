@@ -1480,6 +1480,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{id}/packs/{packId}/verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+                packId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Has the Level 2 proof metric arrived from this agent in the last 15 minutes?
+         * @description Read-only check for packs with a guide (nodejs, kafka, nginx). Requires `telemetry.query`.
+         */
+        get: operations["verifyPackGuide"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{id}/packs/{packId}/inspection": {
         parameters: {
             query?: never;
@@ -4229,6 +4253,18 @@ export interface components {
             settings: {
                 [key: string]: unknown;
             };
+            /** @description Level 2 guided setup — changes the customer makes; the platform never runs them (BR-11-04). */
+            guide?: {
+                summary: string;
+                steps: {
+                    text: string;
+                    command?: string;
+                }[];
+                /** @description Metric name pattern that proves the change works */
+                proof: string;
+                proofLabel: string;
+                troubleshooting: string[];
+            };
         };
         PackAssignment: {
             packId: string;
@@ -6603,6 +6639,40 @@ export interface operations {
                     "application/json": {
                         /** @enum {string} */
                         status: "removing";
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    verifyPackGuide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+                packId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        packId: string;
+                        /** @enum {string} */
+                        status: "active" | "not_found";
+                        series: number;
+                        proof: string;
+                        /** Format: date-time */
+                        checkedAt: string;
                     };
                 };
             };

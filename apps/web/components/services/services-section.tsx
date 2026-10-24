@@ -10,6 +10,7 @@ import { QueryState } from '@/lib/page-guard';
 import { sealCredentials } from '@/lib/seal';
 import { useApiQuery } from '@/lib/use-api-query';
 import type { EnablePackBody } from './enable-pack-dialog';
+import { GuidedSetup, type Guide } from './guided-setup';
 import { LiveBoostControl } from './live-boost';
 import { ServicesPanel, type Assignment, type CatalogPack } from './services-panel';
 
@@ -23,6 +24,7 @@ function ServiceCharts({
   range: chosen,
   boostedUntil,
   onBoost,
+  guide,
 }: {
   agentId: string;
   packId: string;
@@ -31,6 +33,7 @@ function ServiceCharts({
   /** Set while a live boost runs: the last 15 minutes, refreshed every 5 s. */
   boostedUntil: string | null;
   onBoost?: () => Promise<void>;
+  guide?: Guide;
 }) {
   const live = boostedUntil !== null && Date.parse(boostedUntil) > Date.now();
   const range: Range = live ? '15m' : chosen;
@@ -49,7 +52,22 @@ function ServiceCharts({
     <section className="space-y-2" aria-label={`${name} metrics`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{name}</h3>
-        {onBoost ? <LiveBoostControl name={name} until={boostedUntil} onStart={onBoost} /> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {guide ? (
+            <GuidedSetup
+              name={name}
+              guide={guide}
+              verify={async () =>
+                unwrap(
+                  await api.GET('/api/v1/agents/{id}/packs/{packId}/verification', {
+                    params: { path: { id: agentId, packId } },
+                  }),
+                ) as { status: 'active' | 'not_found'; series: number }
+              }
+            />
+          ) : null}
+          {onBoost ? <LiveBoostControl name={name} until={boostedUntil} onStart={onBoost} /> : null}
+        </div>
       </div>
       <QueryState query={metrics} label={`Loading ${name} metrics`}>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -167,6 +185,7 @@ export function ServicesSection({
           range={range}
           boostedUntil={(boosts.data ?? []).find((b) => b.packId === a.packId)?.expiresAt?.toString() ?? null}
           onBoost={a.status === 'applied' ? () => onBoost(a.packId) : undefined}
+          guide={cat.find((p) => p.id === a.packId)?.guide}
         />
       ))}
     </section>

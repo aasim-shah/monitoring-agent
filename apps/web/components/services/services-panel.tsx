@@ -12,6 +12,8 @@ export interface CatalogPack {
   description: string;
   defaultEndpoint: string | null;
   credentialFields: Array<{ name: string; label: string; secret: boolean; required: boolean }>;
+  /** Level 2 guided setup, for packs that have one (M10.5). */
+  guide?: import('./guided-setup').Guide;
 }
 
 export interface DetectedService {

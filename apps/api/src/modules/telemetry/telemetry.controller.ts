@@ -8,6 +8,7 @@ import { requireTenant } from '../../common/tenant.js';
 import { CLOCK, PRISMA } from '../../tokens.js';
 import { agentStatus } from '../agents/status.js';
 import { FLEET_QUERIES, HOST_QUERIES, RANGES, type RangeKey } from './host-metrics.js';
+import { packById } from '../packs/catalog.js';
 import { SERVICE_CHARTS } from './service-metrics.js';
 import { TelemetryQueryService } from './query.service.js';
 
@@ -71,6 +72,36 @@ export class TelemetryController {
       lastSampleAt: last ? new Date(last[0] * 1000).toISOString() : null,
       completeness: cpu.completeness,
       gaps: cpu.gaps,
+    };
+  }
+
+  /**
+   * Level 2 verification (WB-11 UC-11-04): has the guide's proof metric arrived from this agent in
+   * the last 15 minutes? Read-only; the platform never performs the change (BR-11-04).
+   */
+  @RequirePermission('telemetry.query')
+  @TenantScope({ param: 'id', resource: 'agent' })
+  @Get('agents/:id/packs/:packId/verification')
+  async verifyGuide(@Req() req: ApiRequest, @Param('id') agentId: string, @Param('packId') packId: string) {
+    const guide = packById(packId)?.guide;
+    if (!guide) throw notFound();
+    const ctx = requireTenant(req);
+    const agent = await withTenant(this.prisma, ctx, (tx) =>
+      tx.agent.findUnique({ where: { id: agentId }, select: { productId: true } }),
+    );
+    if (!agent) throw notFound();
+    const rows = await this.telemetry.instant(
+      ctx,
+      `count(last_over_time({__name__=~"${guide.proof}"}[15m]))`,
+      { productId: agent.productId, agentId },
+    );
+    const series = rows[0]?.value ?? 0;
+    return {
+      packId,
+      status: series > 0 ? 'active' : 'not_found',
+      series,
+      proof: guide.proofLabel,
+      checkedAt: this.now(),
     };
   }
 
