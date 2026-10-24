@@ -1091,6 +1091,60 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M4
+  /api/v1/connections/{id}/webhook-deliveries:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listWebhookDeliveries
+      tags: [connections]
+      summary: Latest 50 webhook deliveries and how each was handled
+      description: Latest 50 webhook deliveries and how each was handled. Requires `connection.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookDeliveryList'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M7
+  /api/v1/connections/{id}/change-events:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listChangeEvents
+      tags: [connections]
+      summary: Latest 50 change events (deployments, DNS, security, revocation)
+      description: Latest 50 change events (deployments, DNS, security, revocation). Requires `connection.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeEventList'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M7
+  /api/v1/connections/{id}/inventory:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listConnectionInventory
+      tags: [connections]
+      summary: Resources stored by the last discovery
+      description: Resources stored by the last discovery. Requires `connection.view`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionInventory'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M7
   /api/v1/environments/{environmentId}/agent-enrollments:
     parameters: [{ $ref: '#/components/parameters/environmentId' }]
     post:
@@ -2124,7 +2178,8 @@ paths:
           description: Accepted
           content:
             application/json:
-              schema: { type: object, properties: { accepted: { type: boolean }, changeEvents: { type: integer } } }
+              schema:
+                { type: object, properties: { accepted: { type: boolean }, changeEvents: { type: integer } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '413': { description: Body over 1 MB }
       x-implemented-in: M7
@@ -3309,13 +3364,23 @@ paths:
                 environmentId: { type: string, format: uuid }
                 enabled: { type: boolean }
                 approverRoles: { type: array, items: { type: string, enum: [owner, admin, operator] } }
-                requireApproval: { type: boolean, description: Ignored in production and for AI proposals, which always need approval. }
+                requireApproval:
+                  {
+                    type: boolean,
+                    description: Ignored in production and for AI proposals,
+                    which always need approval.,
+                  }
                 settings:
                   type: object
                   properties:
                     units: { type: array, items: { type: string } }
                     zones: { type: array, items: { type: string } }
-                    workflows: { type: array, items: { type: object, properties: { workflow: { type: string }, ref: { type: string } } } }
+                    workflows:
+                      {
+                        type: array,
+                        items:
+                          { type: object, properties: { workflow: { type: string }, ref: { type: string } } },
+                      }
       responses:
         '200': { $ref: '#/components/responses/Ok' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -3344,8 +3409,17 @@ paths:
               properties:
                 productId: { type: string, format: uuid }
                 environmentId: { type: string, format: uuid }
-                capability: { type: string, enum: [host.restart_service, cloudflare.purge_cache, github.workflow_dispatch] }
-                target: { type: object, additionalProperties: true, example: { agentId: 7b3c8f2a-1d4e-4c5b-9a6f-0e1d2c3b4a59 } }
+                capability:
+                  {
+                    type: string,
+                    enum: [host.restart_service, cloudflare.purge_cache, github.workflow_dispatch],
+                  }
+                target:
+                  {
+                    type: object,
+                    additionalProperties: true,
+                    example: { agentId: 7b3c8f2a-1d4e-4c5b-9a6f-0e1d2c3b4a59 },
+                  }
                 params: { type: object, additionalProperties: true, example: { unit: api.service } }
                 idempotencyKey: { type: string, minLength: 8 }
                 reason: { type: string }
@@ -3657,7 +3731,12 @@ components:
         approverRoles: { type: array, items: { type: string } }
         requireApproval: { type: boolean }
         settings: { type: object, additionalProperties: true }
-        available: { type: boolean, description: False until the capability's connection type exists (Cloudflare, GitHub). }
+        available:
+          {
+            type: boolean,
+            description: False until the capability's connection type exists (Cloudflare,
+            GitHub).,
+          }
     ActionExecution:
       type: object
       required: [id, location, adapter, adapterVersion, status, startedAt]
@@ -3675,7 +3754,8 @@ components:
         error: { type: string, nullable: true }
     ActionRequest:
       type: object
-      required: [id, productId, environmentId, capability, target, params, status, proposedByAi, expiresAt, createdAt]
+      required:
+        [id, productId, environmentId, capability, target, params, status, proposedByAi, expiresAt, createdAt]
       properties:
         id: { type: string, format: uuid }
         productId: { type: string, format: uuid }
@@ -3683,7 +3763,22 @@ components:
         capability: { type: string }
         target: { type: object, additionalProperties: true }
         params: { type: object, additionalProperties: true }
-        status: { type: string, enum: [proposed, rejected_policy, pending_approval, approved, executing, succeeded, failed, rejected, expired] }
+        status:
+          {
+            type: string,
+            enum:
+              [
+                proposed,
+                rejected_policy,
+                pending_approval,
+                approved,
+                executing,
+                succeeded,
+                failed,
+                rejected,
+                expired,
+              ],
+          }
         reason: { type: string, nullable: true }
         impact: { type: object, additionalProperties: true }
         proposedByAi: { type: boolean }
@@ -4546,6 +4641,53 @@ components:
               errorMessage: { type: [string, 'null'], description: Redacted before storage }
               items: { type: [integer, 'null'] }
               createdAt: { type: string, format: date-time }
+    WebhookDeliveryList:
+      type: object
+      required: [deliveries]
+      properties:
+        deliveries:
+          type: array
+          items:
+            type: object
+            required: [id, deliveryId, eventType, result, receivedAt]
+            properties:
+              id: { type: string, format: uuid }
+              deliveryId: { type: string }
+              eventType: { type: string }
+              result: { type: string, description: 'processed, ignored, or failed' }
+              detail: { type: [string, 'null'] }
+              receivedAt: { type: string, format: date-time }
+    ChangeEventList:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            type: object
+            required: [id, kind, title, externalId, occurredAt]
+            properties:
+              id: { type: string, format: uuid }
+              kind: { type: string }
+              title: { type: string }
+              url: { type: [string, 'null'] }
+              actor: { type: [string, 'null'] }
+              externalId: { type: string }
+              occurredAt: { type: string, format: date-time }
+    ConnectionInventory:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [externalId, resourceType, name, attributes]
+            properties:
+              externalId: { type: string }
+              resourceType: { type: string }
+              name: { type: string }
+              attributes: { type: object, additionalProperties: true }
     CreateAgentEnrollmentRequest:
       type: object
       properties:

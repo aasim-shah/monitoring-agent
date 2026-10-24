@@ -47,13 +47,17 @@ describe('product navigation (spec §21)', () => {
       label: 'Agents',
       href: '/orgs/o/products/p/agents',
     });
-    expect(items.find((i) => i.label === 'Integrations')).toEqual({ label: 'Integrations', milestone: 'M7' });
+    expect(items.find((i) => i.label === 'Integrations')).toEqual({
+      label: 'Integrations',
+      href: '/orgs/o/products/p/integrations',
+    });
     expect(items.find((i) => i.label === 'Infrastructure')).toEqual({
       label: 'Infrastructure',
       href: '/orgs/o/products/p/infrastructure',
     });
     expect(items.filter((i) => i.href).map((i) => i.label)).toEqual([
       'Health Overview',
+      'Integrations',
       'Agents',
       'Assets',
       'Infrastructure',

@@ -35,7 +35,11 @@ export function buildOrgNav(orgId: string, role: Role): NavItem[] {
 export function buildProductNav(orgId: string, productId: string, role: Role): NavItem[] {
   const items: Array<NavItem & { permission?: Permission }> = [
     { label: 'Health Overview', href: `/orgs/${orgId}/products/${productId}` },
-    { label: 'Integrations', milestone: 'M7' },
+    {
+      label: 'Integrations',
+      href: `/orgs/${orgId}/products/${productId}/integrations`,
+      permission: 'connection.view',
+    },
     { label: 'Agents', href: `/orgs/${orgId}/products/${productId}/agents`, permission: 'agent.view' },
     { label: 'Assets', href: `/orgs/${orgId}/products/${productId}/assets`, permission: 'asset.view' },
     {

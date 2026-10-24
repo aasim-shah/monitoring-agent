@@ -960,6 +960,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/connections/{id}/webhook-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Latest 50 webhook deliveries and how each was handled
+         * @description Latest 50 webhook deliveries and how each was handled. Requires `connection.view`.
+         */
+        get: operations["listWebhookDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/change-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Latest 50 change events (deployments, DNS, security, revocation)
+         * @description Latest 50 change events (deployments, DNS, security, revocation). Requires `connection.view`.
+         */
+        get: operations["listChangeEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Resources stored by the last discovery
+         * @description Resources stored by the last discovery. Requires `connection.view`.
+         */
+        get: operations["listConnectionInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/environments/{environmentId}/agent-enrollments": {
         parameters: {
             query?: never;
@@ -1960,7 +2029,7 @@ export interface paths {
         put?: never;
         /**
          * Provider webhook (signature + replay checks)
-         * @description Provider webhook (signature + replay checks).
+         * @description Verified with the connection's own secret (GitHub `X-Hub-Signature-256`, Cloudflare `cf-webhook-auth`). A bad signature, an unknown or disconnected connection, and a provider mismatch all answer the same 401. A repeated delivery ID answers 200 `{duplicate: true}`; payloads are not stored. Bodies over 1 MB answer 413.
          */
         post: operations["receiveWebhook"];
         delete?: never;
@@ -3789,6 +3858,42 @@ export interface components {
                 createdAt: string;
             }[];
         };
+        WebhookDeliveryList: {
+            deliveries: {
+                /** Format: uuid */
+                id: string;
+                deliveryId: string;
+                eventType: string;
+                /** @description processed, ignored, or failed */
+                result: string;
+                detail?: string | null;
+                /** Format: date-time */
+                receivedAt: string;
+            }[];
+        };
+        ChangeEventList: {
+            events: {
+                /** Format: uuid */
+                id: string;
+                kind: string;
+                title: string;
+                url?: string | null;
+                actor?: string | null;
+                externalId: string;
+                /** Format: date-time */
+                occurredAt: string;
+            }[];
+        };
+        ConnectionInventory: {
+            items: {
+                externalId: string;
+                resourceType: string;
+                name: string;
+                attributes: {
+                    [key: string]: unknown;
+                };
+            }[];
+        };
         CreateAgentEnrollmentRequest: {
             /**
              * @default host
@@ -5427,6 +5532,81 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listWebhookDeliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDeliveryList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listChangeEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeEventList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listConnectionInventory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionInventory"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listAgentEnrollments: {
         parameters: {
             query?: never;
@@ -6679,8 +6859,37 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Duplicate delivery (no-op) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        duplicate?: boolean;
+                    };
+                };
+            };
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        accepted?: boolean;
+                        changeEvents?: number;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
+            /** @description Body over 1 MB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listProductAssets: {

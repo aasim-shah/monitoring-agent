@@ -214,7 +214,9 @@ export class ConnectorRuntime {
           checkedAt: this.now(),
           ok: !outcome.reason,
           reason: outcome.reason ?? null,
-          detail: outcome.message ?? null,
+          detail: outcome.missingPermissions
+            ? JSON.stringify({ missingPermissions: outcome.missingPermissions })
+            : (outcome.message ?? null),
         },
       });
       // A connected cloud connection with a health check gets a schedule (the worker's reconciler picks it up).

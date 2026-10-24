@@ -355,6 +355,29 @@ export class ConnectionsService {
     );
   }
 
+  webhookDeliveries(ctx: TenantContext, id: string) {
+    return withTenant(this.prisma, ctx, (tx) =>
+      tx.webhookDelivery.findMany({ where: { connectionId: id }, orderBy: { receivedAt: 'desc' }, take: 50 }),
+    );
+  }
+
+  changeEvents(ctx: TenantContext, id: string) {
+    return withTenant(this.prisma, ctx, (tx) =>
+      tx.changeEvent.findMany({ where: { connectionId: id }, orderBy: { occurredAt: 'desc' }, take: 50 }),
+    );
+  }
+
+  /** What the last discovery stored, for scoping without calling the provider again. */
+  inventory(ctx: TenantContext, id: string) {
+    return withTenant(this.prisma, ctx, (tx) =>
+      tx.connectionInventoryItem.findMany({
+        where: { connectionId: id },
+        orderBy: [{ resourceType: 'asc' }, { name: 'asc' }],
+        take: 5000,
+      }),
+    );
+  }
+
   /** Crypto-shreds the credentials and marks the connection disconnected (terminal). */
   async remove(ctx: TenantContext, id: string): Promise<ConnectionStatus> {
     return withTenant(this.prisma, ctx, async (tx) => {

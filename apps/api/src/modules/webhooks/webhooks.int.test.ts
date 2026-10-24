@@ -152,4 +152,36 @@ describe('webhook ingestion (WB-06 UC-06-10, BR-06-05)', () => {
     const big = JSON.stringify({ pad: 'x'.repeat(1_100_000) });
     expect((await post(id, big, 'whsec-4', randomUUID())).statusCode).toBe(413);
   });
+  it('lists webhook deliveries, change events, and stored inventory to the connection viewer only', async () => {
+    const owner = await ownerWithOrg(t);
+    const other = await ownerWithOrg(t);
+    const id = await connection(owner, 'whsec-list');
+    const body = JSON.stringify({ id: 'dep-7', kind: 'deployment', title: 'Deployed v7' });
+    expect((await post(id, body, 'whsec-list', 'deliv-7')).statusCode).toBe(202);
+    await sql(
+      `INSERT INTO connection_inventory (organization_id, connection_id, resource_type, external_id, name, attributes)
+       VALUES ($1, $2, 'mock_resource', 'mock-1', 'Mock resource 1', '{"plan":"free"}')`,
+      [owner.orgId, id],
+    );
+    const get = (cookie: string, path: string) =>
+      t.app.inject({ method: 'GET', url: `/api/v1/connections/${id}/${path}`, headers: { cookie } });
+    const deliveries = await get(owner.cookie, 'webhook-deliveries');
+    expect(deliveries.statusCode, deliveries.body).toBe(200);
+    expect(deliveries.json().deliveries).toEqual([
+      expect.objectContaining({ deliveryId: 'deliv-7', eventType: 'deployment_status', result: 'processed' }),
+    ]);
+    expect((await get(owner.cookie, 'change-events')).json().events).toEqual([
+      expect.objectContaining({ kind: 'deployment', title: 'Deployed v7', externalId: 'dep-7' }),
+    ]);
+    expect((await get(owner.cookie, 'inventory')).json().items).toEqual([
+      {
+        externalId: 'mock-1',
+        resourceType: 'mock_resource',
+        name: 'Mock resource 1',
+        attributes: { plan: 'free' },
+      },
+    ]);
+    for (const path of ['webhook-deliveries', 'change-events', 'inventory'])
+      expect((await get(other.cookie, path)).statusCode).toBe(404);
+  });
 });

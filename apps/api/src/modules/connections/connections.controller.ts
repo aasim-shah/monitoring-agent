@@ -184,6 +184,56 @@ export class ConnectionsController {
     };
   }
 
+  @RequirePermission('connection.view')
+  @TenantScope(CONNECTION)
+  @Get('connections/:id/webhook-deliveries')
+  async webhookDeliveries(@Req() req: ApiRequest, @Param('id') id: string) {
+    const rows = await this.connections.webhookDeliveries(requireTenant(req), id);
+    return {
+      deliveries: rows.map((d) => ({
+        id: d.id,
+        deliveryId: d.deliveryId,
+        eventType: d.eventType,
+        result: d.result,
+        detail: d.detail,
+        receivedAt: d.receivedAt,
+      })),
+    };
+  }
+
+  @RequirePermission('connection.view')
+  @TenantScope(CONNECTION)
+  @Get('connections/:id/change-events')
+  async changeEvents(@Req() req: ApiRequest, @Param('id') id: string) {
+    const rows = await this.connections.changeEvents(requireTenant(req), id);
+    return {
+      events: rows.map((e) => ({
+        id: e.id,
+        kind: e.kind,
+        title: e.title,
+        url: e.url,
+        actor: e.actor,
+        externalId: e.externalId,
+        occurredAt: e.occurredAt,
+      })),
+    };
+  }
+
+  @RequirePermission('connection.view')
+  @TenantScope(CONNECTION)
+  @Get('connections/:id/inventory')
+  async inventory(@Req() req: ApiRequest, @Param('id') id: string) {
+    const rows = await this.connections.inventory(requireTenant(req), id);
+    return {
+      items: rows.map((i) => ({
+        externalId: i.externalId,
+        resourceType: i.resourceType,
+        name: i.name,
+        attributes: i.attributes,
+      })),
+    };
+  }
+
   @RequirePermission('connection.configure')
   @TenantScope(CONNECTION)
   @Delete('connections/:id')

@@ -125,7 +125,14 @@ describe('ConnectorRuntime.validate', () => {
     );
     expect(row.status).toBe(status);
     expect(row.statusReason).toBe(reason);
-    if (behavior === 'forbidden') expect(result.missingPermissions).toEqual(['mock:read']);
+    if (behavior === 'forbidden') {
+      expect(result.missingPermissions).toEqual(['mock:read']);
+      // Stored so the connection page can list what the token lacks.
+      const health = await withTenant(prisma, ctx(orgA), (tx) =>
+        tx.connectionHealth.findFirstOrThrow({ where: { connectionId: id } }),
+      );
+      expect(JSON.parse(health.detail!)).toEqual({ missingPermissions: ['mock:read'] });
+    }
   });
 
   it('keeps the status but records rate limiting', async () => {
