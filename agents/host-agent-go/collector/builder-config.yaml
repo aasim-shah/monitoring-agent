@@ -17,12 +17,16 @@ receivers:
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver v0.162.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.162.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver v0.162.0
+  # Level 2 (M10.5): apps instrumented with the OpenTelemetry SDK send OTLP to the agent on loopback.
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.162.0
 
 processors:
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.162.0
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.162.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.162.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor v0.162.0
+  # Drops high-cardinality labels and normalizes paths before export (BR-11-06).
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor v0.162.0
 
 connectors:
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/connector/countconnector v0.162.0
