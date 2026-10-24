@@ -72,7 +72,17 @@ describe('pack catalog', () => {
     const res = await user(owner.cookie, 'GET', '/api/v1/monitoring-packs');
     expect(res.statusCode, res.body).toBe(200);
     const ids = (res.json().packs as Array<{ id: string }>).map((p) => p.id);
-    expect(ids).toEqual(['redis', 'postgresql', 'mysql', 'mongodb', 'kafka', 'nginx', 'nodejs']);
+    expect(ids).toEqual([
+      'redis',
+      'postgresql',
+      'mysql',
+      'mongodb',
+      'kafka',
+      'redis-exporter',
+      'kafka-exporter',
+      'nginx',
+      'nodejs',
+    ]);
     const pg = res.json().packs.find((p: { id: string }) => p.id === 'postgresql');
     expect(pg).toMatchObject({ name: 'PostgreSQL', defaultEndpoint: '127.0.0.1:5432' });
     expect(pg.credentialFields.map((f: { name: string }) => f.name)).toEqual(['username', 'password']);

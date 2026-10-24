@@ -1,4 +1,12 @@
-export type Capability = 'host.restart_service' | 'cloudflare.purge_cache' | 'github.workflow_dispatch';
+export type Capability =
+  | 'host.restart_service'
+  | 'host.install_exporter'
+  | 'host.remove_exporter'
+  | 'cloudflare.purge_cache'
+  | 'github.workflow_dispatch';
+
+/** Level 1 managed exporters pcp-helper can install (M18.3); versions and checksums live in the helper. */
+export const EXPORTERS = ['redis_exporter', 'kafka_exporter'] as const;
 
 type Bag = Record<string, unknown>;
 
@@ -47,6 +55,8 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
     targetKey: (target, params) => `host.restart_service:${str(target.agentId)}:${str(params.unit)}`,
     requiredApprovals: () => 1,
   },
+  'host.install_exporter': exporterCapability('Install managed exporter'),
+  'host.remove_exporter': exporterCapability('Remove managed exporter'),
   'cloudflare.purge_cache': {
     label: 'Purge Cloudflare cache',
     location: 'platform',
@@ -88,3 +98,20 @@ export const CAPABILITIES: Record<Capability, CapabilityDef> = {
 };
 
 export const isCapability = (c: string): c is Capability => c in CAPABILITIES;
+
+/** Install and remove share the target key, so they never run at once on one host. */
+function exporterCapability(label: string): CapabilityDef {
+  return {
+    label,
+    location: 'agent',
+    validate(target, params) {
+      const issues: string[] = [];
+      if (!UUID.test(str(target.agentId))) issues.push('target.agentId must be an agent ID');
+      if (!(EXPORTERS as readonly string[]).includes(str(params.exporter)))
+        issues.push(`params.exporter must be one of ${EXPORTERS.join(', ')}`);
+      return issues;
+    },
+    targetKey: (target, params) => `host.exporter:${str(target.agentId)}:${str(params.exporter)}`,
+    requiredApprovals: () => 1,
+  };
+}

@@ -18,6 +18,11 @@ const policyBody = z
     settings: z
       .object({
         units: z.array(z.string().max(128)).max(50).optional(),
+        // Level 1 exporters this policy allows (M18.3).
+        exporters: z
+          .array(z.enum(['redis_exporter', 'kafka_exporter']))
+          .max(2)
+          .optional(),
         zones: z.array(z.string().max(64)).max(20).optional(),
         workflows: z
           .array(z.object({ workflow: z.string().max(128), ref: z.string().max(100) }).strict())

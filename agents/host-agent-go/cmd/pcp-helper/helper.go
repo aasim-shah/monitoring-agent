@@ -43,6 +43,8 @@ type Helper struct {
 	Wait   time.Duration
 	Settle time.Duration
 	Sleep  func(time.Duration)
+	// Installer handles Level 1 exporters (M18.3), only on hosts that opted in in helper.yaml.
+	Installer *Installer
 }
 
 func failed(format string, args ...any) Response {
@@ -61,12 +63,16 @@ func (h *Helper) Handle(raw []byte) Response {
 	if task.Type != "action" {
 		return failed("only action tasks are accepted")
 	}
-	if c, _ := task.Payload["capability"].(string); c != "service_restart" {
-		return failed("capability %s is not supported by this helper", c)
+	capability, _ := task.Payload["capability"].(string)
+	if capability != "service_restart" && capability != "pack_install" && capability != "pack_remove" {
+		return failed("capability %s is not supported by this helper", capability)
 	}
 	expires, err := time.Parse(time.RFC3339Nano, task.ExpiresAt)
 	if err != nil || !h.Now().Before(expires) {
 		return failed("task expired")
+	}
+	if capability != "service_restart" {
+		return h.exporter(task, capability)
 	}
 	unit, _ := task.Payload["unit"].(string)
 	if !unitName.MatchString(unit) {
@@ -117,4 +123,33 @@ func (h *Helper) waitActive(unit string) string {
 		h.Sleep(step)
 	}
 	return state
+}
+
+// exporter installs or removes a Level 1 exporter (M18.3) on a host whose owner set
+// capabilities.pack_install.enabled: true in helper.yaml (install.sh --enable-pack-installer).
+func (h *Helper) exporter(task proto.AgentTask, capability string) Response {
+	data, _ := os.ReadFile(h.AllowlistPath)
+	if !packInstallEnabled(data) || h.Installer == nil {
+		return failed("pack installation is not enabled on this host (capabilities.pack_install.enabled in %s, or reinstall with --enable-pack-installer)", h.AllowlistPath)
+	}
+	fresh, err := h.Used.Claim(task.Id, h.Now())
+	if err != nil {
+		return failed("cannot record the task: %v", err)
+	}
+	if !fresh {
+		return failed("task was already used")
+	}
+	name, _ := task.Payload["exporter"].(string)
+	var result map[string]any
+	if capability == "pack_install" {
+		url, _ := task.Payload["downloadUrl"].(string)
+		target, _ := task.Payload["target"].(string)
+		result, err = h.Installer.Install(name, url, target)
+	} else {
+		result, err = h.Installer.Remove(name)
+	}
+	if err != nil {
+		return failed("%v", err)
+	}
+	return Response{Status: "succeeded", Result: result}
 }

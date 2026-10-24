@@ -5,6 +5,8 @@ const parse = (v: string) => (/^\d+(\.\d+){0,2}$/.test(v) ? v.split('.').map(Num
 
 /** Actions through pcp-helper (action tasks) arrived with agent 0.3.0 (M16). */
 export const MINIMUM_ACTION_AGENT_VERSION = '0.3.0';
+/** Level 1 exporters (M18.3) need the 0.5.0 helper with pack_install. */
+export const MINIMUM_EXPORTER_AGENT_VERSION = '0.5.0';
 
 export function supportsLiveTail(version: string): boolean {
   return atLeast(version, MINIMUM_TAIL_AGENT_VERSION);

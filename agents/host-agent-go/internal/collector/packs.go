@@ -106,6 +106,13 @@ var level2Receivers = map[string]level2{
 	},
 }
 
+// exporterPacks scrape a Level 1 managed exporter on loopback (M18.3, spec §8.9) and keep its
+// Prometheus metric names.
+var exporterPacks = map[string]string{
+	"redis-exporter": `^redis_`,
+	"kafka-exporter": `^kafka_(brokers|topic_|consumergroup_)`,
+}
+
 func addPacks(receivers map[string]any, packs []PackConfig, boosted map[string]bool) ([]string, []string, error) {
 	ids, prefixes, _, err := addPacksKeep(receivers, packs, boosted)
 	return ids, prefixes, err
@@ -115,6 +122,25 @@ func addPacksKeep(receivers map[string]any, packs []PackConfig, boosted map[stri
 	var ids, keep []string
 	prefixes := []string{"system", "process"}
 	for _, p := range packs {
+		if keepPattern, ok := exporterPacks[p.ID]; ok {
+			endpoint, _ := p.Settings["endpoint"].(string)
+			if endpoint == "" {
+				return nil, nil, nil, fmt.Errorf("pack %s: endpoint is required", p.ID)
+			}
+			interval := packInterval
+			if boosted[p.ID] {
+				interval = BoostInterval
+			}
+			name := "prometheus/" + p.ID
+			receivers[name] = map[string]any{"config": map[string]any{"scrape_configs": []any{map[string]any{
+				"job_name":        p.ID,
+				"scrape_interval": interval,
+				"static_configs":  []any{map[string]any{"targets": []string{endpoint}}},
+			}}}}
+			ids = append(ids, name)
+			keep = append(keep, keepPattern)
+			continue
+		}
 		r, ok := packReceivers[p.ID]
 		if !ok {
 			return nil, nil, nil, fmt.Errorf("unknown pack %q", p.ID)

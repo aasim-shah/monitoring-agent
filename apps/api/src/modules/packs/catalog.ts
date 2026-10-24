@@ -141,6 +141,26 @@ export const PACKS: Pack[] = [
       ],
     },
   },
+  // Level 1 managed exporters (M18.3, spec §8.9): installed by pcp-helper after an approved action
+  // (host.install_exporter), which then enables this pack; the agent scrapes them on loopback.
+  {
+    id: 'redis-exporter',
+    name: 'Redis (managed exporter)',
+    description:
+      'redis_exporter on 127.0.0.1:9121: keys per database, slow log, evictions. Installed after approval.',
+    defaultEndpoint: '127.0.0.1:9121',
+    credentialFields: [],
+    ...endpointSettings(hostPort, 'host:port'),
+  },
+  {
+    id: 'kafka-exporter',
+    name: 'Kafka (managed exporter)',
+    description:
+      'kafka_exporter on 127.0.0.1:9308: consumer-group lag, partitions, brokers. Installed after approval.',
+    defaultEndpoint: '127.0.0.1:9308',
+    credentialFields: [],
+    ...endpointSettings(hostPort, 'host:port'),
+  },
   {
     id: 'nginx',
     name: 'nginx',

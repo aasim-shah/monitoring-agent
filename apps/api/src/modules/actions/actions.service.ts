@@ -16,11 +16,16 @@ import type { TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 import { ApiException, notFound } from '../../common/errors.js';
 import type { AgentIdentity } from '../../common/request.js';
-import { CLOCK, PRISMA } from '../../tokens.js';
+import { APP_CONFIG, CLOCK, PRISMA } from '../../tokens.js';
 import { TasksService, type TaskResultBody } from '../agents/tasks.service.js';
 import { AuditService } from '../auditing/audit.service.js';
 import { CONNECTOR_RUNTIME } from '../connections/registry.provider.js';
-import { atLeast, MINIMUM_ACTION_AGENT_VERSION } from '../logs/agent-version.js';
+import {
+  atLeast,
+  MINIMUM_ACTION_AGENT_VERSION,
+  MINIMUM_EXPORTER_AGENT_VERSION,
+} from '../logs/agent-version.js';
+import type { AppConfig } from '../../config.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -95,6 +100,12 @@ const executionView = (e: Prisma.ActionExecutionGetPayload<object>) => ({
  * a signed, short-lived task → verification → audit. Nothing runs without an enabled policy
  * (BR-16-01); the AI only proposes (BR-16-02); one action per target at a time (BR-16-06).
  */
+/** The pack whose service each managed exporter reads (M18.3). */
+export const EXPORTER_BASE_PACK: Record<string, string> = {
+  redis_exporter: 'redis',
+  kafka_exporter: 'kafka',
+};
+
 @Injectable()
 export class ActionsService implements OnModuleInit {
   private readonly logger = new Logger('Actions');
@@ -105,6 +116,7 @@ export class ActionsService implements OnModuleInit {
     private readonly tasks: TasksService,
     private readonly audit: AuditService,
     @Inject(CONNECTOR_RUNTIME) private readonly runtime: ConnectorRuntime,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   onModuleInit() {
@@ -328,12 +340,36 @@ export class ActionsService implements OnModuleInit {
     if (!agent || agent.productId !== input.productId || agent.environmentId !== environmentId)
       throw new ApiException(400, 'invalid_target', 'The host is not part of this product environment');
     if (agent.status === 'revoked') throw new ApiException(409, 'agent_revoked', 'This agent is revoked');
-    if (!atLeast(agent.agentVersion, MINIMUM_ACTION_AGENT_VERSION))
+    const exporter = capability === 'host.install_exporter' || capability === 'host.remove_exporter';
+    const minimum = exporter ? MINIMUM_EXPORTER_AGENT_VERSION : MINIMUM_ACTION_AGENT_VERSION;
+    if (!atLeast(agent.agentVersion, minimum))
       throw new ApiException(
         409,
         'agent_upgrade_required',
-        `Actions need agent ${MINIMUM_ACTION_AGENT_VERSION} or later with pcp-helper; ${agent.hostname} runs ${agent.agentVersion}`,
+        `${exporter ? 'Managed exporters' : 'Actions'} need agent ${minimum} or later with pcp-helper; ${agent.hostname} runs ${agent.agentVersion}`,
       );
+    if (exporter) {
+      const name = String(input.params.exporter ?? '');
+      if (capability === 'host.install_exporter') {
+        const base = await tx.agentPackAssignment.findFirst({
+          where: { agentId: agent.id, packId: EXPORTER_BASE_PACK[name] ?? '', status: 'applied' },
+        });
+        if (!base)
+          throw new ApiException(
+            409,
+            'pack_not_enabled',
+            `${name} reads the ${EXPORTER_BASE_PACK[name]} pack's service; enable that pack on ${agent.hostname} first`,
+          );
+      }
+      return {
+        label: agent.hostname,
+        action:
+          capability === 'host.install_exporter'
+            ? `Installing ${name} on ${agent.hostname} (Level 1, 127.0.0.1 only)`
+            : `Removing ${name} from ${agent.hostname}`,
+        agentId: agent.id,
+      };
+    }
     return {
       label: agent.hostname,
       action: `Restarting ${String(input.params.unit ?? '')} on ${agent.hostname}`,
@@ -560,11 +596,12 @@ export class ActionsService implements OnModuleInit {
     const target = r.target as { agentId: string };
     const unit = String((r.params as { unit?: string }).unit);
     try {
+      const { payload, scope } = await this.helperPayload(ctx, r, target.agentId, unit);
       // A new task per approval; tasks are never reused (BR-16-04, WB-16 §9).
       const task = await this.tasks.create(ctx, target.agentId, {
         type: 'action',
-        payload: { capability: 'service_restart', unit },
-        resourceScope: { agentId: target.agentId, unit },
+        payload,
+        resourceScope: scope,
         ttlSeconds: TASK_TTL_SECONDS,
         maxRuntimeSeconds: TASK_RUNTIME_SECONDS,
         maxResponseBytes: 4096,
@@ -583,6 +620,36 @@ export class ActionsService implements OnModuleInit {
       });
       return (await withTenant(this.prisma, ctx, (tx) => tx.actionRequest.findUnique({ where: { id } })))!;
     }
+  }
+
+  /**
+   * What pcp-helper runs: a service restart, or a Level 1 exporter install or removal (M18.3).
+   * The exporter reads the base pack's service at its configured loopback endpoint.
+   */
+  private async helperPayload(
+    ctx: TenantContext,
+    r: ActionRequest,
+    agentId: string,
+    unit: string,
+  ): Promise<{ payload: Record<string, unknown>; scope: Record<string, string> }> {
+    if (r.capability === 'host.restart_service')
+      return { payload: { capability: 'service_restart', unit }, scope: { agentId, unit } };
+    const exporter = String((r.params as { exporter?: string }).exporter);
+    if (r.capability === 'host.remove_exporter')
+      return { payload: { capability: 'pack_remove', exporter }, scope: { agentId, exporter } };
+    const base = await withTenant(this.prisma, ctx, (tx) =>
+      tx.agentPackAssignment.findFirst({ where: { agentId, packId: EXPORTER_BASE_PACK[exporter] ?? '' } }),
+    );
+    const endpoint = String((base?.settings as { endpoint?: string } | null)?.endpoint ?? '');
+    return {
+      payload: {
+        capability: 'pack_install',
+        exporter,
+        downloadUrl: `${this.config.appOrigin}/downloads`,
+        target: endpoint,
+      },
+      scope: { agentId, exporter },
+    };
   }
 
   /** Cloudflare purge or GitHub dispatch through the connection's connector (M7). */

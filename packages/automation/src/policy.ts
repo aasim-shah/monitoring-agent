@@ -4,9 +4,10 @@ export interface PolicyLike {
   enabled: boolean;
   approverRoles: string[];
   requireApproval: boolean;
-  /** Allowlists: units (host), zones (Cloudflare), workflows with refs (GitHub). */
+  /** Allowlists: units (host), exporters (Level 1), zones (Cloudflare), workflows with refs (GitHub). */
   settings: {
     units?: string[];
+    exporters?: string[];
     zones?: string[];
     workflows?: Array<{ workflow: string; ref: string }>;
   };
@@ -32,6 +33,10 @@ function allowlisted(policy: PolicyLike, p: ProposalLike): string | null {
   if (p.capability === 'host.restart_service') {
     const unit = String(p.params.unit);
     return (s.units ?? []).includes(unit) ? null : `${unit} is not in the policy allowlist`;
+  }
+  if (p.capability === 'host.install_exporter' || p.capability === 'host.remove_exporter') {
+    const exporter = String(p.params.exporter);
+    return (s.exporters ?? []).includes(exporter) ? null : `${exporter} is not in the policy allowlist`;
   }
   if (p.capability === 'cloudflare.purge_cache') {
     const zone = String(p.target.zoneId);

@@ -3,6 +3,7 @@ export {
   isCapability,
   UNIT,
   MAX_PURGE_URLS,
+  EXPORTERS,
   type Capability,
   type CapabilityDef,
 } from './capabilities.js';

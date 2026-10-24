@@ -55,3 +55,32 @@ func parseAllowlist(data []byte) ([]string, error) {
 func unquote(s string) string {
 	return strings.Trim(s, `"'`)
 }
+
+// packInstallEnabled reads capabilities.pack_install.enabled from helper.yaml; anything but
+// `enabled: true` under pack_install is off (BR-05-08).
+func packInstallEnabled(data []byte) bool {
+	inPack := false
+	packIndent := -1
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	for sc.Scan() {
+		line := sc.Text()
+		if i := strings.Index(line, "#"); i >= 0 {
+			line = line[:i]
+		}
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		indent := len(line) - len(strings.TrimLeft(line, " "))
+		text := strings.TrimSpace(line)
+		if inPack && indent <= packIndent {
+			inPack = false
+		}
+		switch {
+		case text == "pack_install:":
+			inPack, packIndent = true, indent
+		case inPack && strings.HasPrefix(text, "enabled:"):
+			return strings.TrimSpace(strings.TrimPrefix(text, "enabled:")) == "true"
+		}
+	}
+	return false
+}

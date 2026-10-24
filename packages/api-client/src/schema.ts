@@ -9225,6 +9225,7 @@ export interface operations {
                     requireApproval?: boolean;
                     settings?: {
                         units?: string[];
+                        exporters?: ("redis_exporter" | "kafka_exporter")[];
                         zones?: string[];
                         workflows?: {
                             workflow?: string;
@@ -9256,7 +9257,7 @@ export interface operations {
                     /** Format: uuid */
                     environmentId: string;
                     /** @enum {string} */
-                    capability: "host.restart_service" | "cloudflare.purge_cache" | "github.workflow_dispatch";
+                    capability: "host.restart_service" | "host.install_exporter" | "host.remove_exporter" | "cloudflare.purge_cache" | "github.workflow_dispatch";
                     /**
                      * @example {
                      *       "agentId": "7b3c8f2a-1d4e-4c5b-9a6f-0e1d2c3b4a59"

@@ -1,10 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import type { Prisma, PrismaClient } from '@pcp/database';
 import type { TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 import { ApiException, notFound, parseBody } from '../../common/errors.js';
 import type { AgentIdentity } from '../../common/request.js';
 import { CLOCK, PRISMA } from '../../tokens.js';
+import { TasksService } from '../agents/tasks.service.js';
 import { AuditService } from '../auditing/audit.service.js';
 import { packById } from './catalog.js';
 import type { configAckBody, enablePackBody } from './schemas.js';
@@ -35,13 +36,37 @@ interface InventoryService {
 }
 
 /** Monitoring pack assignments and the agent's configuration channel (WB-11, D24). */
+/** The scrape pack each managed exporter feeds, and where the exporter listens (M18.3). */
+const EXPORTER_PACKS: Record<string, { packId: string; endpoint: string }> = {
+  redis_exporter: { packId: 'redis-exporter', endpoint: '127.0.0.1:9121' },
+  kafka_exporter: { packId: 'kafka-exporter', endpoint: '127.0.0.1:9308' },
+};
+
 @Injectable()
-export class PacksService {
+export class PacksService implements OnModuleInit {
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     @Inject(CLOCK) private readonly now: () => Date,
     private readonly audit: AuditService,
+    private readonly tasks: TasksService,
   ) {}
+
+  /** After pcp-helper installs or removes a Level 1 exporter, start or stop scraping it. */
+  onModuleInit() {
+    this.tasks.onResult(async (ctx, _agent, task, body) => {
+      const capability = task.payload.capability;
+      if (task.type !== 'action' || body.status !== 'succeeded') return;
+      if (capability !== 'pack_install' && capability !== 'pack_remove') return;
+      const target = EXPORTER_PACKS[String(task.payload.exporter)];
+      if (!target) return;
+      const agentId = (await withTenant(this.prisma, ctx, (tx) =>
+        tx.agentTask.findUnique({ where: { id: task.id }, select: { agentId: true } }),
+      ))!.agentId;
+      if (capability === 'pack_install')
+        await this.enable(ctx, agentId, { packId: target.packId, settings: { endpoint: target.endpoint } });
+      else await this.disable(ctx, agentId, target.packId).catch(() => undefined);
+    });
+  }
 
   /** Bumps the agent's policy version; the row lock serializes concurrent changes to one agent. */
   private async bump(tx: Prisma.TransactionClient, agentId: string): Promise<number> {

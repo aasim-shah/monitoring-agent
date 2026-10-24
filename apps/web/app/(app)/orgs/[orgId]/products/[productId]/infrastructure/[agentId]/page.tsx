@@ -132,6 +132,11 @@ export default function HostMetricsPage() {
           canManage={roleCan(role, 'pack.manage')}
           canInspect={roleCan(role, 'data.inspect')}
           canConfigureInspection={roleCan(role, 'data.inspect.configure')}
+          actionScope={
+            roleCan(role, 'action.propose')
+              ? { productId, environmentId: agent.data.environmentId }
+              : undefined
+          }
           // Pack series are not rolled up; service charts stop at 7 days.
           range={range === '30d' || range === '90d' ? '7d' : range}
         />

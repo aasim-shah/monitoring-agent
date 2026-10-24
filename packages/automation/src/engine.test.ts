@@ -63,6 +63,34 @@ describe('capabilities (BR-16-09)', () => {
   });
 });
 
+describe('Level 1 exporters (M18.3, spec §8.9)', () => {
+  const install = (exporter: unknown) => ({
+    capability: 'host.install_exporter' as const,
+    target: { agentId: AGENT },
+    params: { exporter },
+    proposedByAi: false,
+  });
+  it('installs and removes only the catalog exporters, one per host', () => {
+    for (const cap of ['host.install_exporter', 'host.remove_exporter'] as const) {
+      expect(CAPABILITIES[cap].location).toBe('agent');
+      expect(CAPABILITIES[cap].validate({ agentId: AGENT }, { exporter: 'redis_exporter' })).toEqual([]);
+      expect(CAPABILITIES[cap].validate({ agentId: AGENT }, { exporter: 'node_exporter' })).not.toEqual([]);
+      expect(CAPABILITIES[cap].validate({ agentId: 'x' }, { exporter: 'kafka_exporter' })).not.toEqual([]);
+    }
+    expect(
+      CAPABILITIES['host.install_exporter'].targetKey({ agentId: AGENT }, { exporter: 'redis_exporter' }),
+    ).toBe(`host.exporter:${AGENT}:redis_exporter`);
+  });
+  it('needs the exporter in the policy allowlist', () => {
+    const p = policy({ settings: { exporters: ['redis_exporter'] } });
+    expect(evaluatePolicy(p, install('redis_exporter'), prod).decision).toBe('pending_approval');
+    expect(evaluatePolicy(p, install('kafka_exporter'), prod)).toEqual({
+      decision: 'rejected_policy',
+      reason: 'kafka_exporter is not in the policy allowlist',
+    });
+  });
+});
+
 describe('evaluatePolicy (BR-16-01/02)', () => {
   it('TC-16-01: no policy, or a disabled one, rejects', () => {
     expect(evaluatePolicy(null, restart(), prod)).toEqual({

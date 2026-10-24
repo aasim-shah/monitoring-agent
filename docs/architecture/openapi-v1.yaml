@@ -3872,6 +3872,8 @@ paths:
                   type: object
                   properties:
                     units: { type: array, items: { type: string } }
+                    exporters:
+                      { type: array, items: { type: string, enum: [redis_exporter, kafka_exporter] } }
                     zones: { type: array, items: { type: string } }
                     workflows:
                       {
@@ -3910,7 +3912,14 @@ paths:
                 capability:
                   {
                     type: string,
-                    enum: [host.restart_service, cloudflare.purge_cache, github.workflow_dispatch],
+                    enum:
+                      [
+                        host.restart_service,
+                        host.install_exporter,
+                        host.remove_exporter,
+                        cloudflare.purge_cache,
+                        github.workflow_dispatch,
+                      ],
                   }
                 target:
                   {

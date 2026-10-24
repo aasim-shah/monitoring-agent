@@ -12,7 +12,14 @@ import { useApiQuery } from '@/lib/use-api-query';
 import type { EnablePackBody } from './enable-pack-dialog';
 import { GuidedSetup, type Guide } from './guided-setup';
 import { InspectionPanel, type InspectionApi } from './inspection-panel';
+import { ManagedExporterButton } from './managed-exporter';
 import { RetainLogsToggle } from './retain-logs-toggle';
+
+/** Packs a Level 1 exporter can deepen (M18.3), and the scrape pack it feeds. */
+const EXPORTERS: Record<string, { exporter: 'redis_exporter' | 'kafka_exporter'; packId: string }> = {
+  redis: { exporter: 'redis_exporter', packId: 'redis-exporter' },
+  kafka: { exporter: 'kafka_exporter', packId: 'kafka-exporter' },
+};
 
 /** Packs with log files the agent can ship (the M11 log sources). */
 const PACKS_WITH_LOGS = new Set(['redis', 'postgresql', 'mysql', 'mongodb', 'kafka', 'nginx']);
@@ -31,6 +38,7 @@ function ServiceCharts({
   onBoost,
   guide,
   retainLogs,
+  exporter,
 }: {
   agentId: string;
   packId: string;
@@ -38,6 +46,10 @@ function ServiceCharts({
   range: Range;
   /** Retained logs opt-in for packs with log files (M18.1). */
   retainLogs?: { enabled: boolean; onChange: (enabled: boolean) => Promise<void> };
+  exporter?: {
+    name: 'redis_exporter' | 'kafka_exporter';
+    propose: (exporter: string) => Promise<{ status: string; reason?: string | null }>;
+  };
   /** Set while a live boost runs: the last 15 minutes, refreshed every 5 s. */
   boostedUntil: string | null;
   onBoost?: () => Promise<void>;
@@ -74,6 +86,7 @@ function ServiceCharts({
               }
             />
           ) : null}
+          {exporter ? <ManagedExporterButton exporter={exporter.name} propose={exporter.propose} /> : null}
           {retainLogs ? (
             <RetainLogsToggle name={name} enabled={retainLogs.enabled} onChange={retainLogs.onChange} />
           ) : null}
@@ -104,6 +117,7 @@ export function ServicesSection({
   canManage,
   canInspect = false,
   canConfigureInspection = false,
+  actionScope,
   range,
 }: {
   agentId: string;
@@ -112,6 +126,8 @@ export function ServicesSection({
   /** Data inspection (M18.2): run it, and turn it on with allowlists (owner, admin). */
   canInspect?: boolean;
   canConfigureInspection?: boolean;
+  /** Set when the member may propose actions: Level 1 exporter installs go through approval. */
+  actionScope?: { productId: string; environmentId: string };
   range: Range;
 }) {
   const queryClient = useQueryClient();
@@ -220,6 +236,46 @@ export function ServicesSection({
             }
             onBoost={a.status === 'applied' ? () => onBoost(a.packId) : undefined}
             guide={cat.find((p) => p.id === a.packId)?.guide}
+            retainLogs={
+              canManage && a.status === 'applied' && PACKS_WITH_LOGS.has(a.packId)
+                ? {
+                    enabled: a.retainLogs ?? false,
+                    onChange: async (enabled) => {
+                      unwrap(
+                        await api.PATCH('/api/v1/agents/{id}/packs/{packId}/retained-logs', {
+                          params: { path: { id: agentId, packId: a.packId } },
+                          body: { enabled },
+                        }),
+                      );
+                      await refresh();
+                    },
+                  }
+                : undefined
+            }
+            exporter={
+              actionScope &&
+              a.status === 'applied' &&
+              EXPORTERS[a.packId] &&
+              !assignments.some((x) => x.packId === EXPORTERS[a.packId]!.packId)
+                ? {
+                    name: EXPORTERS[a.packId]!.exporter,
+                    propose: async (name) =>
+                      unwrap(
+                        await api.POST('/api/v1/actions/proposals', {
+                          body: {
+                            productId: actionScope.productId,
+                            environmentId: actionScope.environmentId,
+                            capability: 'host.install_exporter',
+                            target: { agentId },
+                            params: { exporter: name },
+                            idempotencyKey: crypto.randomUUID(),
+                            reason: `Level 1 ${name} for deeper ${a.packId} metrics`,
+                          },
+                        }),
+                      ),
+                  }
+                : undefined
+            }
           />
           {a.status === 'applied' &&
           (a.packId === 'redis' || a.packId === 'kafka') &&

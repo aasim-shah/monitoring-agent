@@ -56,6 +56,27 @@ export const SERVICE_CHARTS: Record<string, ChartTemplate[]> = {
     },
     logErrors('redis'),
   ],
+  // Level 1 exporters (M18.3): series only the exporters provide, so nothing doubles with the OTel packs.
+  'redis-exporter': [
+    { key: 'keys', title: 'Keys', unit: 'count', promql: 'sum(redis_db_keys)' },
+    { key: 'slowlog', title: 'Slow log length', unit: 'count', promql: 'max(redis_slowlog_length)' },
+    {
+      key: 'evicted',
+      title: 'Evicted keys per second',
+      unit: 'perSecond',
+      promql: 'sum(rate(redis_evicted_keys_total[5m]))',
+    },
+  ],
+  'kafka-exporter': [
+    {
+      key: 'lag',
+      title: 'Consumer lag',
+      unit: 'count',
+      promql: 'sum by (consumergroup) (kafka_consumergroup_lag)',
+    },
+    { key: 'partitions', title: 'Partitions', unit: 'count', promql: 'sum(kafka_topic_partitions)' },
+    { key: 'brokers', title: 'Brokers', unit: 'count', promql: 'max(kafka_brokers)' },
+  ],
   postgresql: [
     { key: 'connections', title: 'Connections', unit: 'count', promql: 'sum(postgresql_backends)' },
     {

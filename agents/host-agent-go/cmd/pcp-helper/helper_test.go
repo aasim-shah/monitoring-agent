@@ -175,8 +175,8 @@ func TestRefusesUnitsOutsideTheLocalAllowlist(t *testing.T) {
 func TestRefusesOtherTaskTypesAndCapabilities(t *testing.T) {
 	s := newSetup(t, allowAPI)
 	task := restartTask("t7", "firemaps-api.service", now.Add(time.Minute))
-	task["payload"] = map[string]any{"capability": "pack_install", "unit": "firemaps-api.service"}
-	if r := s.helper.Handle(signed(t, s.priv, task)); r.Error != "capability pack_install is not supported by this helper" {
+	task["payload"] = map[string]any{"capability": "shell", "unit": "firemaps-api.service"}
+	if r := s.helper.Handle(signed(t, s.priv, task)); r.Error != "capability shell is not supported by this helper" {
 		t.Fatalf("%+v", r)
 	}
 	task = restartTask("t8", "firemaps-api.service", now.Add(time.Minute))

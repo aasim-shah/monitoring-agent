@@ -166,3 +166,29 @@ func TestKafkaPackScrapesTheJMXExporterOnLoopback(t *testing.T) {
 		t.Error("scrapes 127.0.0.1:7071 and keeps the JMX kafka_* metrics")
 	}
 }
+
+// M18.3: a Level 1 exporter pack scrapes the managed exporter on loopback and keeps its metrics.
+func TestExporterPacksScrapeTheManagedExporter(t *testing.T) {
+	cfg, raw := packConfig(t,
+		PackConfig{ID: "redis-exporter", Settings: map[string]any{"endpoint": "127.0.0.1:9121"}},
+		PackConfig{ID: "kafka-exporter", Settings: map[string]any{"endpoint": "127.0.0.1:9308"}},
+	)
+	recv := cfg["receivers"].(map[string]any)
+	for name, target := range map[string]string{"prometheus/redis-exporter": "127.0.0.1:9121", "prometheus/kafka-exporter": "127.0.0.1:9308"} {
+		r, ok := recv[name]
+		if !ok {
+			t.Fatalf("no %s receiver", name)
+		}
+		if b, _ := json.Marshal(r); !strings.Contains(string(b), `"targets":["`+target+`"]`) {
+			t.Errorf("%s: %s", name, b)
+		}
+	}
+	for _, keep := range []string{`^redis_`, `^kafka_(brokers|topic_|consumergroup_)`} {
+		if !strings.Contains(raw, keep) {
+			t.Errorf("allowlist does not keep %s", keep)
+		}
+	}
+	if got := toStrings(pipeline(cfg)["receivers"]); len(got) != 3 {
+		t.Errorf("receivers = %v", got)
+	}
+}

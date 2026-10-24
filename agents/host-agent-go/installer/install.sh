@@ -11,10 +11,13 @@
 # Re-running upgrades the binaries and keeps the enrolled identity; --force re-enrolls.
 #   --enable-helper  also install pcp-helper (opt-in, root): restarts only the systemd units you
 #                    list in /etc/pcp-agent/helper.yaml, for signed and approved actions (D20)
+#   --enable-pack-installer  also let pcp-helper install Level 1 exporters (redis_exporter,
+#                    kafka_exporter) after an approved action: version-pinned, checksum-checked,
+#                    own user and unit, 127.0.0.1 only (implies --enable-helper; spec §8.9)
 #   --uninstall      stop the service and remove the agent, its user, and its data
 set -euo pipefail
 
-TOKEN="" CONTROL_URL="" DOWNLOAD_URL="" FORCE=0 UNINSTALL=0 CA_FILE="" SERVER_NAME="" INGEST_URL="" ENABLE_HELPER=0
+TOKEN="" CONTROL_URL="" DOWNLOAD_URL="" FORCE=0 UNINSTALL=0 CA_FILE="" SERVER_NAME="" INGEST_URL="" ENABLE_HELPER=0 PACK_INSTALLER=0
 STATE_DIR=/var/lib/pcp-agent CONF_DIR=/etc/pcp-agent BIN_DIR=/usr/local/bin
 UNIT=/etc/systemd/system/pcp-agent.service HELPER_UNIT=/etc/systemd/system/pcp-helper.service
 
@@ -29,6 +32,7 @@ while [ $# -gt 0 ]; do
     --force) FORCE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     --enable-helper) ENABLE_HELPER=1; shift ;;
+    --enable-pack-installer) ENABLE_HELPER=1; PACK_INSTALLER=1; shift ;;
     # Development stacks only: private TLS root, TLS name when connecting by IP, ingest override.
     --ca-file) CA_FILE="${2:-}"; shift 2 ;;
     --server-name) SERVER_NAME="${2:-}"; shift 2 ;;
@@ -43,6 +47,14 @@ command -v systemctl >/dev/null || die "systemd is required"
 if [ "$UNINSTALL" -eq 1 ]; then
   systemctl disable --now pcp-agent >/dev/null 2>&1 || true
   systemctl disable --now pcp-helper >/dev/null 2>&1 || true
+  # Level 1 exporters the helper installed (M18.3): units, binaries, and their users.
+  for u in /etc/systemd/system/pcp-exporter-*.service; do
+    [ -e "$u" ] || continue
+    systemctl disable --now "$(basename "$u")" >/dev/null 2>&1 || true
+    rm -f "$u"
+  done
+  rm -rf /opt/pcp-exporters /etc/systemd/system/pcp-helper.service.d
+  for user in $(getent passwd | cut -d: -f1 | grep '^pcp-exp-' || true); do userdel "$user" || true; done
   rm -f "$HELPER_UNIT" "$BIN_DIR/pcp-helper"
   rm -rf /var/lib/pcp-helper
   rm -f "$UNIT" "$BIN_DIR/pcp-agentctl" "$BIN_DIR/pcp-otelcol"
@@ -133,6 +145,18 @@ capabilities:
 ALLOW_EOF
     chown root:root "$CONF_DIR/helper.yaml"
     chmod 0644 "$CONF_DIR/helper.yaml"
+  fi
+  if [ "$PACK_INSTALLER" -eq 1 ]; then
+    # The owner opts in here; the helper reads it at execution time (BR-05-08).
+    sed -i '/^  pack_install:/,/^  [a-z_]*:/ s/^    enabled: false/    enabled: true/' "$CONF_DIR/helper.yaml"
+    grep -q '^    enabled: true' "$CONF_DIR/helper.yaml" || die "could not enable pack_install in $CONF_DIR/helper.yaml"
+    # Installing an exporter writes its unit under /etc/systemd/system, its binary under
+    # /opt/pcp-exporters, and its system user; /usr and /boot stay read-only.
+    mkdir -p /etc/systemd/system/pcp-helper.service.d
+    cat > /etc/systemd/system/pcp-helper.service.d/pack-installer.conf <<'DROPIN_EOF'
+[Service]
+ProtectSystem=true
+DROPIN_EOF
   fi
   cat > "$HELPER_UNIT" <<'HELPER_UNIT_EOF'
 @@HELPER_UNIT@@

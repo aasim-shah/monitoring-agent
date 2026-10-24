@@ -55,10 +55,25 @@ RUN mkdir -p /out && tar -C /in/ansible/roles -czf /out/pcp_agent-role.tar.gz pc
     && tar -C /in -czf /out/compose-agent.tar.gz compose-agent \
     && cp /in/cloud-init/user-data.yaml.tmpl /out/
 
+# Level 1 exporters (M18.3): the exact releases pcp-helper pins, checked here and again on the host.
+FROM --platform=$BUILDPLATFORM alpine:3.22 AS exporters
+RUN apk add --no-cache curl && mkdir -p /out && cd /out && \
+    printf '%s  %s\n' \
+      ed2e531fa68ca2b8604544e19d1088fe409d0592b9ab4f3093fba0783c764972 redis_exporter-v1.93.0.linux-amd64.tar.gz \
+      c41f29c98ed45964f0588c8644f74b06bae703f696244536691f09ecf7b081a1 redis_exporter-v1.93.0.linux-arm64.tar.gz \
+      246720dc4ecd8670801625423b7e44bbeb93115de07353cc6b4ea27e5bb7b87d kafka_exporter-1.10.0.linux-amd64.tar.gz \
+      47c3c19eec67a511fde2afcc714f9cdc382642ffcd72a1ac4c9535d8d433fee1 kafka_exporter-1.10.0.linux-arm64.tar.gz \
+      > SHA256SUMS && \
+    for a in amd64 arm64; do \
+      curl -fsSLO https://github.com/oliver006/redis_exporter/releases/download/v1.93.0/redis_exporter-v1.93.0.linux-$a.tar.gz && \
+      curl -fsSLO https://github.com/danielqsj/kafka_exporter/releases/download/v1.10.0/kafka_exporter-1.10.0.linux-$a.tar.gz || exit 1; \
+    done && sha256sum -c SHA256SUMS
+
 # The `downloads` service: /install.sh and /downloads/<tarballs, SHA256SUMS, VERSION>.
 FROM caddy:2.10.2-alpine AS downloads
 COPY --from=package /dist /srv/downloads
 COPY --from=installer /install.sh /srv/install.sh
 COPY --from=fleet /out /srv/downloads/install
+COPY --from=exporters /out /srv/downloads/exporters
 COPY agents/release/Caddyfile /etc/caddy/Caddyfile
 EXPOSE 8080

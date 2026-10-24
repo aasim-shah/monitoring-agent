@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -58,6 +59,10 @@ func main() {
 		Wait:          60 * time.Second,
 		Settle:        3 * time.Second,
 		Sleep:         time.Sleep,
+		Installer: &Installer{
+			Catalog: Exporters, Host: systemHost{}, Dir: "/opt/pcp-exporters", UnitDir: "/etc/systemd/system",
+			Client: &http.Client{Timeout: 2 * time.Minute}, Verify: verifyLoopback,
+		},
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()

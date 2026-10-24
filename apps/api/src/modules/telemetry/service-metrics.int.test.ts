@@ -83,7 +83,17 @@ const values = (pts: Array<[number, number | null]>) =>
 describe('service charts (WB-11, fixed PromQL per pack)', () => {
   it('has a chart template for every pack', () => {
     expect(Object.keys(SERVICE_CHARTS).sort()).toEqual(
-      ['kafka', 'mongodb', 'mysql', 'nginx', 'nodejs', 'postgresql', 'redis'].sort(),
+      [
+        'kafka',
+        'mongodb',
+        'mysql',
+        'nginx',
+        'nodejs',
+        'postgresql',
+        'redis',
+        'redis-exporter',
+        'kafka-exporter',
+      ].sort(),
     );
   });
 

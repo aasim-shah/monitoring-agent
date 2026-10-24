@@ -931,9 +931,9 @@ describe('approved service restart through pcp-helper (M16 exit gate)', () => {
     );
     expect(unit.status, unit.stdout + unit.stderr).toBe(0);
     const agentId = JSON.parse((await inHost('cat /var/lib/pcp-agent/state.json')).stdout).agentId as string;
-    await until('agent 0.4.0 reporting', async () => {
+    await until('agent 0.5.0 reporting', async () => {
       const a = (await api('GET', `/api/v1/agents/${agentId}`)).json;
-      return a.agentVersion === '0.4.0' ? true : undefined;
+      return a.agentVersion === '0.5.0' ? true : undefined;
     });
 
     const admin = await adminMember();
@@ -1008,6 +1008,100 @@ describe('approved service restart through pcp-helper (M16 exit gate)', () => {
       180_000,
     );
     expect(refused.reason).toBe('ghost.service is not in the helper allowlist (/etc/pcp-agent/helper.yaml)');
+  });
+});
+
+describe('Level 1 managed exporter through pcp-helper (M18.3 exit gate)', () => {
+  it('installs redis_exporter on loopback after approval, scrapes it, and removes it completely', async () => {
+    const installer = `curl -fsSL http://${CADDY}/install.sh | bash -s --`;
+    const devFlags = `--control-url https://agent.localhost --download-url http://${CADDY}/downloads --ca-file /root/caddy-root.crt`;
+    const install = await inHost(`${installer} ${devFlags} --enable-pack-installer`);
+    expect(install.status, install.stdout + install.stderr).toBe(0);
+    expect((await inHost("grep -A1 'pack_install:' /etc/pcp-agent/helper.yaml")).stdout).toContain(
+      'enabled: true',
+    );
+    // The helper downloads from the app origin (localhost:HTTP_PORT in this stack) through Caddy.
+    await inHost(
+      `systemctl is-active pcp-origin >/dev/null 2>&1 || systemd-run --unit pcp-origin socat TCP-LISTEN:${HTTP_PORT},fork,reuseaddr,bind=127.0.0.1 TCP:${CADDY}:80`,
+    );
+    const agentId = JSON.parse((await inHost('cat /var/lib/pcp-agent/state.json')).stdout).agentId as string;
+    expect(
+      (
+        await api('POST', `/api/v1/agents/${agentId}/packs`, {
+          packId: 'redis',
+          settings: { endpoint: '127.0.0.1:6379' },
+        })
+      ).status,
+    ).toBeLessThan(300);
+    await until('redis pack applied', async () => {
+      const list = (await api('GET', `/api/v1/agents/${agentId}/packs`)).json.packs as Json[];
+      return list.find((p) => p.packId === 'redis' && p.status === 'applied') ? true : undefined;
+    });
+    for (const capability of ['host.install_exporter', 'host.remove_exporter'])
+      expect(
+        (
+          await api('PUT', `/api/v1/products/${productId}/action-policies/${capability}`, {
+            environmentId,
+            enabled: true,
+            approverRoles: ['owner', 'admin'],
+            requireApproval: true,
+            settings: { exporters: ['redis_exporter'] },
+          })
+        ).status,
+      ).toBe(200);
+    const admin = await adminMember();
+    const run = async (capability: string) => {
+      const req = (
+        await api('POST', '/api/v1/actions/proposals', {
+          productId,
+          environmentId,
+          capability,
+          target: { agentId },
+          params: { exporter: 'redis_exporter' },
+          idempotencyKey: `e2e-${capability}-${Date.now()}`,
+          reason: 'agent-e2e Level 1',
+        })
+      ).json;
+      expect(req.status, JSON.stringify(req)).toBe('pending_approval');
+      await asUser(admin, () => api('POST', `/api/v1/actions/${req.id}/approve`, { note: 'e2e' }));
+      return until(
+        `${capability} finished`,
+        async () => {
+          const r = (await api('GET', `/api/v1/actions/${req.id}`)).json;
+          if (r.status === 'failed') throw new Error(`${capability} failed: ${r.reason}`);
+          return r.status === 'succeeded' ? r : undefined;
+        },
+        240_000,
+      );
+    };
+    await run('host.install_exporter');
+    expect((await inHost('systemctl is-active pcp-exporter-redis_exporter')).stdout.trim()).toBe('active');
+    expect(
+      (
+        await inHost('stat -c %U /proc/$(systemctl show -p MainPID --value pcp-exporter-redis_exporter)')
+      ).stdout.trim(),
+    ).toBe('pcp-exp-redis');
+    const listeners = (await inHost("ss -ltnH 'sport = :9121' | awk '{print $4}'")).stdout.trim().split('\n');
+    expect(listeners).toEqual(['127.0.0.1:9121']);
+    await until('exporter pack applied', async () => {
+      const list = (await api('GET', `/api/v1/agents/${agentId}/packs`)).json.packs as Json[];
+      return list.find((p) => p.packId === 'redis-exporter' && p.status === 'applied') ? true : undefined;
+    });
+    await until(
+      'redis_exporter series charted',
+      async () => {
+        const body = (await api('GET', `/api/v1/agents/${agentId}/services/redis-exporter/metrics?range=15m`))
+          .json;
+        const keys = (body.charts as Json[] | undefined)?.find((c) => c.key === 'keys');
+        return (keys?.series as Json[] | undefined)?.length ? true : undefined;
+      },
+      180_000,
+    );
+    await run('host.remove_exporter');
+    const gone = await inHost(
+      'test -e /etc/systemd/system/pcp-exporter-redis_exporter.service; echo $?; test -e /opt/pcp-exporters/redis_exporter; echo $?; id pcp-exp-redis >/dev/null 2>&1; echo $?',
+    );
+    expect(gone.stdout.split('\n').filter(Boolean)).toEqual(['1', '1', '1']);
   });
 });
 
