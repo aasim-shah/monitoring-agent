@@ -37,6 +37,22 @@ export const SCOPE_PURPOSE: Record<string, string> = {
   'tagmanager.readonly': 'Tag Manager containers',
 };
 
+export const SERVICE_LABEL: Record<GoogleService, string> = {
+  ga4: 'GA4',
+  searchConsole: 'Search Console',
+  firebase: 'Firebase',
+  play: 'Play vitals',
+  ads: 'Google Ads',
+  bigquery: 'BigQuery exports',
+};
+
+export const STATUS_TEXT: Record<ServiceStatus, string> = {
+  available: 'available',
+  permission_denied: 'access not granted',
+  pending_platform_approval: 'pending platform approval',
+  not_read_yet: 'not read yet',
+};
+
 /** The scope each service needs. */
 export const SERVICE_SCOPE: Record<GoogleService, string> = {
   ga4: `${SCOPE_PREFIX}analytics.readonly`,

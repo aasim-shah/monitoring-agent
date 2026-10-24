@@ -1146,6 +1146,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/{productId}/kpis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: components["parameters"]["productId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Daily analytics, search, and mobile KPIs with freshness
+         * @description Every day of the range is present; a day without a value is null, never 0 (BR-09-05). Only resources scoped to this product are read. Requires `telemetry.query`.
+         */
+        get: operations["getProductKpis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/products/{productId}/agents": {
         parameters: {
             query?: never;
@@ -3885,6 +3908,63 @@ export interface components {
         ResourceScopeList: {
             scopes: components["schemas"]["ResourceScope"][];
         };
+        ProductKpis: {
+            /** @enum {string} */
+            range: "7d" | "28d" | "90d";
+            days: string[];
+            gaps: string[];
+            connections: {
+                /** Format: uuid */
+                id: string;
+                displayName: string;
+                accountEmail: string | null;
+                status: string;
+                statusReason: string | null;
+                services: {
+                    [key: string]: "available" | "permission_denied" | "pending_platform_approval" | "not_read_yet";
+                };
+                freshness: {
+                    /** Format: date-time */
+                    lastSuccessfulSync: string | null;
+                    /** Format: date-time */
+                    lastAttempt: string | null;
+                    expectedIntervalSeconds: number;
+                    /** @enum {string} */
+                    status: "current" | "stale" | "unavailable";
+                    reason: string | null;
+                };
+            }[];
+            resources: {
+                /** Format: uuid */
+                connectionId: string;
+                resourceType: string;
+                externalId: string;
+                name: string;
+                breakdown?: {
+                    sessionsByChannel?: {
+                        channel: string;
+                        value: number;
+                    }[];
+                };
+                kpis: {
+                    key: string;
+                    label: string;
+                    /** @enum {string} */
+                    unit: "count" | "percent" | "ratio" | "position";
+                    definition: string;
+                    caveats: string[];
+                    lowerIsBetter?: boolean;
+                    total: number | null;
+                    points: {
+                        /** Format: date */
+                        day: string;
+                        value: number | null;
+                        /** @enum {string|null} */
+                        completeness: "complete" | "partial" | null;
+                    }[];
+                }[];
+            }[];
+        };
         SyncRunList: {
             runs: {
                 /** Format: uuid */
@@ -5856,6 +5936,34 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    getProductKpis: {
+        parameters: {
+            query?: {
+                range?: "7d" | "28d" | "90d";
+            };
+            header?: never;
+            path: {
+                /** @description Product ID */
+                productId: components["parameters"]["productId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductKpis"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     listAgents: {

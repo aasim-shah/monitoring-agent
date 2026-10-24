@@ -7,7 +7,7 @@ import {
   type MetricPoint,
 } from '@pcp/connector-sdk';
 import type { Observation } from '@pcp/shared-contracts';
-import { SERVICE_SCOPE, type GoogleService } from './scopes.js';
+import { SERVICE_LABEL, SERVICE_SCOPE, type GoogleService } from './scopes.js';
 
 export * from './scopes.js';
 
@@ -33,15 +33,6 @@ const HOST = {
   firebase: 'firebase.googleapis.com',
   play: 'playdeveloperreporting.googleapis.com',
 } as const;
-
-const SERVICE_LABEL: Record<GoogleService, string> = {
-  ga4: 'GA4',
-  searchConsole: 'Search Console',
-  firebase: 'Firebase',
-  play: 'Play vitals',
-  ads: 'Google Ads',
-  bigquery: 'BigQuery exports',
-};
 
 /** GA4 totals per day, in this order (WB-08 UC-08-04). `login` events are never read (BR-08-05). */
 const GA4_METRICS = ['activeUsers', 'newUsers', 'sessions', 'screenPageViews', 'engagementRate', 'keyEvents'];
