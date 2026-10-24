@@ -190,6 +190,81 @@ describe('discovery sources and rules (WB-10 UC-10-01/03)', () => {
     });
   });
 
+  it('turns connector inventory into a domain, a repository, and a monitored service on the agent host (M7, TC-06-06)', async () => {
+    const { owner, productId } = await fixture();
+    const conn = async (provider: string) => {
+      const id = randomUUID();
+      await sql(
+        `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, updated_at)
+         VALUES ($1, $2, $3, $3, 'connected', 'cloud', now())`,
+        [id, owner.orgId, provider],
+      );
+      return id;
+    };
+    const item = (connectionId: string, type: string, externalId: string, name: string, attributes: object) =>
+      sql(
+        `INSERT INTO connection_inventory (organization_id, connection_id, resource_type, external_id, name, attributes) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [owner.orgId, connectionId, type, externalId, name, JSON.stringify(attributes)],
+      );
+    const scope = (connectionId: string, type: string, externalId: string, name: string) =>
+      sql(
+        `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [owner.orgId, connectionId, externalId, type, name, productId],
+      );
+    const cf = await conn('cloudflare');
+    await item(cf, 'cloudflare_zone', 'zone-1', 'firemaps.example', {
+      name: 'firemaps.example',
+      status: 'active',
+    });
+    await item(cf, 'dns_record', 'rec-1', 'api.firemaps.example', {
+      zoneId: 'zone-1',
+      type: 'A',
+      name: 'api.firemaps.example',
+      content: '203.0.113.7',
+      proxied: false,
+    });
+    await item(cf, 'cloudflare_zone', 'zone-2', 'other.example', { name: 'other.example' });
+    await scope(cf, 'cloudflare_zone', 'zone-1', 'firemaps.example');
+    const gh = await conn('github');
+    await item(gh, 'github_repository', '101', 'acme/shop', {
+      name: 'acme/shop',
+      fullName: 'acme/shop',
+      defaultBranch: 'main',
+    });
+    await scope(gh, 'github_repository', '101', 'acme/shop');
+    const prom = await conn('prometheus');
+    await item(prom, 'prometheus_target', 'node|203.0.113.7:9100', '203.0.113.7:9100', {
+      instance: '203.0.113.7:9100',
+      job: 'node',
+      ip: '203.0.113.7',
+      health: 'up',
+    });
+    await item(prom, 'prometheus_server', 'server', 'https://prom.example.com', {
+      name: 'https://prom.example.com',
+    });
+    await scope(prom, 'prometheus_server', 'server', 'Prometheus');
+
+    expect((await run(owner, productId)).statusCode).toBe(200);
+    const g = await graph(productId);
+    const names = g.assets.map((a) => [a.asset_type, a.name]);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        ['domain', 'firemaps.example'],
+        ['repository', 'acme/shop'],
+        ['service', 'node'],
+      ]),
+    );
+    expect(names).not.toContainEqual(['domain', 'other.example']); // not scoped to this product
+    // The Prometheus target is the agent host (same IP), not a second host.
+    expect(g.assets.filter((a) => a.asset_type === 'host')).toHaveLength(1);
+    expect(g.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'HOSTS', source: 'vps-1', target: 'node' }),
+        expect.objectContaining({ type: 'ROUTES_TO', source: 'firemaps.example', target: 'vps-1' }),
+      ]),
+    );
+  });
+
   it('drifts a verified route when DNS moves to a new host and proposes the new one (Review Focus #4)', async () => {
     const { owner, productId, environmentId, domain } = await fixture();
     await run(owner, productId);

@@ -110,6 +110,34 @@ describe('AI assistant (WB-14 UC-14-01)', () => {
     expect(list.conversations.map((c: Body) => c.id)).toEqual([conversationId]);
   });
 
+  it('answers with deployments from a connected GitHub (M7 change events)', async () => {
+    const { owner, productId } = await setup();
+    const conn = randomUUID();
+    await sql(
+      `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, updated_at)
+       VALUES ($1, $2, 'github', 'GitHub', 'connected', 'cloud', now())`,
+      [conn, owner.orgId],
+    );
+    await sql(
+      `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id)
+       VALUES ($1, $2, '101', 'github_repository', 'acme/shop', $3)`,
+      [owner.orgId, conn, productId],
+    );
+    await sql(
+      `INSERT INTO change_events (organization_id, connection_id, provider, kind, title, occurred_at, external_id)
+       VALUES ($1, $2, 'github', 'deployment', 'Deployed main to production (acme/shop)', now() - interval '2 hours', '55:success')`,
+      [owner.orgId, conn],
+    );
+    const { events: ev } = await ask(owner.cookie, productId, 'Why was FireMaps slow yesterday?');
+    const answer = ev.find((e) => e.event === 'answer')!.data;
+    const deployments = (answer.evidence as Body[]).find((e) => e.tool === 'getDeployments')!;
+    expect(deployments.status).toBe('ok');
+    expect((deployments.data as Body).changes).toEqual([
+      expect.objectContaining({ kind: 'deployment', title: 'Deployed main to production (acme/shop)' }),
+    ]);
+    expect(answer.missing).not.toContain('Deployments: source not connected');
+  });
+
   it("returns not_found for another tenant's asset and audits the denial (TC-14-01)", async () => {
     const a = await setup();
     const b = await setup();

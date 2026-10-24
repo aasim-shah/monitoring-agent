@@ -76,6 +76,32 @@ describe('buildSnapshot (BR-15-01, BR-15-05)', () => {
     expect(JSON.stringify(section(s, 'infrastructure'))).not.toMatch(/"cpu/);
   });
 
+  it('reports deployments from a connected source (M7)', async () => {
+    const s = await buildSnapshot(
+      fixtureSources({
+        deployments: async () => ({
+          deployed: 2,
+          failed: 1,
+          items: [
+            {
+              kind: 'deployment',
+              title: 'Deployed main to production (acme/shop)',
+              occurredAt: '2026-10-25T09:00:00.000Z',
+            },
+            {
+              kind: 'deployment_failed',
+              title: 'Deployment failed: main to production (acme/shop)',
+              occurredAt: '2026-10-25T08:00:00.000Z',
+            },
+          ],
+        }),
+      }),
+      w,
+    );
+    expect(section(s, 'deployments')).toMatchObject({ status: 'ok', data: { deployed: 2, failed: 1 } });
+    expect(s.coverage.find((c) => c.source === 'Deployments')).toBeUndefined();
+  });
+
   it('flags large changes against the previous day, above a floor', async () => {
     const s = await buildSnapshot(fixtureSources(), w);
     expect(s.anomalies).toContainEqual({

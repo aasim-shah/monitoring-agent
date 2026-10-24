@@ -64,6 +64,10 @@ export function sectionLines(s: Section): string[] {
       return (s.data as { databases: DatabaseStats[] }).databases.map(
         (d) => `${d.name} (${d.provider}): ${d.status}`,
       );
+    case 'deployments': {
+      const d = s.data as { deployed: number; failed: number; items: Array<{ title: string }> };
+      return [`Deployments: ${d.deployed}, failed: ${d.failed}`, ...d.items.slice(0, 10).map((i) => i.title)];
+    }
     case 'availability':
       return (s.data as { websites: WebsiteStats[] }).websites.map(
         (w) =>

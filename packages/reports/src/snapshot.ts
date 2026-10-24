@@ -25,6 +25,12 @@ export interface WebsiteStats {
   uptimePercent: number | null;
   tlsDays: number | null;
 }
+export interface DeploymentStats {
+  deployed: number;
+  failed: number;
+  /** Newest first, at most 20. */
+  items: Array<{ kind: string; title: string; occurredAt: string }>;
+}
 export interface CoverageItem {
   source: string;
   status: 'ok' | 'partial' | 'missing';
@@ -38,6 +44,8 @@ export interface ReportSources {
   logErrors(w: ReportWindow): Promise<{ errors: number; warnings: number } | null>;
   databases(w: ReportWindow): Promise<DatabaseStats[] | null>;
   websites(w: ReportWindow): Promise<WebsiteStats[] | null>;
+  /** Null when no deployment source (GitHub) is connected (M7). */
+  deployments(w: ReportWindow): Promise<DeploymentStats | null>;
   coverage(w: ReportWindow): Promise<CoverageItem[]>;
 }
 
@@ -124,18 +132,29 @@ function suggestedActions(
  */
 export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Promise<Snapshot> {
   const prev = previousWindow(w);
-  const [incidents, prevIncidents, rawHosts, prevHosts, logs, prevLogs, databases, rawSites, coverage] =
-    await Promise.all([
-      sources.incidents(w),
-      sources.incidents(prev),
-      sources.hosts(w),
-      sources.hosts(prev),
-      sources.logErrors(w),
-      sources.logErrors(prev),
-      sources.databases(w),
-      sources.websites(w),
-      sources.coverage(w),
-    ]);
+  const [
+    incidents,
+    prevIncidents,
+    rawHosts,
+    prevHosts,
+    logs,
+    prevLogs,
+    databases,
+    rawSites,
+    coverage,
+    deployments,
+  ] = await Promise.all([
+    sources.incidents(w),
+    sources.incidents(prev),
+    sources.hosts(w),
+    sources.hosts(prev),
+    sources.logErrors(w),
+    sources.logErrors(prev),
+    sources.databases(w),
+    sources.websites(w),
+    sources.coverage(w),
+    sources.deployments(w),
+  ]);
   const hosts =
     rawHosts?.map((h) => ({
       hostname: h.hostname,
@@ -159,11 +178,9 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
   const actions = suggestedActions(incidents, hosts, databases, websites);
   const allCoverage: CoverageItem[] = [
     ...coverage,
-    ...Object.values(NOT_CONNECTED).map((n) => ({
-      source: n.source,
-      status: 'missing' as const,
-      reason: n.reason,
-    })),
+    ...Object.entries(NOT_CONNECTED)
+      .filter(([key]) => !(key === 'deployments' && deployments))
+      .map(([, n]) => ({ source: n!.source, status: 'missing' as const, reason: n!.reason })),
   ];
 
   const data: Record<SectionKey, { data: unknown } | { missing: string }> = {
@@ -187,7 +204,7 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     analytics: { missing: NOT_CONNECTED.analytics!.reason },
     databases: databases?.length ? { data: { databases } } : { missing: 'No database connected' },
     ads: { missing: NOT_CONNECTED.ads!.reason },
-    deployments: { missing: NOT_CONNECTED.deployments!.reason },
+    deployments: deployments ? { data: deployments } : { missing: NOT_CONNECTED.deployments!.reason },
     availability: websites?.length ? { data: { websites } } : { missing: 'No website monitors' },
     anomalies: { data: anomalies },
     actions: { data: actions },

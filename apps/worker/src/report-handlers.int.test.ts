@@ -319,4 +319,39 @@ describe('report-generate and report-deliver (UC-15-02/03)', () => {
       last_error: '550 mailbox unavailable',
     });
   });
+  it('reports deployments from a product-scoped GitHub connection in the window', async () => {
+    const s = await seed();
+    const conn = randomUUID();
+    await sql(
+      `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, updated_at)
+       VALUES ($1, $2, 'github', 'GitHub', 'connected', 'cloud', now())`,
+      [conn, s.org],
+    );
+    await sql(
+      `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id)
+       VALUES ($1, $2, 'r-1', 'github_repository', 'acme/shop', $3)`,
+      [s.org, conn, s.product],
+    );
+    const event = (kind: string, title: string, at: string) =>
+      sql(
+        `INSERT INTO change_events (organization_id, connection_id, product_id, provider, kind, title, external_id, occurred_at)
+         VALUES ($1, $2, $3, 'github', $4, $5, $6, $7)`,
+        [s.org, conn, s.product, kind, title, randomUUID(), at],
+      );
+    await event('deployment', 'shop deployed to production', '2026-10-25T09:00:00Z');
+    await event('deployment_failed', 'shop deploy failed', '2026-10-25T11:00:00Z');
+    await event('deployment', 'outside the window', '2026-10-27T09:00:00Z');
+    const h = reportHandlers(deps());
+    await h['report-generate'](ctx(s.org), s.schedule, job('2026-10-25'));
+    const [report] = await reports(s);
+    const snapshot = report!.snapshot as { sections: Array<{ key: string; status: string; data: unknown }> };
+    expect(snapshot.sections.find((x) => x.key === 'deployments')).toMatchObject({
+      status: 'ok',
+      data: {
+        deployed: 1,
+        failed: 1,
+        items: [{ title: 'shop deploy failed' }, { title: 'shop deployed to production' }],
+      },
+    });
+  });
 });

@@ -22,6 +22,7 @@ export function fixtureSources(over: Partial<ReportSources> = {}): ReportSources
     websites: async () => [
       { url: 'https://shop.example.com/health?token=secret-value', uptimePercent: 98.611, tlsDays: 12 },
     ],
+    deployments: async () => null,
     coverage: async () => [
       { source: 'Host metrics', status: 'ok' },
       { source: 'Website monitors', status: 'ok' },

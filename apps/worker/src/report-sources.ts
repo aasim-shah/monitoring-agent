@@ -2,6 +2,7 @@ import type { PrismaClient } from '@pcp/database';
 import type {
   CoverageItem,
   DatabaseStats,
+  DeploymentStats,
   HostStats,
   IncidentStats,
   ReportSources,
@@ -186,6 +187,34 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
         }));
       });
 
+    const deployments = (w: ReportWindow) =>
+      once<DeploymentStats | null>('deployments', w, () =>
+        db(async (tx) => {
+          const scoped = { scopes: { some: { productId } } };
+          const sources = await tx.connection.count({
+            where: { provider: 'github', status: { notIn: ['disconnected', 'revoked'] }, ...scoped },
+          });
+          if (!sources) return null;
+          const rows = await tx.changeEvent.findMany({
+            where: {
+              kind: { in: ['deployment', 'deployment_failed'] },
+              occurredAt: { gte: w.start, lt: w.end },
+              connection: scoped,
+            },
+            orderBy: { occurredAt: 'desc' },
+            take: 100,
+            select: { kind: true, title: true, occurredAt: true },
+          });
+          return {
+            deployed: rows.filter((r) => r.kind === 'deployment').length,
+            failed: rows.filter((r) => r.kind === 'deployment_failed').length,
+            items: rows
+              .slice(0, 20)
+              .map((r) => ({ kind: r.kind, title: r.title, occurredAt: r.occurredAt.toISOString() })),
+          };
+        }),
+      );
+
     const coverage = async (w: ReportWindow): Promise<CoverageItem[]> => {
       const [h, l, d, s] = await Promise.all([hosts(w), logErrors(w), databases(w), websites(w)]);
       const telemetry = deps.vmQueryUrl ? null : 'Telemetry storage is not configured';
@@ -207,6 +236,6 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
       ];
     };
 
-    return { incidents, hosts, logErrors, databases, websites, coverage };
+    return { incidents, hosts, logErrors, databases, websites, deployments, coverage };
   };
 }

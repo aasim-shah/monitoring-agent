@@ -19,6 +19,7 @@ export {
   type HostStats,
   type DatabaseStats,
   type WebsiteStats,
+  type DeploymentStats,
 } from './snapshot.js';
 export { narrate, summarize, type NarrativeStatus } from './narrative.js';
 export { renderReport, sectionLines, type ReportMessage, type RenderableReport } from './render.js';

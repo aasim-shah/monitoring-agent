@@ -504,7 +504,38 @@ export const AI_TOOLS: Tool[] = [
   }),
   unavailable('getAnalyticsReport', 'GA4 and Firebase product analytics', 'Analytics: source not connected'),
   unavailable('getAdPerformance', 'Ads spend, clicks, conversions', 'Ads: source not connected'),
-  unavailable('getDeployments', 'Deployments and code changes', 'Deployments: source not connected'),
+  defineTool<{ range: keyof typeof RANGE_SECONDS }, AiDeps>({
+    name: 'getDeployments',
+    description:
+      'Deployments, failed deployments and workflows, releases, and pushes to the default branch from connected GitHub repositories, newest first.',
+    permission: 'connection.view',
+    input: z.object({ range: z.enum(['1h', '24h', '7d']).default('7d').describe('Look-back window') }),
+    run: async (ctx, input, d) => {
+      const since = new Date(d.now().getTime() - RANGE_SECONDS[input.range] * 1000);
+      const { sources, rows } = await withTenant(d.prisma, ctx, async (tx) => {
+        const scoped = { scopes: { some: { productId: d.productId } } };
+        const sources = await tx.connection.count({
+          where: { provider: 'github', status: { notIn: ['disconnected', 'revoked'] }, ...scoped },
+        });
+        const rows = await tx.changeEvent.findMany({
+          where: {
+            kind: { in: ['deployment', 'deployment_failed', 'workflow_failed', 'release', 'push'] },
+            occurredAt: { gte: since },
+            connection: scoped,
+          },
+          orderBy: { occurredAt: 'desc' },
+          take: 30,
+          select: { kind: true, title: true, occurredAt: true, actor: true, url: true },
+        });
+        return { sources, rows };
+      });
+      if (!sources) return { data: { changes: [] }, gaps: ['Deployments: source not connected'] };
+      return {
+        data: { range: input.range, changes: rows },
+        sources: [{ label: 'Integrations', href: `${base(d)}/integrations` }],
+      };
+    },
+  }),
   unavailable(
     'getApplicationMetrics',
     'Request rate, errors, and latency of applications',

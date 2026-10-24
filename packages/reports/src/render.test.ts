@@ -53,4 +53,28 @@ describe('renderReport (UC-15-03)', () => {
     expect(m.html).not.toContain('<b>x</b>');
     expect(m.html).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
+
+  it('lists deployments when a source is connected', async () => {
+    const { sectionLines } = await import('./render.js');
+    const snapshot = await buildSnapshot(
+      fixtureSources({
+        deployments: async () => ({
+          deployed: 1,
+          failed: 0,
+          items: [
+            {
+              kind: 'deployment',
+              title: 'Deployed main to production (acme/shop)',
+              occurredAt: '2026-10-25T09:00:00.000Z',
+            },
+          ],
+        }),
+      }),
+      w,
+    );
+    expect(sectionLines(snapshot.sections.find((x) => x.key === 'deployments')!)).toEqual([
+      'Deployments: 1, failed: 0',
+      'Deployed main to production (acme/shop)',
+    ]);
+  });
 });

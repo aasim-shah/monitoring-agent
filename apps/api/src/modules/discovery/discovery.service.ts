@@ -17,6 +17,8 @@ import { DNS_RESOLVER, PRISMA, REDIS } from '../../tokens.js';
 export type DnsResolver = (hostname: string) => Promise<string[]>;
 
 const DB_PROVIDERS = ['postgres', 'mysql', 'mongodb'];
+/** Cloud connectors whose discovered inventory becomes assets (M7). */
+const INVENTORY_PROVIDERS = ['cloudflare', 'github', 'prometheus'];
 /** Inventory pack → database connector provider (same engine). */
 const PACK_ENGINE: Record<string, string> = { postgresql: 'postgres', mysql: 'mysql', mongodb: 'mongodb' };
 const LOOPBACK = /^(127\.|::1$|localhost$)/;
@@ -74,7 +76,18 @@ export class DiscoveryService {
           scopes: { some: { productId } },
         },
       });
-      return { domains: product.domains, agents, connections };
+      const cloud = await tx.connection.findMany({
+        where: {
+          provider: { in: INVENTORY_PROVIDERS },
+          status: { notIn: ['disconnected', 'revoked'] },
+          scopes: { some: { productId } },
+        },
+        include: {
+          scopes: { where: { productId }, select: { externalId: true } },
+          inventory: { take: 5000 },
+        },
+      });
+      return { domains: product.domains, agents, connections, cloud };
     });
 
     // DNS outside the transaction: lookups can take a while.
@@ -209,6 +222,124 @@ export class DiscoveryService {
               direct: false,
               detail: { reason: `the only ${c.provider} service in this product` },
               ruleId: 'name-similarity',
+            });
+            edges++;
+          }
+        }
+      }
+
+      // Connector inventory (M7): scoped zones, repositories, and Prometheus targets.
+      for (const c of data.cloud) {
+        const scoped = new Set(c.scopes.map((x) => x.externalId));
+        const attrs = (i: { attributes: unknown }) => (i.attributes ?? {}) as Record<string, unknown>;
+        if (c.provider === 'cloudflare') {
+          for (const zone of c.inventory.filter(
+            (i) => i.resourceType === 'cloudflare_zone' && scoped.has(i.externalId),
+          )) {
+            const records = c.inventory
+              .filter((i) => i.resourceType === 'dns_record' && attrs(i).zoneId === zone.externalId)
+              .map((i) => attrs(i));
+            const domain = await ingestObservation(tx, org, {
+              source: 'connector',
+              assetType: 'domain',
+              identity: { kind: 'stable', key: `cloudflare:zone:${zone.externalId}` },
+              name: zone.name,
+              attributes: {
+                provider: 'cloudflare',
+                connectionId: c.id,
+                status: attrs(zone).status ?? null,
+                records: records
+                  .slice(0, 200)
+                  .map((r) => ({ type: r.type, name: r.name, content: r.content, proxied: r.proxied })),
+              },
+              productId,
+            });
+            seen.connector.push(domain.assetId);
+            for (const r of records.filter((x) => x.type === 'A' || x.type === 'AAAA')) {
+              const host = hosts.find((h) => h.ip && h.ip === r.content);
+              if (!host) continue;
+              await proposeEdge(tx, org, {
+                source: domain.assetId,
+                target: host.assetId,
+                type: 'ROUTES_TO',
+                confidence: CONFIDENCE.ipMatch,
+                evidenceKind: 'ip_match',
+                direct: false,
+                detail: { record: r.name, ip: r.content, provider: 'cloudflare' },
+                ruleId: 'cloudflare-dns-to-host',
+              });
+              edges++;
+            }
+          }
+        } else if (c.provider === 'github') {
+          for (const repo of c.inventory.filter(
+            (i) => i.resourceType === 'github_repository' && scoped.has(i.externalId),
+          )) {
+            const a = attrs(repo);
+            const asset = await ingestObservation(tx, org, {
+              source: 'connector',
+              assetType: 'repository',
+              identity: { kind: 'stable', key: `github:repo:${repo.externalId}` },
+              name: repo.name,
+              attributes: {
+                provider: 'github',
+                connectionId: c.id,
+                defaultBranch: a.defaultBranch ?? null,
+                visibility: a.visibility ?? null,
+                url: a.url ?? null,
+              },
+              productId,
+            });
+            seen.connector.push(asset.assetId);
+          }
+        } else if (c.provider === 'prometheus') {
+          for (const target of c.inventory.filter((i) => i.resourceType === 'prometheus_target')) {
+            const a = attrs(target);
+            const ip = typeof a.ip === 'string' ? a.ip : null;
+            const hostname = typeof a.hostname === 'string' ? a.hostname : null;
+            // The same machine as an agent host when the IP or hostname matches; never merged on a guess.
+            const matched = hosts.find((h) => (ip && h.ip === ip) || (hostname && h.hostname === hostname));
+            const hostId = matched
+              ? matched.assetId
+              : (
+                  await ingestObservation(tx, org, {
+                    source: 'connector',
+                    assetType: 'host',
+                    identity: {
+                      kind: 'weak',
+                      name: hostname ?? ip ?? String(a.instance),
+                      ...(ip ? { ip } : {}),
+                    },
+                    name: hostname ?? ip ?? String(a.instance),
+                    attributes: { provider: 'prometheus', instance: a.instance, ip },
+                    productId,
+                  })
+                ).assetId;
+            if (!matched) seen.connector.push(hostId);
+            const job = String(a.job ?? 'unknown');
+            const svc = await ingestObservation(tx, org, {
+              source: 'connector',
+              assetType: 'service',
+              identity: { kind: 'stable', key: `prometheus:${c.id}:${job}:${String(a.instance)}` },
+              name: job,
+              attributes: {
+                provider: 'prometheus',
+                connectionId: c.id,
+                instance: a.instance,
+                health: a.health ?? null,
+              },
+              productId,
+            });
+            seen.connector.push(svc.assetId);
+            await proposeEdge(tx, org, {
+              source: hostId,
+              target: svc.assetId,
+              type: 'HOSTS',
+              confidence: matched ? CONFIDENCE.ipMatch : CONFIDENCE.nameOnly,
+              evidenceKind: matched ? 'ip_match' : 'name',
+              direct: false,
+              detail: { instance: a.instance, job, provider: 'prometheus' },
+              ruleId: 'prometheus-target',
             });
             edges++;
           }
