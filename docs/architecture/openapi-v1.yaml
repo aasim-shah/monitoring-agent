@@ -204,6 +204,58 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ResetPasswordRequest'
+  /api/v1/auth/providers:
+    get:
+      operationId: authProviders
+      tags: [identity]
+      summary: Sign-in methods this deployment offers
+      description: Google and OIDC sign-in as configured; the login page reads this at runtime (M19.4).
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [google, oidc]
+                properties:
+                  google: { type: boolean }
+                  oidc:
+                    type: [object, 'null']
+                    required: [name, startUrl]
+                    properties:
+                      name: { type: string }
+                      startUrl: { type: string }
+      x-implemented-in: M19
+  /api/v1/auth/oidc/start:
+    get:
+      operationId: authOidcStart
+      tags: [identity]
+      summary: Start OIDC sign-in (self-hosted; openid email profile only)
+      description: Redirects to the OpenID Provider's authorization endpoint with PKCE S256, state, and nonce. 404 when OIDC is not configured.
+      security: []
+      responses:
+        '302':
+          description: Redirect to the identity provider
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M19
+  /api/v1/auth/oidc/callback:
+    get:
+      operationId: authOidcCallback
+      tags: [identity]
+      summary: OIDC sign-in callback
+      description: Verifies the ID token (issuer, audience, nonce, JWKS) and a verified email, then sets the session cookie.
+      security: []
+      responses:
+        '302':
+          description: Signed in
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Email not verified by the identity provider
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M19
   /api/v1/auth/google/start:
     get:
       operationId: authGoogleStart
