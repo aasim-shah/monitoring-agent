@@ -37,6 +37,7 @@ type Gateway struct {
 	cfg     Config
 	series  *SeriesLimiter
 	samples *SampleLimiter
+	usage   usageCounters
 	mux     *http.ServeMux
 }
 
@@ -155,11 +156,13 @@ func (g *Gateway) write(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !g.series.Admit(now, id.AgentID, id.OrganizationID, keys) {
+		g.usage.add(id.OrganizationID, func(u *TenantUsage) { u.RefusedSeriesRequests++ })
 		w.Header().Set("Retry-After", "60")
 		http.Error(w, "active series limit reached; new series refused, existing series continue", http.StatusTooManyRequests)
 		return
 	}
 	if ok, wait := g.samples.Allow(now, id.AgentID, samples); !ok {
+		g.usage.add(id.OrganizationID, func(u *TenantUsage) { u.RefusedRateRequests++ })
 		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds()+0.999)))
 		http.Error(w, "sample rate limit reached", http.StatusTooManyRequests)
 		return
@@ -169,6 +172,7 @@ func (g *Gateway) write(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "storage unavailable; retry", http.StatusServiceUnavailable)
 		return
 	}
+	g.usage.add(id.OrganizationID, func(u *TenantUsage) { u.Samples += int64(samples) })
 	w.WriteHeader(http.StatusNoContent)
 }
 

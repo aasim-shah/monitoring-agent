@@ -413,6 +413,58 @@ paths:
           description: Link expired
           content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
       x-implemented-in: M19
+  /api/v1/organizations/{orgId}/usage:
+    parameters: [{ $ref: '#/components/parameters/orgId' }]
+    get:
+      operationId: getTelemetryUsage
+      tags: [organizations]
+      summary: Telemetry usage, limits, and refusals
+      description: >-
+        Samples, active series, and refused requests as the ingest gateway saw them, in hourly (24h) or
+        daily (7d) buckets; `overLimitSince` is set while refusals happened in the last hour. Requires
+        `org.view`.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: range, in: query, required: false, schema: { type: string, enum: [24h, 7d], default: 24h } }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [range, buckets, totals, limits, overLimitSince]
+                properties:
+                  range: { type: string }
+                  buckets:
+                    type: array
+                    items:
+                      type: object
+                      required: [start, samples, activeSeries, refusedRequests]
+                      properties:
+                        start: { type: string, format: date-time }
+                        samples: { type: number }
+                        activeSeries: { type: integer }
+                        refusedRequests: { type: integer }
+                  totals:
+                    type: object
+                    required: [samples, activeSeries, refusedRequests]
+                    properties:
+                      samples: { type: number }
+                      activeSeries: { type: integer }
+                      refusedRequests: { type: integer }
+                  limits:
+                    type: object
+                    required: [agentSeries, tenantSeries, agentSamplesPerSecond]
+                    properties:
+                      agentSeries: { type: integer }
+                      tenantSeries: { type: integer }
+                      agentSamplesPerSecond: { type: integer }
+                  overLimitSince: { type: [string, 'null'], format: date-time }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M10
   /api/v1/organizations/{orgId}/settings:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     patch:
@@ -4372,6 +4424,10 @@ components:
           type: [string, 'null']
           format: date-time
           description: Set while a deletion is pending — when the organization is purged.
+        telemetryLimitSince:
+          type: [string, 'null']
+          format: date-time
+          description: Set while the ingest gateway refused telemetry in the last hour (dashboard warning).
         role:
           type: string
           enum:

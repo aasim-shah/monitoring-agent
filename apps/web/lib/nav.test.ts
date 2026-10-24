@@ -9,6 +9,7 @@ describe('organization navigation', () => {
       'Overview',
       'Members & Roles',
       'Audit Log',
+      'Usage',
       'Settings',
       'Notifications',
     ]);
@@ -19,7 +20,7 @@ describe('organization navigation', () => {
   });
 
   it('hides audit log and settings from viewers (UI only; the API also refuses)', () => {
-    expect(labels(buildOrgNav('o', 'viewer'))).toEqual(['Overview', 'Members & Roles']);
+    expect(labels(buildOrgNav('o', 'viewer'))).toEqual(['Overview', 'Members & Roles', 'Usage']);
   });
 });
 

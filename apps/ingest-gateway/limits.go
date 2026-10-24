@@ -47,6 +47,16 @@ func (l *SeriesLimiter) Admit(now time.Time, agent, tenant string, keys []string
 	return true
 }
 
+// Active returns the tenant's distinct series admitted in the current hour.
+func (l *SeriesLimiter) Active(now time.Time, tenant string) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if now.Unix()/3600 != l.window {
+		return 0
+	}
+	return l.tenant[tenant]
+}
+
 // SampleLimiter is a per-agent token bucket: Rate samples/s with a 10 s burst.
 type SampleLimiter struct {
 	Rate float64

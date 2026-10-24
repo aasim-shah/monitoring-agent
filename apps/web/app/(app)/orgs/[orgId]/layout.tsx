@@ -11,6 +11,7 @@ import { Loading } from '@/components/states/loading';
 import { NotFoundState } from '@/components/states/not-found-state';
 import { ApiError, unwrap } from '@pcp/api-client';
 import { DeletionBanner } from '@/components/orgs/tenant-data';
+import { LimitBanner } from '@/components/usage/usage-view';
 import { api } from '@/lib/api';
 import { roleCan } from '@/lib/permissions';
 import { buildOrgNav, buildProductNav } from '@/lib/nav';
@@ -55,6 +56,9 @@ export default function OrganizationLayout({ children }: { children: ReactNode }
               await queryClient.invalidateQueries({ queryKey: ['org', orgId] });
             }}
           />
+        ) : null}
+        {org.data.telemetryLimitSince ? (
+          <LimitBanner since={org.data.telemetryLimitSince} usageHref={`/orgs/${orgId}/usage`} />
         ) : null}
         {children}
       </main>

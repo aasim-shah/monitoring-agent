@@ -289,6 +289,14 @@ beforeAll(async () => {
         [org, ghConn],
       );
       await c.query(`INSERT INTO tenant_exports (organization_id, status) VALUES ($1, 'queued')`, [org]);
+      await c.query(
+        `INSERT INTO telemetry_usage (organization_id, minute, active_series, samples) VALUES ($1, now(), 1, 1)`,
+        [org],
+      );
+      await c.query(
+        `INSERT INTO agent_live_boosts (organization_id, agent_id, pack_id, expires_at) VALUES ($1, gen_random_uuid(), 'redis', now())`,
+        [org],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

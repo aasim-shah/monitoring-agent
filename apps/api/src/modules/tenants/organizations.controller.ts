@@ -5,6 +5,7 @@ import { RequirePermission, SessionOnly, TenantScope } from '../../common/decora
 import { parseBody } from '../../common/errors.js';
 import { requireAuth, type ApiRequest } from '../../common/request.js';
 import { requireTenant } from '../../common/tenant.js';
+import { UsageService } from '../usage/usage.service.js';
 import { LifecycleService } from './lifecycle.service.js';
 import { OrganizationsService } from './organizations.service.js';
 import { createOrganizationBody, updateSettingsBody } from './schemas.js';
@@ -33,6 +34,7 @@ export class OrganizationsController {
   constructor(
     private readonly organizations: OrganizationsService,
     private readonly lifecycle: LifecycleService,
+    private readonly usage: UsageService,
   ) {}
 
   @SessionOnly()
@@ -50,7 +52,12 @@ export class OrganizationsController {
   @Get(':orgId')
   async get(@Req() req: ApiRequest) {
     const ctx = requireTenant(req);
-    return { ...view(await this.organizations.get(ctx)), role: ctx.roles[0] };
+    return {
+      ...view(await this.organizations.get(ctx)),
+      role: ctx.roles[0],
+      // Set while telemetry was refused in the last hour: the dashboard banner (M10.6).
+      telemetryLimitSince: await this.usage.limitSince(ctx),
+    };
   }
 
   @RequirePermission('org.settings.manage')

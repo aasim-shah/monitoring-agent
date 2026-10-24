@@ -54,6 +54,8 @@ export const TENANT_TABLES = [
   'connection_inventory',
   'metric_aggregates',
   'tenant_exports',
+  'telemetry_usage',
+  'agent_live_boosts',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];

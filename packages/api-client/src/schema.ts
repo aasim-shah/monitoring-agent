@@ -342,6 +342,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{orgId}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Telemetry usage, limits, and refusals
+         * @description Samples, active series, and refused requests as the ingest gateway saw them, in hourly (24h) or daily (7d) buckets; `overLimitSince` is set while refusals happened in the last hour. Requires `org.view`.
+         */
+        get: operations["getTelemetryUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{orgId}/settings": {
         parameters: {
             query?: never;
@@ -3739,6 +3762,11 @@ export interface components {
              * @description Set while a deletion is pending — when the organization is purged.
              */
             deletionScheduledFor?: string | null;
+            /**
+             * Format: date-time
+             * @description Set while the ingest gateway refused telemetry in the last hour (dashboard warning).
+             */
+            telemetryLimitSince?: string | null;
             /** @enum {string} */
             role?: "owner" | "admin" | "operator" | "analyst" | "viewer";
         };
@@ -4844,6 +4872,55 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    getTelemetryUsage: {
+        parameters: {
+            query?: {
+                range?: "24h" | "7d";
+            };
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        range: string;
+                        buckets: {
+                            /** Format: date-time */
+                            start: string;
+                            samples: number;
+                            activeSeries: number;
+                            refusedRequests: number;
+                        }[];
+                        totals: {
+                            samples: number;
+                            activeSeries: number;
+                            refusedRequests: number;
+                        };
+                        limits: {
+                            agentSeries: number;
+                            tenantSeries: number;
+                            agentSamplesPerSecond: number;
+                        };
+                        /** Format: date-time */
+                        overLimitSince: string | null;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     updateOrganizationSettings: {

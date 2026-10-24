@@ -169,6 +169,8 @@ model Organization {
   channels       NotificationChannel[]
   aiSettings     AiSettings?
   exports        TenantExport[]
+  usage          TelemetryUsage[]
+  liveBoosts     AgentLiveBoost[]
 
   @@map("organizations")
 }
@@ -1562,4 +1564,38 @@ model DeletedOrganization {
   summary             Json     @default("{}")
 
   @@map("deleted_organizations")
+}
+
+/// One minute of a tenant's telemetry as the ingest gateway saw it (M10.6, spec §11.6).
+model TelemetryUsage {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId        String   @map("organization_id") @db.Uuid
+  minute                DateTime @db.Timestamptz(6)
+  /// Distinct series admitted this hour (a level, not a sum).
+  activeSeries          Int      @map("active_series")
+  samples               BigInt
+  refusedSeriesRequests Int      @default(0) @map("refused_series_requests")
+  refusedRateRequests   Int      @default(0) @map("refused_rate_requests")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, minute])
+  @@map("telemetry_usage")
+}
+
+/// A live boost: one pack on one agent collects every 5 s until expires_at (M10.7, BR-11-08).
+model AgentLiveBoost {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  agentId         String   @map("agent_id") @db.Uuid
+  packId          String   @map("pack_id")
+  taskId          String?  @map("task_id") @db.Uuid
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  expiresAt       DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, expiresAt])
+  @@map("agent_live_boosts")
 }

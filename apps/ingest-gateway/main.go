@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -53,6 +54,21 @@ func main() {
 		MaxBodyBytes:    10 << 20,
 		Now:             time.Now,
 	})
+
+	// Per-tenant usage to the API every minute (M10.6); a failed report is retried with the next.
+	reporter := &UsageReporter{
+		BaseURL: strings.TrimRight(required("API_INTERNAL_URL"), "/"),
+		Token:   required("INTERNAL_TOKEN"),
+		Client:  &http.Client{Timeout: 10 * time.Second},
+		Gateway: gateway,
+	}
+	go func() {
+		for range time.Tick(time.Minute) {
+			if err := reporter.Report(context.Background()); err != nil {
+				slog.Warn("usage report failed", "error", err)
+			}
+		}
+	}()
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /healthz", health.Handler(service))

@@ -25,6 +25,7 @@ export function buildOrgNav(orgId: string, role: Role): NavItem[] {
     { label: 'Overview', href: base },
     { label: 'Members & Roles', href: `${base}/members`, permission: 'org.view' },
     { label: 'Audit Log', href: `${base}/audit`, permission: 'audit.view' },
+    { label: 'Usage', href: `${base}/usage`, permission: 'org.view' },
     { label: 'Settings', href: `${base}/settings`, permission: 'org.settings.manage' },
     { label: 'Notifications', href: `${base}/settings/notifications`, permission: 'org.settings.manage' },
   ];
