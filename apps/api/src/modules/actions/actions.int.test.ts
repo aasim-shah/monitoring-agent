@@ -13,7 +13,9 @@ import {
 import { sql } from '../../../test/db.js';
 
 let t: TestApp;
-let now = new Date('2026-10-24T10:00:00Z');
+// Real time at the start: enrollment tokens are checked against the database clock.
+const START = new Date();
+let now = START;
 
 beforeAll(async () => {
   t = await createTestApp({ env: { ...(await agentEnv()), PCP_AI_FAKE: '1' }, clock: () => new Date(now) });
@@ -276,7 +278,7 @@ describe('approval, execution, and verification (UC-16-05/08/09)', () => {
         409,
       );
     } finally {
-      now = new Date('2026-10-24T10:00:00Z');
+      now = START;
     }
     expect(await auditActions(s.owner.orgId)).toEqual(
       expect.arrayContaining(['action.propose', 'action.reject', 'action.expire']),

@@ -1,11 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/app-factory.js';
 import { headers, ownerWithOrg } from '../../../test/auth-helpers.js';
-import { sql } from '../../../test/db.js';
 
 const TOKEN = 'internal-token-for-usage-tests-000';
 let t: TestApp;
-let now = new Date('2026-10-25T10:00:30Z');
+// Relative to the real hour, so the test never ages out; `at(m)` is m minutes (plus 30 s) past it.
+const HOUR = Math.floor(Date.now() / 3_600_000) * 3_600_000 + 3_600_000;
+const at = (minutes: number, seconds = 30) => new Date(HOUR + minutes * 60_000 + seconds * 1000);
+const iso = (minutes: number) => new Date(HOUR + minutes * 60_000).toISOString();
+let now = at(0);
 
 beforeAll(async () => {
   t = await createTestApp({ env: { INTERNAL_TOKEN: TOKEN }, clock: () => now });
@@ -48,7 +51,7 @@ describe('telemetry usage (M10.6, spec §11.6, TC-11-08)', () => {
       ...o,
     });
     expect((await report([tenant({})])).statusCode).toBe(204);
-    now = new Date('2026-10-25T10:01:30Z');
+    now = at(1);
     await report([tenant({ activeSeries: 125, samples: 3000 })]);
     const res = await usage(owner.cookie, owner.orgId);
     expect(res.statusCode, res.body).toBe(200);
@@ -58,10 +61,10 @@ describe('telemetry usage (M10.6, spec §11.6, TC-11-08)', () => {
       overLimitSince: null,
     });
 
-    now = new Date('2026-10-25T10:02:30Z');
+    now = at(2);
     await report([tenant({ refusedSeriesRequests: 3 })]);
     const over = (await usage(owner.cookie, owner.orgId)).json();
-    expect(over.overLimitSince).toBe('2026-10-25T10:02:00.000Z');
+    expect(over.overLimitSince).toBe(iso(2));
     expect(over.totals.refusedRequests).toBe(3);
     // The organization view carries the warning for the banner (Review Focus #4).
     const { 'content-type': _ct, ...bare } = headers(owner.cookie);
@@ -70,10 +73,10 @@ describe('telemetry usage (M10.6, spec §11.6, TC-11-08)', () => {
       url: `/api/v1/organizations/${owner.orgId}`,
       headers: bare,
     });
-    expect(org.json().telemetryLimitSince).toBe('2026-10-25T10:02:00.000Z');
+    expect(org.json().telemetryLimitSince).toBe(iso(2));
 
     // An hour without refusals clears the warning.
-    now = new Date('2026-10-25T11:05:00Z');
+    now = at(65, 0);
     expect((await usage(owner.cookie, owner.orgId)).json().overLimitSince).toBeNull();
   });
 
@@ -86,12 +89,12 @@ describe('telemetry usage (M10.6, spec §11.6, TC-11-08)', () => {
       refusedSeriesRequests: 2,
       refusedRateRequests: 0,
     };
-    now = new Date('2026-10-25T12:00:30Z');
+    now = at(120);
     await report([refused]);
-    now = new Date('2026-10-25T12:20:30Z');
+    now = at(140);
     await report([refused]);
     expect(t.mailer.to(owner.email).filter((m) => /limit/i.test(m.subject))).toHaveLength(1);
-    now = new Date('2026-10-25T13:05:30Z');
+    now = at(185);
     await report([refused]);
     const mails = t.mailer.to(owner.email).filter((m) => /limit/i.test(m.subject));
     expect(mails).toHaveLength(2);
