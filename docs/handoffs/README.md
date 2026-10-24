@@ -103,13 +103,13 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M12.2 | Alert receiver and incident engine | Done | [M12-incident-engine](M12-incident-engine.md), [M12-alerting-api](M12-alerting-api.md) |
 | M12.3 | Notifications | Done | [M12-notifications-worker](M12-notifications-worker.md) |
 | M12.4 | Incident UI | Done | [M12-incidents-ui](M12-incidents-ui.md) |
-| M13.1 | Google OAuth framework | Not started | — |
-| M13.2 | GA4 connector | Not started | — |
-| M13.3 | Firebase, Play, Search Console, BigQuery exports | Not started | — |
-| M13.4 | Google Ads connector (gated on developer token) | Not started | — |
+| M13.1 | Google OAuth framework | Done | [M13b-google](M13b-google.md) |
+| M13.2 | GA4 connector | Done | [M13b-google](M13b-google.md) |
+| M13.3 | Firebase, Play, Search Console, BigQuery exports | Done (BigQuery exports not read yet) | [M13b-google](M13b-google.md) |
+| M13.4 | Google Ads connector (gated on developer token) | Awaiting approval | Needs a Google Ads developer token |
 | M13.5 | Website monitoring | Done | [M13a-schema](M13a-schema.md), [M13a-probe](M13a-probe.md), [M13a-worker-alerts](M13a-worker-alerts.md), [M13a-api](M13a-api.md), [M13a-web](M13a-web.md) |
-| M13.6 | KPI definitions and freshness | Not started | — |
-| M13.7 | Analytics, ads, website, mobile screens | Not started | — |
+| M13.6 | KPI definitions and freshness | Done | [M13b-google](M13b-google.md) |
+| M13.7 | Analytics, ads, website, mobile screens | Done | [M13b-google](M13b-google.md) |
 | M14.1 | LLM provider layer | Done | [M14-schema](M14-schema.md), [M14-providers](M14-providers.md) |
 | M14.2 | Tool registry | Done | [M14-ai-api](M14-ai-api.md) |
 | M14.3 | Orchestration loop and validation | Done | [M14-investigation-loop](M14-investigation-loop.md) |
