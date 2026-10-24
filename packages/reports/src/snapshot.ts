@@ -25,6 +25,17 @@ export interface WebsiteStats {
   uptimePercent: number | null;
   tlsDays: number | null;
 }
+/** The report day's values per Google property, site, or app (M13b); null values stay null. */
+export interface AnalyticsStats {
+  resources: Array<{
+    name: string;
+    source: string;
+    /** The provider is still processing that day. */
+    partial: boolean;
+    values: Array<{ label: string; value: number | null; unit: string }>;
+  }>;
+}
+
 export interface DeploymentStats {
   deployed: number;
   failed: number;
@@ -46,6 +57,8 @@ export interface ReportSources {
   websites(w: ReportWindow): Promise<WebsiteStats[] | null>;
   /** Null when no deployment source (GitHub) is connected (M7). */
   deployments(w: ReportWindow): Promise<DeploymentStats | null>;
+  /** null when no Google connection exists for the product. */
+  analytics(w: ReportWindow): Promise<AnalyticsStats | null>;
   coverage(w: ReportWindow): Promise<CoverageItem[]>;
 }
 
@@ -73,7 +86,7 @@ export interface Snapshot {
 
 /** Sources that have no connector yet; listed, never zero. */
 const NOT_CONNECTED: Partial<Record<SectionKey, { source: string; reason: string }>> = {
-  analytics: { source: 'User analytics', reason: 'Google Analytics not connected (M13b)' },
+  analytics: { source: 'User analytics', reason: 'Google Analytics not connected' },
   ads: { source: 'Advertising', reason: 'No ad platform connected' },
   deployments: { source: 'Deployments', reason: 'No deployment source connected (GitHub, M7)' },
 };
@@ -143,6 +156,7 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     rawSites,
     coverage,
     deployments,
+    analytics,
   ] = await Promise.all([
     sources.incidents(w),
     sources.incidents(prev),
@@ -154,6 +168,7 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     sources.websites(w),
     sources.coverage(w),
     sources.deployments(w),
+    sources.analytics(w),
   ]);
   const hosts =
     rawHosts?.map((h) => ({
@@ -179,7 +194,7 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
   const allCoverage: CoverageItem[] = [
     ...coverage,
     ...Object.entries(NOT_CONNECTED)
-      .filter(([key]) => !(key === 'deployments' && deployments))
+      .filter(([key]) => !(key === 'deployments' && deployments) && !(key === 'analytics' && analytics))
       .map(([, n]) => ({ source: n!.source, status: 'missing' as const, reason: n!.reason })),
   ];
 
@@ -201,7 +216,11 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     application: logs
       ? { data: logs }
       : { missing: 'No log-derived metrics (turn on log collection on an agent)' },
-    analytics: { missing: NOT_CONNECTED.analytics!.reason },
+    analytics: analytics
+      ? analytics.resources.length
+        ? { data: analytics }
+        : { missing: 'Google is connected but no property, site, or app is scoped to this product' }
+      : { missing: NOT_CONNECTED.analytics!.reason },
     databases: databases?.length ? { data: { databases } } : { missing: 'No database connected' },
     ads: { missing: NOT_CONNECTED.ads!.reason },
     deployments: deployments ? { data: deployments } : { missing: NOT_CONNECTED.deployments!.reason },

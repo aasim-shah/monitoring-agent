@@ -23,7 +23,7 @@ describe('renderReport (UC-15-03)', () => {
     expect(m.subject).toBe('Daily report — Shop — 2026-10-25');
     expect(m.text).toContain('Data coverage and missing sources');
     expect(m.text).toContain('Infrastructure performance\nNo data: No host metrics in this window');
-    expect(m.text).toContain('User analytics\nNo data: Google Analytics not connected (M13b)');
+    expect(m.text).toContain('User analytics\nNo data: Google Analytics not connected');
     expect(m.text).toContain('Quiet day [S2].');
     expect(m.text).toContain(link);
     expect(m.text).not.toMatch(/Infrastructure performance\n.*0 %/);
@@ -75,6 +75,32 @@ describe('renderReport (UC-15-03)', () => {
     expect(sectionLines(snapshot.sections.find((x) => x.key === 'deployments')!)).toEqual([
       'Deployments: 1, failed: 0',
       'Deployed main to production (acme/shop)',
+    ]);
+  });
+
+  it('lists analytics values, says when the day is partial, and never prints a missing value as 0', async () => {
+    const { sectionLines } = await import('./render.js');
+    const snapshot = await buildSnapshot(
+      fixtureSources({
+        analytics: async () => ({
+          resources: [
+            {
+              name: 'FireMaps web',
+              source: 'GA4',
+              partial: true,
+              values: [
+                { label: 'Active users', value: 120, unit: 'count' },
+                { label: 'Engagement rate', value: 0.615, unit: 'ratio' },
+                { label: 'Sessions', value: null, unit: 'count' },
+              ],
+            },
+          ],
+        }),
+      }),
+      w,
+    );
+    expect(sectionLines(snapshot.sections.find((x) => x.key === 'analytics')!)).toEqual([
+      'FireMaps web (GA4, partial day): Active users 120, Engagement rate 61.5 %, Sessions no data',
     ]);
   });
 });

@@ -1,5 +1,6 @@
 import type { NarrativeStatus } from './narrative.js';
 import type {
+  AnalyticsStats,
   Anomaly,
   CoverageItem,
   DatabaseStats,
@@ -64,6 +65,19 @@ export function sectionLines(s: Section): string[] {
       return (s.data as { databases: DatabaseStats[] }).databases.map(
         (d) => `${d.name} (${d.provider}): ${d.status}`,
       );
+    case 'analytics': {
+      const d = s.data as AnalyticsStats;
+      const fmt = (v: { value: number | null; unit: string }) =>
+        v.value === null
+          ? 'no data'
+          : v.unit === 'ratio'
+            ? `${Math.round(v.value * 1000) / 10} %`
+            : String(Math.round(v.value * 100) / 100);
+      return d.resources.map(
+        (r) =>
+          `${r.name} (${r.source}${r.partial ? ', partial day' : ''}): ${r.values.map((v) => `${v.label} ${fmt(v)}`).join(', ')}`,
+      );
+    }
     case 'deployments': {
       const d = s.data as { deployed: number; failed: number; items: Array<{ title: string }> };
       return [`Deployments: ${d.deployed}, failed: ${d.failed}`, ...d.items.slice(0, 10).map((i) => i.title)];

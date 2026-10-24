@@ -3,16 +3,23 @@ import type {
   CoverageItem,
   DatabaseStats,
   DeploymentStats,
+  AnalyticsStats,
   HostStats,
   IncidentStats,
   ReportSources,
   ReportWindow,
   WebsiteStats,
 } from '@pcp/reports';
-import type { TenantContext } from '@pcp/shared-contracts';
+import { kpisFor, type TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 
 const DB_PROVIDERS = ['postgres', 'mysql', 'mongodb'];
+/** Google resources with daily KPI values, and how a report names their source. */
+const GOOGLE_SOURCE: Record<string, string> = {
+  google_ga4_property: 'GA4',
+  google_search_console_site: 'Search Console',
+  google_play_app: 'Play vitals',
+};
 const QUERY_TIMEOUT_MS = 10_000;
 
 type Sample = { labels: Record<string, string>; value: number | null };
@@ -215,6 +222,51 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
         }),
       );
 
+    /** The report's local date of each scoped Google property, site, or app (M13b). */
+    const analytics = (w: ReportWindow) =>
+      once<AnalyticsStats | null>('analytics', w, () =>
+        db(async (tx) => {
+          const connections = await tx.connection.findMany({
+            where: {
+              provider: 'google',
+              status: { notIn: ['disconnected', 'revoked'] },
+              scopes: { some: { productId } },
+            },
+            include: { scopes: { where: { productId, resourceType: { in: Object.keys(GOOGLE_SOURCE) } } } },
+          });
+          if (!connections.length) return null;
+          const rows = await tx.metricAggregate.findMany({
+            where: {
+              connectionId: { in: connections.map((c) => c.id) },
+              day: new Date(`${w.localDate}T00:00:00Z`),
+              dimension: '',
+            },
+          });
+          return {
+            resources: connections.flatMap((c) =>
+              c.scopes.map((sc) => {
+                const mine = rows.filter(
+                  (r) =>
+                    r.connectionId === c.id &&
+                    r.resourceType === sc.resourceType &&
+                    r.externalId === sc.externalId,
+                );
+                return {
+                  name: sc.name,
+                  source: GOOGLE_SOURCE[sc.resourceType]!,
+                  partial: mine.some((r) => r.completeness === 'partial'),
+                  values: kpisFor(sc.resourceType).map((def) => ({
+                    label: def.label,
+                    unit: def.unit,
+                    value: mine.find((r) => r.metric === def.metric)?.value ?? null,
+                  })),
+                };
+              }),
+            ),
+          };
+        }),
+      );
+
     const coverage = async (w: ReportWindow): Promise<CoverageItem[]> => {
       const [h, l, d, s] = await Promise.all([hosts(w), logErrors(w), databases(w), websites(w)]);
       const telemetry = deps.vmQueryUrl ? null : 'Telemetry storage is not configured';
@@ -236,6 +288,6 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
       ];
     };
 
-    return { incidents, hosts, logErrors, databases, websites, deployments, coverage };
+    return { incidents, hosts, logErrors, databases, websites, deployments, analytics, coverage };
   };
 }

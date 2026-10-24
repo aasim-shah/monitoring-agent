@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { defineTool, ToolNotFound, type Tool } from '@pcp/ai-orchestrator';
 import type { PrismaClient } from '@pcp/database';
-import type { TenantContext } from '@pcp/shared-contracts';
+import { aggregate, kpisFor, type TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 import { z } from 'zod/v4';
 import { ApiException } from '../../common/errors.js';
@@ -502,7 +502,89 @@ export const AI_TOOLS: Tool[] = [
       };
     },
   }),
-  unavailable('getAnalyticsReport', 'GA4 and Firebase product analytics', 'Analytics: source not connected'),
+  defineTool<{ range: '7d' | '28d' }, AiDeps>({
+    name: 'getAnalyticsReport',
+    description:
+      'Product analytics from Google: GA4 users, sessions, views, engagement, and key events; Search Console clicks and positions; Play crash and ANR rates. Totals over the range per property, site, or app.',
+    permission: 'telemetry.query',
+    input: z.object({ range: z.enum(['7d', '28d']).default('7d').describe('Look-back window in days') }),
+    run: async (ctx, input, d) => {
+      const n = input.range === '7d' ? 7 : 28;
+      const end = d.now().toISOString().slice(0, 10);
+      const start = new Date(d.now().getTime() - (n - 1) * 86_400_000).toISOString().slice(0, 10);
+      const { connections, rows } = await withTenant(d.prisma, ctx, async (tx) => {
+        const connections = await tx.connection.findMany({
+          where: {
+            provider: 'google',
+            status: { notIn: ['disconnected', 'revoked'] },
+            scopes: { some: { productId: d.productId } },
+          },
+          include: { scopes: { where: { productId: d.productId } } },
+        });
+        const rows = await tx.metricAggregate.findMany({
+          where: {
+            connectionId: { in: connections.map((c) => c.id) },
+            day: { gte: new Date(`${start}T00:00:00Z`), lte: new Date(`${end}T00:00:00Z`) },
+          },
+        });
+        return { connections, rows };
+      });
+      if (!connections.length) return { data: { resources: [] }, gaps: ['Analytics: source not connected'] };
+      const SOURCE: Record<string, string> = {
+        google_ga4_property: 'GA4',
+        google_search_console_site: 'Search Console',
+        google_play_app: 'Play vitals',
+      };
+      const resources = connections.flatMap((c) =>
+        c.scopes
+          .filter((s) => SOURCE[s.resourceType])
+          .map((s) => {
+            const mine = rows.filter(
+              (r) =>
+                r.connectionId === c.id && r.resourceType === s.resourceType && r.externalId === s.externalId,
+            );
+            const totals: Record<string, number | null> = {};
+            for (const def of kpisFor(s.resourceType)) {
+              const values = mine
+                .filter((r) => r.metric === def.metric && r.dimension === '')
+                .map((r) => r.value);
+              const label =
+                def.aggregation === 'mean' && def.unit === 'count'
+                  ? `${def.label} (daily average)`
+                  : def.label;
+              totals[label] = round(aggregate(def, values));
+            }
+            const channels = new Map<string, number>();
+            for (const r of mine)
+              if (r.metric === 'sessions' && r.dimension && r.value !== null)
+                channels.set(r.dimension, (channels.get(r.dimension) ?? 0) + r.value);
+            return {
+              name: s.name,
+              source: SOURCE[s.resourceType]!,
+              totals,
+              partialDays: new Set(
+                mine.filter((r) => r.completeness === 'partial').map((r) => r.day.toISOString()),
+              ).size,
+              ...(channels.size
+                ? {
+                    topChannels: [...channels]
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map(([channel, sessions]) => ({ channel, sessions })),
+                  }
+                : {}),
+            };
+          }),
+      );
+      return {
+        data: { range: input.range, resources },
+        gaps: resources.length
+          ? []
+          : ['Analytics: no Google property, site, or app is scoped to this product'],
+        sources: [{ label: 'Analytics & Ads', href: `${base(d)}/analytics` }],
+      };
+    },
+  }),
   unavailable('getAdPerformance', 'Ads spend, clicks, conversions', 'Ads: source not connected'),
   defineTool<{ range: keyof typeof RANGE_SECONDS }, AiDeps>({
     name: 'getDeployments',

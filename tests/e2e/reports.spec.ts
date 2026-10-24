@@ -69,14 +69,14 @@ test('reports: a daily schedule runs, persists, and delivers with missing-data w
   const mail = await waitForMail(ops, `Daily report — Shop — ${localDate}`, 60_000);
   expect(mail).toContain('Data coverage and missing sources');
   // Mail bodies travel with CRLF line endings.
-  expect(mail).toMatch(/User analytics\r?\nNo data: Google Analytics not connected \(M13b\)/);
+  expect(mail).toMatch(/User analytics\r?\nNo data: Google Analytics not connected/);
 
   // UC-15-04/06: the report view with sections, coverage, and the delivery log.
   await v1.getByRole('link', { name: 'Open' }).click();
   await expect(page.getByRole('heading', { name: `Daily report — ${localDate} · v1` })).toBeVisible();
   await expect(page.getByText('Verified against the data')).toBeVisible();
   await expect(page.getByRole('region', { name: 'User analytics' })).toContainText(
-    'No data: Google Analytics not connected (M13b)',
+    'No data: Google Analytics not connected',
   );
   await expect(page.getByRole('region', { name: 'Data coverage and missing sources' })).toContainText(
     'Host metrics: missing',

@@ -16,6 +16,7 @@ import {
 import { dispatchDueReports } from './report-dispatcher.js';
 import { reportHandlers, type ReportDeps } from './report-handlers.js';
 import { createReportSources } from './report-sources.js';
+import { reauthorizationNotice } from './reauth-notice.js';
 
 let db: TestDatabase;
 let redis: TestRedis;
@@ -353,5 +354,81 @@ describe('report-generate and report-deliver (UC-15-02/03)', () => {
         items: [{ title: 'shop deploy failed' }, { title: 'shop deployed to production' }],
       },
     });
+  });
+  it('reports the day of GA4 values from a product-scoped Google connection (M13b)', async () => {
+    const s = await seed();
+    const conn = randomUUID();
+    await sql(
+      `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, updated_at)
+       VALUES ($1, $2, 'google', 'Google', 'connected', 'cloud', now())`,
+      [conn, s.org],
+    );
+    await sql(
+      `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id)
+       VALUES ($1, $2, 'properties/1', 'google_ga4_property', 'Shop web', $3)`,
+      [s.org, conn, s.product],
+    );
+    const v = (d: string, metric: string, value: number, completeness = 'complete') =>
+      sql(
+        `INSERT INTO metric_aggregates (organization_id, connection_id, resource_type, external_id, metric, day, value, completeness)
+         VALUES ($1, $2, 'google_ga4_property', 'properties/1', $3, $4, $5, $6)`,
+        [s.org, conn, metric, d, value, completeness],
+      );
+    await v('2026-10-25', 'activeUsers', 120, 'partial');
+    await v('2026-10-24', 'activeUsers', 999);
+    const h = reportHandlers(deps());
+    await h['report-generate'](ctx(s.org), s.schedule, job('2026-10-25'));
+    const [report] = await reports(s);
+    const snapshot = report!.snapshot as { sections: Array<{ key: string; status: string; data: unknown }> };
+    const analytics = snapshot.sections.find((x) => x.key === 'analytics')!;
+    expect(analytics.status).toBe('ok');
+    const [res] = (
+      analytics.data as {
+        resources: Array<{
+          name: string;
+          partial: boolean;
+          values: Array<{ label: string; value: number | null }>;
+        }>;
+      }
+    ).resources;
+    expect(res).toMatchObject({ name: 'Shop web', source: 'GA4', partial: true });
+    expect(res!.values.find((x) => x.label === 'Active users')!.value).toBe(120);
+    expect(res!.values.find((x) => x.label === 'Sessions')!.value).toBeNull();
+  });
+});
+
+describe('Google reauthorization notice (WB-08 UC-08-10)', () => {
+  it('emails the member who connected and the owners, with a link to reconnect', async () => {
+    mails = [];
+    const s = await seed();
+    const owner = randomUUID();
+    await sql(`INSERT INTO users (id, email) VALUES ($1, $2)`, [owner, `${owner}@example.com`]);
+    await sql(
+      `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner')`,
+      [randomUUID(), s.org, owner],
+    );
+    const conn = randomUUID();
+    await sql(
+      `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, account_email, created_by_user_id, updated_at)
+       VALUES ($1, $2, 'google', 'Google', 'degraded', 'cloud', 'ops@acme.example', $3, now())`,
+      [conn, s.org, s.user],
+    );
+    await sql(
+      `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id)
+       VALUES ($1, $2, 'properties/1', 'google_ga4_property', 'Shop web', $3)`,
+      [s.org, conn, s.product],
+    );
+    await reauthorizationNotice({
+      prisma,
+      appOrigin: 'https://monitor.example.com',
+      sendMail: deps().delivery.sendMail,
+    })(ctx(s.org), conn);
+    expect(mails).toHaveLength(1);
+    expect(mails[0]!.to).toEqual([`${owner}@example.com`, `${s.user}@example.com`].sort());
+    expect(mails[0]!.subject).toBe('Google connection needs reauthorization');
+    expect(mails[0]!.text).toContain('granted by ops@acme.example');
+    expect(mails[0]!.text).toContain(
+      `https://monitor.example.com/orgs/${s.org}/products/${s.product}/integrations/${conn}`,
+    );
   });
 });

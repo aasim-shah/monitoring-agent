@@ -32,6 +32,8 @@ function fakeStep(req: ChatRequest): ScriptStep {
     const asset = ASSET.exec(question);
     if (asset) return { toolCalls: [{ name: 'getAssetDetails', arguments: { assetId: asset[1] } }] };
     if (/products/i.test(question)) return { toolCalls: [{ name: 'listProducts', arguments: {} }] };
+    if (/users|visitors|traffic|analytics|search clicks|crash/i.test(question))
+      return { toolCalls: [{ name: 'getAnalyticsReport', arguments: { range: '7d' } }] };
     if (/website|site up/i.test(question))
       return { toolCalls: [{ name: 'getWebsiteAvailability', arguments: { range: '24h' } }] };
     return {

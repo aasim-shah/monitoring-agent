@@ -8,6 +8,7 @@ import nodemailer from 'nodemailer';
 import { authoritativeTxt, nodeDns } from '@pcp/website-probe';
 import { alertingHandlers } from './alerting-handlers.js';
 import { dispatchDueReports } from './report-dispatcher.js';
+import { reauthorizationNotice } from './reauth-notice.js';
 import { reportHandlers } from './report-handlers.js';
 import { createReportSources } from './report-sources.js';
 import { websiteProbeHandler } from './website-handler.js';
@@ -67,6 +68,8 @@ const processors = startProcessors({
   prisma,
   runtime,
   handlers: { ...handlers, ...reports, 'website-probe': (ctx, id) => probeWebsite(ctx, id) },
+  // A revoked Google grant: tell whoever connected it, and the owners, once (M13b).
+  onReauthorizationRequired: reauthorizationNotice({ prisma, ...delivery }),
 });
 
 // PostgreSQL holds the schedules; reconcile Redis at startup and periodically after config changes.

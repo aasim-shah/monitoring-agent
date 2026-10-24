@@ -138,6 +138,43 @@ describe('AI assistant (WB-14 UC-14-01)', () => {
     expect(answer.missing).not.toContain('Deployments: source not connected');
   });
 
+  it('answers traffic questions from GA4 daily values (M13b)', async () => {
+    const { owner, productId } = await setup();
+    const conn = randomUUID();
+    await sql(
+      `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, granted_scopes, updated_at)
+       VALUES ($1, $2, 'google', 'Google', 'connected', 'cloud', ARRAY['https://www.googleapis.com/auth/analytics.readonly'], now())`,
+      [conn, owner.orgId],
+    );
+    await sql(
+      `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id)
+       VALUES ($1, $2, 'properties/1', 'google_ga4_property', 'FireMaps web', $3)`,
+      [owner.orgId, conn, productId],
+    );
+    for (const [offset, users, completeness] of [
+      [1, 100, 'complete'],
+      [0, 40, 'partial'],
+    ] as const)
+      await sql(
+        `INSERT INTO metric_aggregates (organization_id, connection_id, resource_type, external_id, metric, day, value, completeness)
+         VALUES ($1, $2, 'google_ga4_property', 'properties/1', 'activeUsers', (now() - make_interval(days => $3))::date, $4, $5)`,
+        [owner.orgId, conn, offset, users, completeness],
+      );
+    const { events: ev } = await ask(owner.cookie, productId, 'How many users visited FireMaps this week?');
+    const answer = ev.find((e) => e.event === 'answer')!.data;
+    const analytics = (answer.evidence as Body[]).find((e) => e.tool === 'getAnalyticsReport')!;
+    expect(analytics.status).toBe('ok');
+    expect((analytics.data as Body).resources).toEqual([
+      expect.objectContaining({
+        name: 'FireMaps web',
+        source: 'GA4',
+        partialDays: 1,
+        totals: expect.objectContaining({ 'Active users (daily average)': 70 }),
+      }),
+    ]);
+    expect(answer.missing).not.toContain('Analytics: source not connected');
+  });
+
   it("returns not_found for another tenant's asset and audits the denial (TC-14-01)", async () => {
     const a = await setup();
     const b = await setup();

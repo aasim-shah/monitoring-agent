@@ -82,7 +82,7 @@ async function seedReport(orgId: string, productId: string, scheduleId: string |
         title: 'User analytics',
         status: 'missing',
         data: null,
-        reason: 'Google Analytics not connected (M13b)',
+        reason: 'Google Analytics not connected',
       },
     ],
     anomalies: [],
@@ -235,7 +235,7 @@ describe('report history (WB-15 UC-15-04/09)', () => {
     const one = (await call(owner.cookie, 'GET', `/api/v1/reports/${id}`)).json();
     expect(one.snapshot.sections[0]).toMatchObject({
       status: 'missing',
-      reason: 'Google Analytics not connected (M13b)',
+      reason: 'Google Analytics not connected',
     });
     expect(one.deliveries).toEqual([
       expect.objectContaining({

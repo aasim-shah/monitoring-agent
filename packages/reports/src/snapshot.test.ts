@@ -43,7 +43,7 @@ describe('buildSnapshot (BR-15-01, BR-15-05)', () => {
   it('lists sources that do not exist yet as missing, never as zero', async () => {
     const s = await buildSnapshot(fixtureSources(), w);
     for (const [key, reason] of [
-      ['analytics', 'Google Analytics not connected (M13b)'],
+      ['analytics', 'Google Analytics not connected'],
       ['ads', 'No ad platform connected'],
       ['deployments', 'No deployment source connected (GitHub, M7)'],
     ])
@@ -51,7 +51,7 @@ describe('buildSnapshot (BR-15-01, BR-15-05)', () => {
     expect(s.coverage).toContainEqual({
       source: 'User analytics',
       status: 'missing',
-      reason: 'Google Analytics not connected (M13b)',
+      reason: 'Google Analytics not connected',
     });
   });
 
@@ -100,6 +100,32 @@ describe('buildSnapshot (BR-15-01, BR-15-05)', () => {
     );
     expect(section(s, 'deployments')).toMatchObject({ status: 'ok', data: { deployed: 2, failed: 1 } });
     expect(s.coverage.find((c) => c.source === 'Deployments')).toBeUndefined();
+  });
+
+  it('reports the day of GA4, Search Console, and Play values when Google is connected (M13b)', async () => {
+    const s = await buildSnapshot(
+      fixtureSources({
+        analytics: async () => ({
+          resources: [
+            {
+              name: 'FireMaps web',
+              source: 'GA4',
+              partial: true,
+              values: [
+                { label: 'Active users', value: 120, unit: 'count' },
+                { label: 'Sessions', value: null, unit: 'count' },
+              ],
+            },
+          ],
+        }),
+      }),
+      w,
+    );
+    expect(section(s, 'analytics')).toMatchObject({
+      status: 'ok',
+      data: { resources: [{ name: 'FireMaps web' }] },
+    });
+    expect(s.coverage.find((c) => c.source === 'User analytics')).toBeUndefined();
   });
 
   it('flags large changes against the previous day, above a floor', async () => {

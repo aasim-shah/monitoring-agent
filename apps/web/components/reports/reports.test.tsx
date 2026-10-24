@@ -194,23 +194,19 @@ const report = (over: Partial<ReportData> = {}): ReportData => ({
         title: 'User analytics',
         status: 'missing',
         data: null,
-        reason: 'Google Analytics not connected (M13b)',
+        reason: 'Google Analytics not connected',
       },
       {
         id: 'S12',
         key: 'coverage',
         title: 'Data coverage and missing sources',
         status: 'ok',
-        data: [
-          { source: 'User analytics', status: 'missing', reason: 'Google Analytics not connected (M13b)' },
-        ],
+        data: [{ source: 'User analytics', status: 'missing', reason: 'Google Analytics not connected' }],
       },
     ],
     anomalies: [],
     actions: [],
-    coverage: [
-      { source: 'User analytics', status: 'missing', reason: 'Google Analytics not connected (M13b)' },
-    ],
+    coverage: [{ source: 'User analytics', status: 'missing', reason: 'Google Analytics not connected' }],
   },
   deliveries: [
     {
@@ -246,7 +242,7 @@ describe('ReportView (UC-15-04/06)', () => {
     expect(within(infra).queryByText(/0 %/)).toBeNull();
     expect(
       within(screen.getByRole('region', { name: 'User analytics' })).getByText(
-        'No data: Google Analytics not connected (M13b)',
+        'No data: Google Analytics not connected',
       ),
     ).toBeInTheDocument();
     expect(
