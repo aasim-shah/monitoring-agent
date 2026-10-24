@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { unwrap } from '@pcp/api-client';
 import type { Role } from '@pcp/shared-contracts';
 import { ConnectDialog, type NewIntegration } from '@/components/integrations/connect-dialog';
+import { GoogleConnectDialog } from '@/components/integrations/google-connect';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
@@ -64,6 +65,23 @@ export default function IntegrationsPage() {
     router.push(`/orgs/${orgId}/products/${productId}/integrations/${created.id}`);
   };
 
+  /** Creates the connection, then sends the browser to Google's consent screen (WB-08 UC-08-01). */
+  const connectGoogle = async () => {
+    const created = unwrap(
+      await api.POST('/api/v1/organizations/{orgId}/connections', {
+        params: { path: { orgId } },
+        body: { provider: 'google', displayName: 'Google', executionLocation: 'cloud', config: {} },
+      }),
+    );
+    const { url } = unwrap(
+      await api.POST('/api/v1/connections/{id}/oauth/google/start', {
+        params: { path: { id: created.id } },
+        body: { productId, missingOnly: false },
+      }),
+    );
+    window.location.assign(url);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -91,11 +109,15 @@ export default function IntegrationsPage() {
                 </div>
                 {canConfigure ? (
                   <div>
-                    <ConnectDialog
-                      spec={spec}
-                      credentialFields={entry.credentialFields ?? []}
-                      onSubmit={connect}
-                    />
+                    {spec.oauth ? (
+                      <GoogleConnectDialog onConnect={connectGoogle} />
+                    ) : (
+                      <ConnectDialog
+                        spec={spec}
+                        credentialFields={entry.credentialFields ?? []}
+                        onSubmit={connect}
+                      />
+                    )}
                   </div>
                 ) : null}
               </Card>

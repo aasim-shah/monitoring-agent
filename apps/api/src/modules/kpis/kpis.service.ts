@@ -14,8 +14,13 @@ import { CLOCK, PRISMA } from '../../tokens.js';
 export const KPI_RANGES = { '7d': 7, '28d': 28, '90d': 90 } as const;
 export type KpiRange = keyof typeof KPI_RANGES;
 
-/** Resource kinds with daily KPI values (M13b). */
-const KPI_RESOURCES = ['google_ga4_property', 'google_search_console_site', 'google_play_app'];
+/** Resource kinds with daily KPI values (M13b); Firebase apps are listed for the Mobile page. */
+const KPI_RESOURCES = [
+  'google_ga4_property',
+  'google_search_console_site',
+  'google_play_app',
+  'google_firebase_app',
+];
 /** A sync runs hourly; two missed runs make the source stale. */
 const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
 

@@ -62,7 +62,9 @@ describe('product navigation (spec §21)', () => {
       'Assets',
       'Infrastructure',
       'Websites & APIs',
+      'Mobile Apps & SDKs',
       'Databases',
+      'Analytics & Ads',
       'Incidents & Alerts',
       'AI Assistant',
       'Reports & Schedules',
@@ -87,6 +89,15 @@ describe('product navigation (spec §21)', () => {
       label: 'Automations & Approvals',
       href: '/orgs/o/products/p/automations',
     });
+    expect(items.find((i) => i.label === 'Analytics & Ads')).toEqual({
+      label: 'Analytics & Ads',
+      href: '/orgs/o/products/p/analytics',
+    });
+    expect(items.find((i) => i.label === 'Mobile Apps & SDKs')).toEqual({
+      label: 'Mobile Apps & SDKs',
+      href: '/orgs/o/products/p/mobile',
+    });
+    expect(items.some((i) => i.milestone)).toBe(false);
     expect(items.find((i) => i.label === 'Incidents & Alerts')).toEqual({
       label: 'Incidents & Alerts',
       href: '/orgs/o/products/p/incidents',

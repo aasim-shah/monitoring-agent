@@ -1,10 +1,12 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { unwrap } from '@pcp/api-client';
 import type { Role } from '@pcp/shared-contracts';
 import { ConnectionDetail } from '@/components/integrations/connection-detail';
+import { GoogleAccess } from '@/components/integrations/google-access';
+import { Alert } from '@/components/ui/alert';
 import { api } from '@/lib/api';
 import { QueryState } from '@/lib/page-guard';
 import { roleCan } from '@/lib/permissions';
@@ -59,9 +61,39 @@ export default function IntegrationDetailPage() {
     },
   );
   const refresh = () => queryClient.invalidateQueries({ queryKey: key });
+  // Back from Google's consent screen (M13b).
+  const googleResult = useSearchParams().get('google');
+  const GOOGLE_RESULT: Record<string, { tone: 'success' | 'info' | 'error'; text: string }> = {
+    connected: { tone: 'success', text: 'Google access saved. Validation and discovery start now.' },
+    cancelled: { tone: 'info', text: 'Google consent was cancelled; nothing was changed.' },
+    error: { tone: 'error', text: 'Google did not accept the sign-in. Try again.' },
+  };
 
   return (
     <QueryState query={detail} label="Loading integration">
+      {googleResult && GOOGLE_RESULT[googleResult] ? (
+        <Alert tone={GOOGLE_RESULT[googleResult]!.tone} className="mb-4">
+          {GOOGLE_RESULT[googleResult]!.text}
+        </Alert>
+      ) : null}
+      {detail.data?.connection.provider === 'google' ? (
+        <div className="mb-4">
+          <GoogleAccess
+            accountEmail={detail.data.connection.accountEmail ?? null}
+            grantedScopes={detail.data.connection.grantedScopes ?? []}
+            canConfigure={roleCan(role, 'connection.configure')}
+            onGrant={async () => {
+              const { url } = unwrap(
+                await api.POST('/api/v1/connections/{id}/oauth/google/start', {
+                  ...path,
+                  body: { productId, missingOnly: true },
+                }),
+              );
+              window.location.assign(url);
+            }}
+          />
+        </div>
+      ) : null}
       {detail.data ? (
         <ConnectionDetail
           data={detail.data}

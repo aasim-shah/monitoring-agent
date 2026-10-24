@@ -52,13 +52,21 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
       href: `/orgs/${orgId}/products/${productId}/websites`,
       permission: 'telemetry.query',
     },
-    { label: 'Mobile Apps & SDKs', milestone: 'M13' },
+    {
+      label: 'Mobile Apps & SDKs',
+      href: `/orgs/${orgId}/products/${productId}/mobile`,
+      permission: 'telemetry.query',
+    },
     {
       label: 'Databases',
       href: `/orgs/${orgId}/products/${productId}/databases`,
       permission: 'connection.view',
     },
-    { label: 'Analytics & Ads', milestone: 'M13' },
+    {
+      label: 'Analytics & Ads',
+      href: `/orgs/${orgId}/products/${productId}/analytics`,
+      permission: 'telemetry.query',
+    },
     {
       label: 'Incidents & Alerts',
       href: `/orgs/${orgId}/products/${productId}/incidents`,

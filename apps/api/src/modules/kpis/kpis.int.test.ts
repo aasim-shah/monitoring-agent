@@ -80,6 +80,7 @@ describe('KPI API (WB-09 UC-09-06, BR-09-05)', () => {
     const conn = await googleConnection(owner, [
       ['google_ga4_property', 'properties/1', 'Shop web', shop],
       ['google_ga4_property', 'properties/2', 'Blog web', blog],
+      ['google_firebase_app', '1:1:android:a', 'Shop Android', shop],
     ]);
     await value(owner, conn, 'properties/1', 'activeUsers', day(-1), 100);
     await value(owner, conn, 'properties/1', 'activeUsers', day(0), 40, 'partial');
@@ -95,7 +96,12 @@ describe('KPI API (WB-09 UC-09-06, BR-09-05)', () => {
     const body = res.json();
     expect(body.days).toHaveLength(7);
     expect(body.days.at(-1)).toBe(day(0));
-    expect(body.resources.map((r: { externalId: string }) => r.externalId)).toEqual(['properties/1']);
+    expect(body.resources.map((r: { externalId: string }) => r.externalId)).toEqual([
+      'properties/1',
+      '1:1:android:a',
+    ]);
+    // Firebase apps have no daily values; they are listed for the Mobile page.
+    expect(body.resources[1]).toMatchObject({ resourceType: 'google_firebase_app', kpis: [] });
     const [shopWeb] = body.resources;
     expect(shopWeb).toMatchObject({
       connectionId: conn,

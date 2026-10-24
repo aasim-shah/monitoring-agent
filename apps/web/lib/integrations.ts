@@ -1,6 +1,8 @@
 /** What each SaaS integration asks for and does, shown before anyone pastes a token (WB-06 UC-06-02). */
 export interface IntegrationSpec {
-  provider: 'cloudflare' | 'github' | 'prometheus' | 'grafana';
+  provider: 'cloudflare' | 'github' | 'prometheus' | 'grafana' | 'google';
+  /** Connected through the provider's sign-in, not a pasted token (Google, M13b). */
+  oauth?: boolean;
   title: string;
   summary: string;
   /** Exact permission names as the provider's token screen shows them. */
@@ -121,6 +123,26 @@ export const INTEGRATIONS: Record<IntegrationSpec['provider'], IntegrationSpec> 
     ],
     displayName: () => 'Grafana',
     scopeTypes: ['grafana_dashboard'],
+  },
+  google: {
+    provider: 'google',
+    oauth: true,
+    title: 'Google',
+    summary: 'GA4, Search Console, Firebase apps, and Play Android vitals through one read-only sign-in.',
+    permissions: [],
+    tokenHelp: '',
+    collects:
+      'Daily GA4, Search Console, and Play vitals values for the properties, sites, and apps you choose.',
+    frequency: 'Hourly.',
+    changes: 'None. Read-only.',
+    configFields: [],
+    displayName: () => 'Google',
+    scopeTypes: [
+      'google_ga4_property',
+      'google_search_console_site',
+      'google_play_app',
+      'google_firebase_app',
+    ],
   },
 };
 

@@ -123,6 +123,9 @@ importers:
       '@pcp/connectors-databases':
         specifier: workspace:*
         version: link:../../packages/connectors/databases
+      '@pcp/connectors-google':
+        specifier: workspace:*
+        version: link:../../packages/connectors/google
       '@pcp/database':
         specifier: workspace:*
         version: link:../../packages/database
