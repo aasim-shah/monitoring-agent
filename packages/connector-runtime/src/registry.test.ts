@@ -32,4 +32,17 @@ describe('buildRegistry', () => {
     });
     expect(registry.has('cloudflare')).toBe(true);
   });
+
+  it('registers Google only when the platform OAuth client is configured (M13b)', async () => {
+    expect((await buildRegistry({})).has('google')).toBe(false);
+    const registry = await buildRegistry({ GOOGLE_CLIENT_ID: 'cid', GOOGLE_CLIENT_SECRET: 'secret' });
+    expect(registry.has('google')).toBe(true);
+    await expect(
+      buildRegistry({
+        GOOGLE_CLIENT_ID: 'cid',
+        GOOGLE_CLIENT_SECRET: 'secret',
+        PCP_GOOGLE_API_URL: 'http://fake:9',
+      }),
+    ).rejects.toThrow(/PCP_ALLOW_TEST_PROVIDERS/);
+  });
 });

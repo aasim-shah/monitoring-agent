@@ -92,6 +92,8 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      # Google data connections return here (M13b); must differ from the sign-in redirect.
+      GOOGLE_CONNECTIONS_REDIRECT_URI: ${GOOGLE_CONNECTIONS_REDIRECT_URI:-}
       # Shown to customers who allowlist the platform (managed databases).
       PLATFORM_EGRESS_IP: ${PLATFORM_EGRESS_IP:-}
       AGENT_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
@@ -153,6 +155,9 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       PCP_AI_FAKE: ${PCP_AI_FAKE:-}
+      # Google KPI sync refreshes access tokens with the platform OAuth client (M13b).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     # egress: managed databases and provider APIs are on the internet; internal has no route out.
     networks: [internal, egress]
     depends_on:
