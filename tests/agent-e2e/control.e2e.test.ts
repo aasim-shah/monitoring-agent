@@ -843,9 +843,14 @@ describe('approved service restart through pcp-helper (M16 exit gate)', () => {
         return ['succeeded', 'failed', 'expired'].includes(r.status as string) ? r : undefined;
       },
       180_000,
-    ).catch((e: Error) => {
-      // Say where it stopped: the request, its executions, and the agent task state.
-      throw new Error(`${e.message}; last: ${JSON.stringify(last)}`);
+    ).catch(async (e: Error) => {
+      // Say where it stopped: the request, its executions, and what the agent and helper logged.
+      const logs = await inHost(
+        'journalctl -u pcp-agent -u pcp-helper --no-pager -n 60 -o short-monotonic; systemctl is-active demo.service',
+      );
+      throw new Error(
+        `${e.message}; last: ${JSON.stringify(last)}; host logs:\n${logs.stdout}${logs.stderr}`,
+      );
     });
     expect(done.status, JSON.stringify(done)).toBe('succeeded');
     expect((done.executions as Json[])[0]!.verification).toEqual({ activeState: 'active', verified: true });
