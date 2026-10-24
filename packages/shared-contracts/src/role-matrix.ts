@@ -25,6 +25,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'pack.manage',
     'relationship.verify',
     'logs.tail',
+    'data.inspect',
     'incident.manage',
     'action.propose',
     'report.manage',

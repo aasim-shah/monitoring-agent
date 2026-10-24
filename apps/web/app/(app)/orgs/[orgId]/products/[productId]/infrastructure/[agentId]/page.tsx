@@ -129,6 +129,8 @@ export default function HostMetricsPage() {
           agentId={agentId}
           x25519PublicKey={agent.data.x25519PublicKey ?? null}
           canManage={roleCan(role, 'pack.manage')}
+          canInspect={roleCan(role, 'data.inspect')}
+          canConfigureInspection={roleCan(role, 'data.inspect.configure')}
           range={range}
         />
       ) : null}

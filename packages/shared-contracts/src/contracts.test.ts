@@ -43,8 +43,27 @@ const redisPack = {
 describe('roles and permissions', () => {
   it('defines the five roles and the master-plan permission list', () => {
     expect(ROLES).toEqual(['owner', 'admin', 'operator', 'analyst', 'viewer']);
-    expect(PERMISSIONS).toHaveLength(27);
+    expect(PERMISSIONS).toHaveLength(28);
     expect(PERMISSIONS).toContain('action.approve');
+  });
+
+  it('owners and admins configure data inspection; operators run it (WB-12 BR-12-06)', () => {
+    const ctx = (role: (typeof ROLES)[number]) => ({
+      organizationId: 'o',
+      actor: { kind: 'user' as const, userId: 'u' },
+      roles: [role],
+      productIds: 'all' as const,
+      environmentIds: 'all' as const,
+      requestId: 'r',
+    });
+    expect(
+      ['owner', 'admin', 'operator', 'analyst', 'viewer'].map((r) =>
+        can(ctx(r as never), 'data.inspect.configure'),
+      ),
+    ).toEqual([true, true, false, false, false]);
+    expect(
+      ['owner', 'admin', 'operator', 'analyst', 'viewer'].map((r) => can(ctx(r as never), 'data.inspect')),
+    ).toEqual([true, true, true, false, false]);
   });
 
   it('only owners export or delete the organization (WB-17 UC-17-09)', () => {

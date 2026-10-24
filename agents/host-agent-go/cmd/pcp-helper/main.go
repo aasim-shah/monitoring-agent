@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-var version = "0.4.0"
+var version = "0.5.0"
 
 const maxRequestBytes = 64 * 1024
 

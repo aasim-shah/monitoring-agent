@@ -309,6 +309,10 @@ beforeAll(async () => {
          VALUES ($1, $2, 'h', 22, 'pcp-install', 'pending', now())`,
         [org, session],
       );
+      await c.query(
+        `INSERT INTO inspection_requests (organization_id, agent_id, pack_id, target, status) VALUES ($1, gen_random_uuid(), 'redis', 'redis', 'queued')`,
+        [org],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

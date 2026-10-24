@@ -210,7 +210,10 @@ export class TasksService implements OnApplicationShutdown {
           organizationId: agent.organizationId,
           agentId: agent.id,
           status: body.status,
-          result: (body.result ?? undefined) as Prisma.InputJsonValue | undefined,
+          // Inspection values are kept by the inspections module (stats) or in Redis (peek), never here.
+          result: (isInspection(task) ? undefined : (body.result ?? undefined)) as
+            | Prisma.InputJsonValue
+            | undefined,
           error: body.error ?? null,
           receivedAt: this.now(),
         },
@@ -289,4 +292,9 @@ export class TasksService implements OnApplicationShutdown {
     if (!session) throw notFound();
     await this.redis.publish(`stream:${sessionId}`, JSON.stringify(body));
   }
+}
+
+/** Data inspections (M18.2); `agent_info` is the agent's own diagnostics, not customer data. */
+function isInspection(task: { type: string; payload: unknown }): boolean {
+  return task.type === 'inspect' && (task.payload as { target?: string } | null)?.target !== 'agent_info';
 }

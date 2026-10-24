@@ -1862,13 +1862,30 @@ paths:
     patch:
       operationId: updatePackInspection
       tags: [logs]
-      summary: Enable or disable data inspection for a pack
-      description: Enable or disable data inspection for a pack.
+      summary: Turn data inspection on or off for the Redis or Kafka pack
+      description: >-
+        Off by default. Exact Redis key names and Kafka topics only (no patterns). Requires
+        `data.inspect.configure` (owner, admin); audited (BR-12-06).
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+                redisKeys: { type: array, maxItems: 50, items: { type: string } }
+                peekTopics: { type: array, maxItems: 50, items: { type: string } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Settings saved
+          content: { application/json: { schema: { $ref: '#/components/schemas/InspectionSettings' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M18
   /api/v1/agents/{id}/live-boost:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
@@ -2005,25 +2022,73 @@ paths:
     post:
       operationId: createInspection
       tags: [logs]
-      summary: Run allowlisted data inspection
-      description: Run allowlisted data inspection.
+      summary: Run an allowlisted, read-only data inspection
+      description: >-
+        Redis stats (INFO, DBSIZE, slowlog command names, latency, client count, memory, allowlisted key sizes),
+        Kafka overview (topics, partitions, retention, sizes, consumer-group lag), or a Kafka message peek
+        (allowlisted topic, reason required, at most 20 messages redacted on the host and kept 10 minutes in
+        memory only). Needs agent 0.5.0. Requires `data.inspect`; audited.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packId, target]
+              additionalProperties: false
+              properties:
+                packId: { type: string }
+                target: { type: string, enum: [redis, kafka, kafka_peek] }
+                topic: { type: string }
+                reason: { type: string }
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status]
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M18
   /api/v1/inspections/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getInspection
       tags: [logs]
-      summary: Inspection result
-      description: Inspection result.
+      summary: Inspection status and result
+      description: A peek's messages are returned for 10 minutes, then `expired` is true and `result` is null.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, agentId, packId, target, status, result, error, createdAt, finishedAt]
+                properties:
+                  id: { type: string, format: uuid }
+                  agentId: { type: string, format: uuid }
+                  packId: { type: string }
+                  target: { type: string, enum: [redis, kafka, kafka_peek] }
+                  topic: { type: [string, 'null'] }
+                  status: { type: string, enum: [queued, succeeded, failed] }
+                  result: { description: Stats object (redis, kafka) or redacted messages (kafka_peek) }
+                  expired: { type: boolean }
+                  error: { type: [string, 'null'] }
+                  createdAt: { type: string, format: date-time }
+                  finishedAt: { type: [string, 'null'], format: date-time }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M18
   /api/v1/products/{id}/logs/search:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
@@ -5186,6 +5251,13 @@ components:
             controlUrl: { type: string }
             downloadUrl: { type: string }
             installScriptUrl: { type: string }
+    InspectionSettings:
+      type: object
+      required: [enabled, redisKeys, peekTopics]
+      properties:
+        enabled: { type: boolean }
+        redisKeys: { type: array, items: { type: string } }
+        peekTopics: { type: array, items: { type: string } }
     InstallSession:
       type: object
       required: [id, mode, status, expiresAt, egressIps, hosts]
@@ -5395,7 +5467,7 @@ components:
             troubleshooting: { type: array, items: { type: string } }
     PackAssignment:
       type: object
-      required: [packId, settings, status, statusMessage, policyVersion, appliedAt, updatedAt]
+      required: [packId, settings, status, statusMessage, policyVersion, appliedAt, updatedAt, inspection]
       properties:
         packId: { type: string }
         settings: { type: object, additionalProperties: true }
@@ -5404,6 +5476,7 @@ components:
         policyVersion: { type: integer }
         appliedAt: { type: [string, 'null'], format: date-time }
         updatedAt: { type: string, format: date-time }
+        inspection: { $ref: '#/components/schemas/InspectionSettings' }
     Inventory:
       type: object
       required: [collectedAt, services, listeners, warnings]

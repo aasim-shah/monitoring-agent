@@ -21,6 +21,12 @@ const view = (a: Assignment) => ({
   policyVersion: a.policyVersion,
   appliedAt: a.appliedAt,
   updatedAt: a.updatedAt,
+  // Data inspection settings (M18.2): which keys and topics an owner allowlisted.
+  inspection: {
+    enabled: (a.inspection as { enabled?: boolean } | null)?.enabled === true,
+    redisKeys: (a.inspection as { redisKeys?: string[] } | null)?.redisKeys ?? [],
+    peekTopics: (a.inspection as { peekTopics?: string[] } | null)?.peekTopics ?? [],
+  },
 });
 
 interface InventoryService {

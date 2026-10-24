@@ -11,6 +11,7 @@ import { sealCredentials } from '@/lib/seal';
 import { useApiQuery } from '@/lib/use-api-query';
 import type { EnablePackBody } from './enable-pack-dialog';
 import { GuidedSetup, type Guide } from './guided-setup';
+import { InspectionPanel, type InspectionApi } from './inspection-panel';
 import { LiveBoostControl } from './live-boost';
 import { ServicesPanel, type Assignment, type CatalogPack } from './services-panel';
 
@@ -91,11 +92,16 @@ export function ServicesSection({
   agentId,
   x25519PublicKey,
   canManage,
+  canInspect = false,
+  canConfigureInspection = false,
   range,
 }: {
   agentId: string;
   x25519PublicKey: string | null;
   canManage: boolean;
+  /** Data inspection (M18.2): run it, and turn it on with allowlists (owner, admin). */
+  canInspect?: boolean;
+  canConfigureInspection?: boolean;
   range: Range;
 }) {
   const queryClient = useQueryClient();
@@ -155,6 +161,22 @@ export function ServicesSection({
     }
   };
 
+  const inspectionApi = (packId: string): InspectionApi => ({
+    configure: async (body) => {
+      const saved = unwrap(
+        await api.PATCH('/api/v1/agents/{id}/packs/{packId}/inspection', {
+          params: { path: { id: agentId, packId } },
+          body,
+        }),
+      );
+      await refresh();
+      return saved;
+    },
+    request: async (body) =>
+      unwrap(await api.POST('/api/v1/agents/{id}/inspections', { params: { path: { id: agentId } }, body })),
+    get: async (id) => unwrap(await api.GET('/api/v1/inspections/{id}', { params: { path: { id } } })),
+  });
+
   const cat = (catalog.data?.packs ?? []) as CatalogPack[];
   const assignments = (packs.data?.packs ?? []) as Assignment[];
   const charted = assignments.filter((a) => a.status === 'applied' || a.status === 'pending');
@@ -177,16 +199,31 @@ export function ServicesSection({
         />
       </QueryState>
       {charted.map((a) => (
-        <ServiceCharts
-          key={a.packId}
-          agentId={agentId}
-          packId={a.packId}
-          name={cat.find((p) => p.id === a.packId)?.name ?? a.packId}
-          range={range}
-          boostedUntil={(boosts.data ?? []).find((b) => b.packId === a.packId)?.expiresAt?.toString() ?? null}
-          onBoost={a.status === 'applied' ? () => onBoost(a.packId) : undefined}
-          guide={cat.find((p) => p.id === a.packId)?.guide}
-        />
+        <div key={a.packId} className="space-y-2">
+          <ServiceCharts
+            agentId={agentId}
+            packId={a.packId}
+            name={cat.find((p) => p.id === a.packId)?.name ?? a.packId}
+            range={range}
+            boostedUntil={
+              (boosts.data ?? []).find((b) => b.packId === a.packId)?.expiresAt?.toString() ?? null
+            }
+            onBoost={a.status === 'applied' ? () => onBoost(a.packId) : undefined}
+            guide={cat.find((p) => p.id === a.packId)?.guide}
+          />
+          {a.status === 'applied' &&
+          (a.packId === 'redis' || a.packId === 'kafka') &&
+          (canInspect || canConfigureInspection) ? (
+            <InspectionPanel
+              name={cat.find((p) => p.id === a.packId)?.name ?? a.packId}
+              packId={a.packId}
+              settings={a.inspection ?? { enabled: false, redisKeys: [], peekTopics: [] }}
+              canConfigure={canConfigureInspection}
+              canRun={canInspect}
+              api={inspectionApi(a.packId)}
+            />
+          ) : null}
+        </div>
       ))}
     </section>
   );

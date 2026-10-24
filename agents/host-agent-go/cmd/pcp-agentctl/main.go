@@ -24,12 +24,13 @@ import (
 	"pcp.local/hostagent/internal/collector"
 	"pcp.local/hostagent/internal/control"
 	"pcp.local/hostagent/internal/discovery"
+	"pcp.local/hostagent/internal/inspect"
 	"pcp.local/hostagent/internal/logs"
 	"pcp.local/hostagent/internal/packs"
 )
 
 // Set at build time with -ldflags "-X main.version=…".
-var version = "0.4.0"
+var version = "0.5.0"
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
@@ -182,7 +183,7 @@ func run(args []string) error {
 	}
 	pending := make(chan struct{}, 1)
 	beat := func() {
-		hb, err := client.Load().Heartbeat(ctx, proto.Heartbeat{Sequence: time.Now().UnixMilli(), AgentVersion: version, PolicyVersion: applied.Load(), Capabilities: []string{"host.health", "host.inventory", "packs"}, Health: "ok"})
+		hb, err := client.Load().Heartbeat(ctx, proto.Heartbeat{Sequence: time.Now().UnixMilli(), AgentVersion: version, PolicyVersion: applied.Load(), Capabilities: []string{"host.health", "host.inventory", "packs", "inspect.redis", "inspect.kafka"}, Health: "ok"})
 		if err != nil {
 			log.Printf("heartbeat: %v", err)
 			return
@@ -292,6 +293,25 @@ func run(args []string) error {
 				default:
 					_ = c.PostResult(ctx, t.Id, control.TaskResult{Status: "failed", Error: "too many live tails on this host"})
 				}
+				continue
+			}
+			if t.Type == "inspect" && t.Payload["target"] != "agent_info" {
+				// Data inspection (M18.2) runs beside the loop with its own deadline.
+				go func(t proto.AgentTask) {
+					ictx, cancel := context.WithTimeout(ctx, 30*time.Second)
+					defer cancel()
+					res := control.TaskResult{Status: "succeeded"}
+					if out, err := inspect.Run(ictx, *dir, t.Payload); err != nil {
+						res = control.TaskResult{Status: "failed", Error: err.Error()}
+					} else {
+						res.Result = map[string]any{"inspection": out}
+					}
+					if err := client.Load().PostResult(ctx, t.Id, res); err != nil {
+						log.Printf("result for inspection %s: %v", t.Id, err)
+					} else {
+						log.Printf("inspection %s (%v) → %s %s", t.Id, t.Payload["target"], res.Status, res.Error)
+					}
+				}(t)
 				continue
 			}
 			res := handle(t, st, started)

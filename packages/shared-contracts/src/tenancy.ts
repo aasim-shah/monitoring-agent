@@ -24,6 +24,8 @@ export const PERMISSIONS = [
   'telemetry.query',
   'logs.tail',
   'data.inspect',
+  /** Owner and admin: turn data inspection on for a pack and allowlist keys and peek topics (BR-12-06). */
+  'data.inspect.configure',
   'incident.view',
   'incident.manage',
   'policy.manage',

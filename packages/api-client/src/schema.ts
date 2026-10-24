@@ -1523,8 +1523,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Enable or disable data inspection for a pack
-         * @description Enable or disable data inspection for a pack.
+         * Turn data inspection on or off for the Redis or Kafka pack
+         * @description Off by default. Exact Redis key names and Kafka topics only (no patterns). Requires `data.inspect.configure` (owner, admin); audited (BR-12-06).
          */
         patch: operations["updatePackInspection"];
         trace?: never;
@@ -1615,8 +1615,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Run allowlisted data inspection
-         * @description Run allowlisted data inspection.
+         * Run an allowlisted, read-only data inspection
+         * @description Redis stats (INFO, DBSIZE, slowlog command names, latency, client count, memory, allowlisted key sizes), Kafka overview (topics, partitions, retention, sizes, consumer-group lag), or a Kafka message peek (allowlisted topic, reason required, at most 20 messages redacted on the host and kept 10 minutes in memory only). Needs agent 0.5.0. Requires `data.inspect`; audited.
          */
         post: operations["createInspection"];
         delete?: never;
@@ -1636,8 +1636,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Inspection result
-         * @description Inspection result.
+         * Inspection status and result
+         * @description A peek's messages are returned for 10 minutes, then `expired` is true and `result` is null.
          */
         get: operations["getInspection"];
         put?: never;
@@ -4167,6 +4167,11 @@ export interface components {
                 installScriptUrl: string;
             };
         };
+        InspectionSettings: {
+            enabled: boolean;
+            redisKeys: string[];
+            peekTopics: string[];
+        };
         InstallSession: {
             /** Format: uuid */
             id: string;
@@ -4346,6 +4351,7 @@ export interface components {
             appliedAt: string | null;
             /** Format: date-time */
             updatedAt: string;
+            inspection: components["schemas"]["InspectionSettings"];
         };
         Inventory: {
             /** Format: date-time */
@@ -6759,9 +6765,26 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled?: boolean;
+                    redisKeys?: string[];
+                    peekTopics?: string[];
+                };
+            };
+        };
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Settings saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -6921,11 +6944,35 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    packId: string;
+                    /** @enum {string} */
+                    target: "redis" | "kafka" | "kafka_peek";
+                    topic?: string;
+                    reason?: string;
+                };
+            };
+        };
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        status: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getInspection: {
@@ -6940,7 +6987,34 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        agentId: string;
+                        packId: string;
+                        /** @enum {string} */
+                        target: "redis" | "kafka" | "kafka_peek";
+                        topic?: string | null;
+                        /** @enum {string} */
+                        status: "queued" | "succeeded" | "failed";
+                        /** @description Stats object (redis */
+                        result: unknown;
+                        expired?: boolean;
+                        error: string | null;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        finishedAt: string | null;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

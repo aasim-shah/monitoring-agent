@@ -157,21 +157,22 @@ model Organization {
   deletionScheduledFor      DateTime? @map("deletion_scheduled_for") @db.Timestamptz(6)
   deletionRequestedByUserId String?   @map("deletion_requested_by_user_id") @db.Uuid
 
-  members         OrganizationMember[]
-  invitations     Invitation[]
-  products        Product[]
-  teams           Team[]
-  auditLogs       AuditLog[]
-  connections     Connection[]
-  jobDefinitions  JobDefinition[]
-  jobExecutions   JobExecution[]
-  alertRules      AlertRule[]
-  channels        NotificationChannel[]
-  aiSettings      AiSettings?
-  exports         TenantExport[]
-  usage           TelemetryUsage[]
-  liveBoosts      AgentLiveBoost[]
-  installSessions InstallSession[]
+  members            OrganizationMember[]
+  invitations        Invitation[]
+  products           Product[]
+  teams              Team[]
+  auditLogs          AuditLog[]
+  connections        Connection[]
+  jobDefinitions     JobDefinition[]
+  jobExecutions      JobExecution[]
+  alertRules         AlertRule[]
+  channels           NotificationChannel[]
+  aiSettings         AiSettings?
+  exports            TenantExport[]
+  usage              TelemetryUsage[]
+  liveBoosts         AgentLiveBoost[]
+  installSessions    InstallSession[]
+  inspectionRequests InspectionRequest[]
 
   @@map("organizations")
 }
@@ -673,6 +674,8 @@ model AgentPackAssignment {
   packId            String     @map("pack_id")
   settings          Json       @default("{}")
   sealedCredentials String?    @map("sealed_credentials")
+  /// Data inspection (M18.2): `{enabled, redisKeys[], peekTopics[]}`; off until an owner or admin turns it on.
+  inspection        Json       @default("{\"enabled\": false}")
   status            PackStatus @default(pending)
   statusMessage     String?    @map("status_message")
   policyVersion     Int        @map("policy_version")
@@ -1654,4 +1657,31 @@ model InstallSessionHost {
 
   @@index([sessionId])
   @@map("install_session_hosts")
+}
+
+/// One data inspection (M18.2, WB-12 UC-12-06..08). `result` holds stats only; a Kafka peek's
+/// messages live in Redis for 10 minutes and never here.
+model InspectionRequest {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  agentId           String    @map("agent_id") @db.Uuid
+  packId            String    @map("pack_id")
+  /// redis | kafka | kafka_peek
+  target            String
+  topic             String?
+  reason            String?
+  /// queued | succeeded | failed
+  status            String
+  taskId            String?   @map("task_id") @db.Uuid
+  requestedByUserId String?   @map("requested_by_user_id") @db.Uuid
+  result            Json?
+  error             String?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  finishedAt        DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, agentId, createdAt(sort: Desc)])
+  @@index([taskId])
+  @@map("inspection_requests")
 }

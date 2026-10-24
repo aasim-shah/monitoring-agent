@@ -2,7 +2,7 @@
 # Agent distribution (master plan M6.1, M6.7): pcp-agentctl + pcp-otelcol for linux/amd64
 # and linux/arm64, packed as pcp-agent-<version>-linux-<arch>.tar.gz with SHA256SUMS,
 # served with install.sh by the `downloads` service.
-ARG AGENT_VERSION=0.4.0
+ARG AGENT_VERSION=0.5.0
 
 # The collector needs Go 1.26 (OpenTelemetry v0.162.0); our own code builds with 1.23.
 FROM --platform=$BUILDPLATFORM golang:1.26.9-alpine AS collector

@@ -27,6 +27,7 @@ export interface Assignment {
   packId: string;
   status: 'pending' | 'applied' | 'failed' | 'removing';
   statusMessage: string | null;
+  inspection?: { enabled: boolean; redisKeys: string[]; peekTopics: string[] };
 }
 
 const hostPort = (a: string, p: number) => (a.includes(':') ? `[${a}]:${p}` : `${a}:${p}`);

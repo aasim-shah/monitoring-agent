@@ -28,7 +28,8 @@ export type TenantResource =
   | 'report'
   | 'action_request'
   | 'action_policy'
-  | 'install_session';
+  | 'install_session'
+  | 'inspection_request';
 
 /** Route parameter that identifies the tenant resource; `orgId`, `productId`, `environmentId` imply theirs. */
 export type TenantScopeOptions =
