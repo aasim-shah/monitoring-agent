@@ -22,18 +22,21 @@ export class TaskNotifier {
     await this.publisher.publish(`${CHANNEL}${agentId}`, '1');
   }
 
-  /** Resolves when a task for the agent is announced, or after `ms`. */
-  wait(agentId: string, ms: number): Promise<void> {
+  /** Resolves when a task for the agent is announced, after `ms`, or when `signal` aborts. */
+  wait(agentId: string, ms: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve) => {
+      if (signal?.aborted) return resolve();
       const set = this.waiters.get(agentId) ?? new Set();
       this.waiters.set(agentId, set);
       const done = () => {
         clearTimeout(timer);
+        signal?.removeEventListener('abort', done);
         set.delete(done);
         if (set.size === 0) this.waiters.delete(agentId);
         resolve();
       };
       const timer = setTimeout(done, ms);
+      signal?.addEventListener('abort', done, { once: true });
       set.add(done);
     });
   }

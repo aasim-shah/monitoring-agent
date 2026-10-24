@@ -81,6 +81,39 @@ describe('signed tasks (WB-03 UC-03-05)', () => {
     expect(Date.now() - started).toBeLessThan(5000);
   });
 
+  it('a long-poll whose agent went away does not claim the task; the restarted agent gets it', async () => {
+    const agent = await newAgent();
+    const [row] = await sql<{ organization_id: string; product_id: string; environment_id: string }>(
+      `SELECT organization_id, product_id, environment_id FROM agents WHERE id = $1`,
+      [agent.agentId],
+    );
+    const tasks = t.app.get(TasksService);
+    const ctx = {
+      organizationId: row!.organization_id,
+      actor: { kind: 'agent' as const, agentId: agent.agentId },
+      roles: [],
+      productIds: [row!.product_id],
+      environmentIds: [row!.environment_id],
+      requestId: 'old-process',
+    };
+    const identity = {
+      id: agent.agentId,
+      organizationId: row!.organization_id,
+      productId: row!.product_id,
+      environmentId: row!.environment_id,
+      fingerprint: agent.fingerprint,
+    };
+    // The old agent process's poll is still waiting on the server when the process stops.
+    const gone = new AbortController();
+    const stale = tasks.poll(ctx, identity, 25, gone.signal);
+    await new Promise((r) => setTimeout(r, 200));
+    gone.abort();
+    await diagnostics(agent.agentId);
+    expect(await stale).toEqual([]);
+    // The new process polls and receives it.
+    expect((await poll(agent)).json().tasks).toHaveLength(1);
+  });
+
   it('never delivers a task that expired while the agent was offline (TC-03-09, Review Focus #3)', async () => {
     const agent = await newAgent();
     const { taskId } = (await diagnostics(agent.agentId)).json();

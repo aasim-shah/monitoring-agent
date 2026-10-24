@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req, Res } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { AgentRoute } from '../../common/decorators.js';
 import { notFound, parseBody } from '../../common/errors.js';
@@ -20,9 +21,19 @@ export class AgentTasksController {
 
   @AgentRoute()
   @Get('tasks')
-  async poll(@Req() req: ApiRequest, @Query('wait') wait?: string) {
+  async poll(
+    @Req() req: ApiRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+    @Query('wait') wait?: string,
+  ) {
     const seconds = Math.max(0, Math.min(25, Number.parseInt(wait ?? '0', 10) || 0));
-    return { tasks: await this.tasks.poll(requireTenant(req), requireAgent(req), seconds) };
+    // An agent that restarts abandons its long-poll; stop waiting so the poll cannot claim a task
+    // and answer a closed connection (the task would be lost as "delivered").
+    const gone = new AbortController();
+    reply.raw.on('close', () => {
+      if (!reply.raw.writableFinished) gone.abort();
+    });
+    return { tasks: await this.tasks.poll(requireTenant(req), requireAgent(req), seconds, gone.signal) };
   }
 
   @AgentRoute()

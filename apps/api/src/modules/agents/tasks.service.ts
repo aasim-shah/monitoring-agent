@@ -142,11 +142,20 @@ export class TasksService implements OnApplicationShutdown {
    * Long-poll (D14): expires past-due tasks, claims queued unexpired ones, and otherwise
    * waits up to `waitSeconds` for a notification. Expired tasks are never delivered (BR-03-06).
    */
-  async poll(ctx: TenantContext, agent: AgentIdentity, waitSeconds: number): Promise<AgentTask[]> {
+  async poll(
+    ctx: TenantContext,
+    agent: AgentIdentity,
+    waitSeconds: number,
+    /** Aborts when the agent's connection closes: a restarted agent's old poll must not claim tasks. */
+    signal?: AbortSignal,
+  ): Promise<AgentTask[]> {
     for (const h of this.pollHandlers) await h(ctx, agent);
+    if (signal?.aborted) return [];
     const claimed = await this.claim(ctx, agent.id);
     if (claimed.length || waitSeconds <= 0) return claimed;
-    await this.notifier.wait(agent.id, Math.min(waitSeconds, MAX_WAIT_SECONDS) * 1000);
+    await this.notifier.wait(agent.id, Math.min(waitSeconds, MAX_WAIT_SECONDS) * 1000, signal);
+    // Nobody is listening any more: leave the tasks queued for the agent's next poll.
+    if (signal?.aborted) return [];
     return this.claim(ctx, agent.id);
   }
 
