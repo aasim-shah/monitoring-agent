@@ -25,7 +25,8 @@
     "@pcp/shared-contracts": "workspace:*",
     "@pcp/tenant-security": "workspace:*",
     "@pcp/connectors-databases": "workspace:*",
-    "@pcp/connectors-custom-http": "workspace:*"
+    "@pcp/connectors-custom-http": "workspace:*",
+    "@pcp/connectors-cloudflare": "workspace:*"
   },
   "devDependencies": {
     "@pcp/connectors-mock": "workspace:*",

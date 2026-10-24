@@ -13,6 +13,7 @@ import { AgentsModule } from './modules/agents/agents.module.js';
 import { AiModule } from './modules/ai/ai.module.js';
 import { ActionsModule } from './modules/actions/actions.module.js';
 import { WebhooksModule } from './modules/webhooks/webhooks.module.js';
+import { ConnectorRuntimeModule } from './modules/connections/runtime.module.js';
 import { ReportsModule } from './modules/reports/reports.module.js';
 import { WebsitesModule } from './modules/websites/websites.module.js';
 import { AlertingModule } from './modules/alerting/alerting.module.js';
@@ -66,6 +67,7 @@ export class AppModule {
         TenantsModule,
         ProductsModule,
         MembersModule,
+        ConnectorRuntimeModule.register(env),
         ConnectionsModule.register(env),
         WebhooksModule.register(env),
         AgentsModule,

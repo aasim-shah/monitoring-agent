@@ -151,6 +151,20 @@ export class ConnectorRuntime {
     };
   }
 
+  /** Runs a provider action approved through M16 (cache purge, workflow dispatch). */
+  async executeAction(
+    ctx: TenantContext,
+    connectionId: string,
+    action: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const c = await this.load(ctx, connectionId);
+    if (c.status !== 'connected' && c.status !== 'degraded')
+      throw new ConnectorError('invalid_config', `the connection is ${c.status}`);
+    const connector = this.registry.get(c.provider);
+    if (!connector.executeAction) throw new ConnectorError('invalid_config', `${c.provider} has no actions`);
+    return this.execute(ctx, c, (e) => connector.executeAction!(e, action));
+  }
+
   /** Validates credentials and applies the lifecycle transition, health record, and reason. */
   async validate(ctx: TenantContext, connectionId: string): Promise<ValidationOutcome> {
     const c = await this.load(ctx, connectionId);

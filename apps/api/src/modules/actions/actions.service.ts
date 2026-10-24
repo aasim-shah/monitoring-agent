@@ -10,6 +10,7 @@ import {
   type Capability,
   type PolicyLike,
 } from '@pcp/automation';
+import type { ConnectorRuntime } from '@pcp/connector-runtime';
 import { Prisma, type ActionRequest, type PrismaClient } from '@pcp/database';
 import type { TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
@@ -18,6 +19,7 @@ import type { AgentIdentity } from '../../common/request.js';
 import { CLOCK, PRISMA } from '../../tokens.js';
 import { TasksService, type TaskResultBody } from '../agents/tasks.service.js';
 import { AuditService } from '../auditing/audit.service.js';
+import { CONNECTOR_RUNTIME } from '../connections/registry.provider.js';
 import { atLeast, MINIMUM_ACTION_AGENT_VERSION } from '../logs/agent-version.js';
 
 type Tx = Prisma.TransactionClient;
@@ -28,6 +30,7 @@ const TASK_TTL_SECONDS = 600;
 /** The helper waits up to 60 s for the unit plus a 3 s settle; the agent allows 90 s. */
 const TASK_RUNTIME_SECONDS = 90;
 const HOST_ADAPTER_VERSION = '0.3.0';
+const PROVIDER_ADAPTER_VERSION = '1';
 
 export interface ProposalInput {
   productId: string;
@@ -101,6 +104,7 @@ export class ActionsService implements OnModuleInit {
     @Inject(CLOCK) private readonly now: () => Date,
     private readonly tasks: TasksService,
     private readonly audit: AuditService,
+    @Inject(CONNECTOR_RUNTIME) private readonly runtime: ConnectorRuntime,
   ) {}
 
   onModuleInit() {
@@ -118,6 +122,14 @@ export class ActionsService implements OnModuleInit {
         tx.environment.findMany({ where: { productId }, orderBy: { createdAt: 'asc' } }),
         tx.actionPolicy.findMany({ where: { productId } }),
       ]);
+      const providers = new Set(
+        (
+          await tx.connection.findMany({
+            where: { status: { in: ['connected', 'degraded'] }, scopes: { some: { productId } } },
+            select: { provider: true },
+          })
+        ).map((c) => c.provider),
+      );
       const policies = envs.flatMap((env) =>
         (Object.keys(CAPABILITIES) as Capability[]).map((capability) => {
           const row = rows.find((r) => r.environmentId === env.id && r.capability === capability);
@@ -133,8 +145,9 @@ export class ActionsService implements OnModuleInit {
             approverRoles: row?.approverRoles.length ? row.approverRoles : defaultApproverRoles(production),
             requireApproval: row?.requireApproval ?? true,
             settings: row?.settings ?? {},
-            // Cloudflare and GitHub actions need their connections (M7).
-            available: CAPABILITIES[capability].location === 'agent',
+            // Cloudflare and GitHub actions need a connected, product-scoped connection (M7).
+            available:
+              CAPABILITIES[capability].location === 'agent' || providers.has(capability.split('.')[0]!),
           };
         }),
       );
@@ -196,22 +209,7 @@ export class ActionsService implements OnModuleInit {
       });
       if (!env)
         throw new ApiException(400, 'invalid_environment', 'The environment is not part of this product');
-      if (def.location === 'platform')
-        throw new ApiException(
-          409,
-          'connection_required',
-          `${def.label} needs a ${capability.split('.')[0]} connection for this product`,
-        );
-      const agent = await tx.agent.findUnique({ where: { id: String(input.target.agentId ?? '') } });
-      if (!agent || agent.productId !== input.productId || agent.environmentId !== env.id)
-        throw new ApiException(400, 'invalid_target', 'The host is not part of this product environment');
-      if (agent.status === 'revoked') throw new ApiException(409, 'agent_revoked', 'This agent is revoked');
-      if (!atLeast(agent.agentVersion, MINIMUM_ACTION_AGENT_VERSION))
-        throw new ApiException(
-          409,
-          'agent_upgrade_required',
-          `Actions need agent ${MINIMUM_ACTION_AGENT_VERSION} or later with pcp-helper; ${agent.hostname} runs ${agent.agentVersion}`,
-        );
+      const target = await this.resolveTarget(tx, capability, input, env.id);
       const policy = await tx.actionPolicy.findUnique({
         where: {
           productId_environmentId_capability: {
@@ -226,10 +224,9 @@ export class ActionsService implements OnModuleInit {
         { capability, target: input.target, params: input.params, proposedByAi: opts.proposedByAi },
         env,
       );
-      const unit = String(input.params.unit ?? '');
       const impact = assessImpact({
-        action: `Restarting ${unit} on ${agent.hostname}`,
-        dependents: await this.dependents(tx, agent.id),
+        action: target.action,
+        dependents: target.agentId ? await this.dependents(tx, target.agentId) : [],
       });
       const request = await tx.actionRequest.create({
         data: {
@@ -246,7 +243,7 @@ export class ActionsService implements OnModuleInit {
             ...impact,
             policyDecision: decision.decision,
             policyReason: decision.reason,
-            host: agent.hostname,
+            host: target.label,
           } as unknown as Prisma.InputJsonValue,
           proposedByAi: opts.proposedByAi,
           requestedByUserId: ctx.actor.kind === 'user' ? ctx.actor.userId : null,
@@ -272,6 +269,76 @@ export class ActionsService implements OnModuleInit {
     });
     if (created.status === 'approved') return requestView(await this.tryExecute(ctx, created.id));
     return requestView(created);
+  }
+
+  /**
+   * The thing an action changes: a host with pcp-helper (agent 0.3.0+), or a provider
+   * connection of the capability's provider, connected and scoped to this product (M7).
+   */
+  private async resolveTarget(
+    tx: Tx,
+    capability: Capability,
+    input: ProposalInput,
+    environmentId: string,
+  ): Promise<{ label: string; action: string; agentId?: string }> {
+    if (CAPABILITIES[capability].location === 'platform') {
+      const provider = capability.split('.')[0]!;
+      const connectionId = String(input.target.connectionId ?? '');
+      const c = /^[0-9a-f-]{36}$/i.test(connectionId)
+        ? await tx.connection.findFirst({
+            where: {
+              id: connectionId,
+              provider,
+              status: { in: ['connected', 'degraded'] },
+              scopes: { some: { productId: input.productId } },
+            },
+          })
+        : null;
+      if (!c)
+        throw new ApiException(
+          409,
+          'connection_required',
+          `${CAPABILITIES[capability].label} needs a connected ${provider} connection for this product`,
+        );
+      if (capability === 'cloudflare.purge_cache') {
+        const zoneId = String(input.target.zoneId ?? '');
+        const zone = await tx.connectionInventoryItem.findFirst({
+          where: { connectionId: c.id, resourceType: 'cloudflare_zone', externalId: zoneId },
+        });
+        const scope = await tx.connectionResourceScope.findFirst({
+          where: { connectionId: c.id, externalId: zoneId },
+        });
+        const label = zone?.name ?? scope?.name ?? zoneId;
+        const urls = Array.isArray(input.params.urls) ? input.params.urls.length : 0;
+        return {
+          label,
+          action:
+            input.params.everything === true
+              ? `Purging the whole Cloudflare cache of ${label}`
+              : `Purging ${urls} URL${urls === 1 ? '' : 's'} from the Cloudflare cache of ${label}`,
+        };
+      }
+      const repo = String(input.target.repo ?? '');
+      return {
+        label: repo,
+        action: `Running workflow ${String(input.params.workflow)} on ${String(input.params.ref)} in ${repo}`,
+      };
+    }
+    const agent = await tx.agent.findUnique({ where: { id: String(input.target.agentId ?? '') } });
+    if (!agent || agent.productId !== input.productId || agent.environmentId !== environmentId)
+      throw new ApiException(400, 'invalid_target', 'The host is not part of this product environment');
+    if (agent.status === 'revoked') throw new ApiException(409, 'agent_revoked', 'This agent is revoked');
+    if (!atLeast(agent.agentVersion, MINIMUM_ACTION_AGENT_VERSION))
+      throw new ApiException(
+        409,
+        'agent_upgrade_required',
+        `Actions need agent ${MINIMUM_ACTION_AGENT_VERSION} or later with pcp-helper; ${agent.hostname} runs ${agent.agentVersion}`,
+      );
+    return {
+      label: agent.hostname,
+      action: `Restarting ${String(input.params.unit ?? '')} on ${agent.hostname}`,
+      agentId: agent.id,
+    };
   }
 
   /** Assets the host serves or that depend on what it serves (dry-run impact, UC-16-04). */
@@ -466,9 +533,12 @@ export class ActionsService implements OnModuleInit {
             requestId: id,
             targetKey: r.targetKey,
             runningKey: r.targetKey,
-            location: 'agent',
+            location: CAPABILITIES[r.capability as Capability].location,
             adapter: r.capability,
-            adapterVersion: HOST_ADAPTER_VERSION,
+            adapterVersion:
+              CAPABILITIES[r.capability as Capability].location === 'agent'
+                ? HOST_ADAPTER_VERSION
+                : PROVIDER_ADAPTER_VERSION,
             startedAt: this.now(),
           },
         });
@@ -482,6 +552,11 @@ export class ActionsService implements OnModuleInit {
     });
     if (!claimed.execution || !claimed.request) return claimed.request!;
     const r = claimed.request;
+    if (CAPABILITIES[r.capability as Capability].location === 'platform') {
+      // Provider calls (and GitHub's run check, up to 30 s) finish in the background.
+      void this.runProvider(ctx, claimed.execution.id, r);
+      return r;
+    }
     const target = r.target as { agentId: string };
     const unit = String((r.params as { unit?: string }).unit);
     try {
@@ -507,6 +582,39 @@ export class ActionsService implements OnModuleInit {
         verification: null,
       });
       return (await withTenant(this.prisma, ctx, (tx) => tx.actionRequest.findUnique({ where: { id } })))!;
+    }
+  }
+
+  /** Cloudflare purge or GitHub dispatch through the connection's connector (M7). */
+  private async runProvider(ctx: TenantContext, executionId: string, r: ActionRequest) {
+    const target = r.target as { connectionId: string; zoneId?: string; repo?: string };
+    const params = r.params as Record<string, unknown>;
+    const action =
+      r.capability === 'cloudflare.purge_cache'
+        ? {
+            kind: 'purge_cache',
+            zoneId: target.zoneId,
+            ...(params.everything === true ? { everything: true } : { urls: params.urls }),
+          }
+        : { kind: 'workflow_dispatch', repo: target.repo, workflow: params.workflow, ref: params.ref };
+    try {
+      const out = (await this.runtime.executeAction(ctx, target.connectionId, action)) as
+        | { ok: true; result: Record<string, unknown>; verification: Record<string, unknown> }
+        | { ok: false; error: string; verification?: Record<string, unknown> };
+      await this.finish(
+        ctx,
+        executionId,
+        out.ok
+          ? { status: 'succeeded', error: null, result: out.result, verification: out.verification }
+          : { status: 'failed', error: out.error, result: null, verification: out.verification ?? null },
+      );
+    } catch (err) {
+      await this.finish(ctx, executionId, {
+        status: 'failed',
+        error: (err as Error).message.slice(0, 500),
+        result: null,
+        verification: null,
+      }).catch((e) => this.logger.error(`action ${r.id}: ${String(e)}`));
     }
   }
 
