@@ -4,11 +4,11 @@ export const createConnectionBody = z.object({
   provider: z.string().trim().min(1).max(64),
   displayName: z.string().trim().min(1).max(100),
   executionLocation: z.enum(['cloud', 'private']),
-  config: z.record(z.unknown()).default({}),
+  config: z.record(z.string(), z.unknown()).default({}),
 });
 
 export const authorizeBody = z.object({
-  credentials: z.record(z.string().min(1).max(16_384)),
+  credentials: z.record(z.string(), z.string().min(1).max(16_384)),
 });
 
 export const resourceScopesBody = z.object({

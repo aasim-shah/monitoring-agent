@@ -45,11 +45,11 @@ export const observationSchema = z
     provider: z.string().min(1),
     resourceType: z.string().min(1),
     externalId: z.string().optional(),
-    attributes: z.record(z.unknown()),
+    attributes: z.record(z.string(), z.unknown()),
     observedAt: z.string().datetime(),
     method: z.string().min(1),
     confidence: z.number().min(0).max(1),
-    evidence: z.record(z.unknown()),
+    evidence: z.record(z.string(), z.unknown()),
   })
   .strict();
 export type Observation = z.infer<typeof observationSchema>;

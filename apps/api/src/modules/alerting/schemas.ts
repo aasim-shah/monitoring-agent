@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const severity = z.enum(['critical', 'warning', 'info']);
-const params = z.record(z.unknown());
+const params = z.record(z.string(), z.unknown());
 
 export const createRuleBody = z
   .object({

@@ -18,7 +18,7 @@ export const packManifestSchema = z
     ),
     changeLevel: z.union([z.literal(0), z.literal(1), z.literal(2)]),
     credentials: z.array(z.object({ name: z.string(), hint: z.string() }).strict()),
-    collector: z.object({ receivers: z.record(z.unknown()) }).strict(),
+    collector: z.object({ receivers: z.record(z.string(), z.unknown()) }).strict(),
     logSources: z.array(z.string()).optional(),
     metricAllowlist: z.array(z.string()).min(1),
     dropLabels: z.array(z.string()).optional(),

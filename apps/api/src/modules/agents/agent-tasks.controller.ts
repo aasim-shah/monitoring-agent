@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const resultBody = z.object({
   status: z.enum(['succeeded', 'failed']),
-  result: z.record(z.unknown()).optional(),
+  result: z.record(z.string(), z.unknown()).optional(),
   error: z.string().max(4096).optional(),
 });
 

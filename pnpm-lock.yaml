@@ -175,8 +175,8 @@ importers:
         specifier: 7.8.2
         version: 7.8.2
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@nestjs/testing':
         specifier: 11.2.7
@@ -216,7 +216,7 @@ importers:
     dependencies:
       '@hookform/resolvers':
         specifier: 5.9.2
-        version: 5.9.2(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.21.0)(react-hook-form@7.90.0(@types/react@19.1.17)(react@19.1.10))(zod@3.25.76)
+        version: 5.9.2(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.21.0)(react-hook-form@7.90.0(@types/react@19.1.17)(react@19.1.10))(zod@4.6.7)
       '@pcp/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -272,8 +272,8 @@ importers:
         specifier: 3.7.0
         version: 3.7.0
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@tailwindcss/postcss':
         specifier: 4.3.3
@@ -360,8 +360,8 @@ importers:
         specifier: 10.2.0
         version: 10.2.0
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@pcp/test-support':
         specifier: workspace:*
@@ -419,8 +419,8 @@ importers:
         specifier: workspace:*
         version: link:../shared-contracts
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: 22.20.5
@@ -1006,8 +1006,8 @@ importers:
   packages/shared-contracts:
     dependencies:
       zod:
-        specifier: 3.25.76
-        version: 3.25.76
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@types/node':
         specifier: 22.20.5
@@ -5997,8 +5997,8 @@ packages:
     resolution: {integrity: sha512-zK7YHHz4ZXpW89AHXUPbQVGKI7uvkd3hzusTdotCg1UxyaVtg0zFJSTfW/Dq5f7OBBVnq6cZIaC8Ti4hb6dtCA==}
     engines: {node: '>= 14'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
   zustand@4.5.7:
     resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
@@ -6388,7 +6388,7 @@ snapshots:
       protobufjs: 7.6.6
       yargs: 17.7.3
 
-  '@hookform/resolvers@5.9.2(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.21.0)(react-hook-form@7.90.0(@types/react@19.1.17)(react@19.1.10))(zod@3.25.76)':
+  '@hookform/resolvers@5.9.2(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.21.0)(react-hook-form@7.90.0(@types/react@19.1.17)(react@19.1.10))(zod@4.6.7)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.90.0(@types/react@19.1.17)(react@19.1.10)
@@ -6398,7 +6398,7 @@ snapshots:
       ajv-errors: 3.0.0(ajv@8.20.0)
       ajv-formats: 2.1.1(ajv@8.20.0)
       effect: 3.21.0
-      zod: 3.25.76
+      zod: 4.6.7
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -11023,7 +11023,7 @@ snapshots:
       compress-commons: 6.0.2
       readable-stream: 4.8.0
 
-  zod@3.25.76: {}
+  zod@4.6.7: {}
 
   zustand@4.5.7(@types/react@19.1.17)(immer@11.2.9)(react@19.1.10):
     dependencies:

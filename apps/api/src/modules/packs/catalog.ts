@@ -40,7 +40,7 @@ export interface Pack {
   settingsSchema: Record<string, unknown>;
 }
 
-const endpointSettings = (endpoint: z.ZodString | z.ZodEffects<z.ZodString>, hint: string) => ({
+const endpointSettings = (endpoint: z.ZodType<string>, hint: string) => ({
   settings: z.object({ endpoint }).strict() as z.ZodType<Record<string, unknown>>,
   settingsSchema: {
     type: 'object',

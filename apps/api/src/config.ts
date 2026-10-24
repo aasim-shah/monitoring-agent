@@ -23,7 +23,7 @@ const schema = z
     SMTP_URL: z.string().min(1).optional(),
     MAIL_FROM: z.string().min(3).default('Product Control Plane <no-reply@localhost>'),
     /** The platform's public egress IP, shown to customers who allowlist it (e.g. MongoDB Atlas). */
-    PLATFORM_EGRESS_IP: z.string().ip().optional(),
+    PLATFORM_EGRESS_IP: z.union([z.ipv4(), z.ipv6()]).optional(),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     GOOGLE_REDIRECT_URI: z.string().url().optional(),

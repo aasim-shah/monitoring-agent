@@ -8,7 +8,7 @@ const MIN_SEALED_BYTES = 60;
 export const enablePackBody = z
   .object({
     packId: z.string().max(64),
-    settings: z.record(z.unknown()),
+    settings: z.record(z.string(), z.unknown()),
     sealedCredentials: z
       .string()
       .max(4096)
