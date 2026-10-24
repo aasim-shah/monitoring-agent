@@ -132,14 +132,14 @@ Settings → Data retention, Security, AI providers; Organization → Export dat
 
 - [x] M1.3 Compose and Caddy
 - [x] M1.4 CI pipeline
-- [ ] M19.1 Security hardening
+- [x] M19.1 Security hardening (CSP and headers, dependency audit; external pentest pending)
 - [ ] M19.2 Load tests
-- [ ] M19.3 Backup and restore
+- [x] M19.3 Backup and restore
 - [ ] M19.4 Self-hosted packaging
-- [ ] M19.5 Platform self-monitoring
+- [x] M19.5 Platform self-monitoring
 - [ ] M19.6 Documentation
 - [ ] M19.7 Pilot
-- [ ] M19.8 Tenant data export and deletion
+- [x] M19.8 Tenant data export and deletion
 
 ## 10. Acceptance criteria
 

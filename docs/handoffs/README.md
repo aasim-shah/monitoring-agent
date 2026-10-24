@@ -29,7 +29,8 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M15 Reports and schedules | Done | Branch `feat/m15-reports`; deployed; [execution log](M15-execution-log.md) |
 | M14 AI assistant | Done | Branch `feat/m14-ai`; deployed; [execution log](M14-execution-log.md) |
 | M7 SaaS integrations and webhooks | Done | Branch `feat/m7-integrations`; deployed; Cloudflare, GitHub, Prometheus, Grafana; [execution log](M7-execution-log.md) |
-| M10, M17–M19 | Not started | M10 partly delivered in M6b; M13.4 Google Ads gated on a developer token |
+| M19 Hardening (production-critical subset) | Done | Branch `feat/m19-hardening`; deployed; backups + restore drill, watchdog, CSP, zod fix, tenant export/deletion, lost-task fix; [execution log](M19-execution-log.md) |
+| M10, M17, M18; M19.2/.4/.7 | Not started | M10 partly delivered in M6b; M13.4 Google Ads gated on a developer token; pentest, load baselines, self-hosted packaging, and pilot need people or a separate host |
 
 ## Maintenance
 
@@ -128,11 +129,11 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M18.2 | Data inspection | Not started | — |
 | M18.3 | Level 1 managed exporters | Not started | — |
 | M18.4 | Long-term rollups | Not started | — |
-| M19.1 | Security hardening | Not started | — |
+| M19.1 | Security hardening | In progress | CSP and headers, dependency audit, zod fix done; external pentest pending — [M19 log](M19-execution-log.md) |
 | M19.2 | Load tests | Not started | — |
-| M19.3 | Backup and restore | Not started | — |
+| M19.3 | Backup and restore | Done | [runbook](../runbooks/backup-restore.md) |
 | M19.4 | Self-hosted packaging | Not started | — |
-| M19.5 | Platform self-monitoring | Not started | — |
-| M19.6 | Documentation | Not started | — |
+| M19.5 | Platform self-monitoring | Done | [runbook](../runbooks/watchdog.md) |
+| M19.6 | Documentation | In progress | Runbooks for backup and watchdog; customer and security docs pending |
 | M19.7 | Pilot | Not started | — |
-| M19.8 | Tenant data export and deletion | Not started | — |
+| M19.8 | Tenant data export and deletion | Done | [M19 log](M19-execution-log.md) |
