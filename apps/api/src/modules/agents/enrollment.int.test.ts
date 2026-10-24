@@ -129,6 +129,22 @@ describe('agent enrollment (WB-03)', () => {
     expect([a.statusCode, b.statusCode].sort()).toEqual([201, 401]);
   });
 
+  it('a fleet token enrolls up to maxUses hosts and gives the parameters for fleet tooling (M17.1)', async () => {
+    const owner = await ownerWithOrg(t);
+    const { environmentId } = await environmentFor(t, owner);
+    const e = await createEnrollment(t, owner, environmentId, { maxUses: 3 });
+    expect(e.install).toEqual({
+      token: e.token,
+      controlUrl: expect.stringMatching(/^https?:\/\//),
+      downloadUrl: 'http://localhost:8080/downloads',
+      installScriptUrl: 'http://localhost:8080/install.sh',
+    });
+    expect(e.installCommand).toContain(`--control-url ${e.install.controlUrl}`);
+    const codes: number[] = [];
+    for (let i = 0; i < 4; i++) codes.push((await enroll(await enrollRequest(e.token))).statusCode);
+    expect(codes).toEqual([201, 201, 201, 401]);
+  });
+
   it('rejects tenant identifiers and unsupported protocol versions (TC-03-03, BR-03-08)', async () => {
     const owner = await ownerWithOrg(t);
     const { environmentId } = await environmentFor(t, owner);

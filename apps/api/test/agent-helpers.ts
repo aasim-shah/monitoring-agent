@@ -79,7 +79,14 @@ export async function createEnrollment(
   owner: Owner,
   environmentId: string,
   body: Record<string, unknown> = {},
-): Promise<{ id: string; token: string; expiresAt: string; maxUses: number; installCommand: string }> {
+): Promise<{
+  id: string;
+  token: string;
+  expiresAt: string;
+  maxUses: number;
+  installCommand: string;
+  install: { token: string; controlUrl: string; downloadUrl: string; installScriptUrl: string };
+}> {
   const res = await t.app.inject({
     method: 'POST',
     url: `/api/v1/environments/${environmentId}/agent-enrollments`,

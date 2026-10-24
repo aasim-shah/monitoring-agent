@@ -16,6 +16,12 @@ const created = {
   installCommand: 'curl ... --token pcp_enr_secret --control-url https://agent',
   expiresAt: '2026-10-22T13:00:00Z',
   maxUses: 3,
+  install: {
+    token: 'pcp_enr_secret',
+    controlUrl: 'https://agent',
+    downloadUrl: 'https://app/downloads',
+    installScriptUrl: 'https://app/install.sh',
+  },
 };
 
 describe('AddServerDialog', () => {
@@ -31,6 +37,28 @@ describe('AddServerDialog', () => {
     expect(onCreate).toHaveBeenCalledWith({ environmentId: 'e2', maxUses: 3, expiresInMinutes: 60 });
     expect(await screen.findByText(created.installCommand)).toBeInTheDocument();
     expect(screen.getByText(/Waiting for servers/)).toBeInTheDocument();
+  });
+
+  it('offers Ansible, cloud-init, and Docker snippets for the same token (M17.1)', async () => {
+    const user = userEvent.setup();
+    render(
+      <AddServerDialog
+        environments={environments}
+        onCreate={vi.fn().mockResolvedValue(created)}
+        connected={[]}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Add server' }));
+    await user.click(screen.getByRole('button', { name: 'Create install command' }));
+    await screen.findByText(created.installCommand);
+    expect(screen.getByRole('tab', { name: 'One-liner' })).toHaveAttribute('aria-selected', 'true');
+    await user.click(screen.getByRole('tab', { name: 'Ansible' }));
+    expect(screen.getByText(/vault_pcp_fleet_token: pcp_enr_secret/)).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'cloud-init' }));
+    expect(screen.getByText(/#cloud-config/)).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Docker' }));
+    expect(screen.getByText(/PCP_TOKEN=pcp_enr_secret/)).toBeInTheDocument();
+    expect(screen.queryByText(created.installCommand)).toBeNull();
   });
 
   it('forgets the token when closed (shown once)', async () => {

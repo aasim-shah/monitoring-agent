@@ -5096,13 +5096,22 @@ components:
         expiresInMinutes: { type: integer, minimum: 5, maximum: 1440, default: 60 }
     AgentEnrollmentCreated:
       type: object
-      required: [id, token, expiresAt, maxUses, installCommand]
+      required: [id, token, expiresAt, maxUses, installCommand, install]
       properties:
         id: { type: string, format: uuid }
         token: { type: string, description: Shown once; only a peppered hash is stored }
         expiresAt: { type: string, format: date-time }
         maxUses: { type: integer }
         installCommand: { type: string }
+        install:
+          type: object
+          description: Parameters for fleet tooling (Ansible, cloud-init, Compose profile); M17.1
+          required: [token, controlUrl, downloadUrl, installScriptUrl]
+          properties:
+            token: { type: string }
+            controlUrl: { type: string }
+            downloadUrl: { type: string }
+            installScriptUrl: { type: string }
     AgentEnrollmentList:
       type: object
       required: [enrollments]

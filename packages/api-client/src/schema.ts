@@ -4133,6 +4133,13 @@ export interface components {
             expiresAt: string;
             maxUses: number;
             installCommand: string;
+            /** @description Parameters for fleet tooling (Ansible, cloud-init, Compose profile); M17.1 */
+            install: {
+                token: string;
+                controlUrl: string;
+                downloadUrl: string;
+                installScriptUrl: string;
+            };
         };
         AgentEnrollmentList: {
             enrollments: {

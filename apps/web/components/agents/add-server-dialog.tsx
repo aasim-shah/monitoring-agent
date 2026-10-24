@@ -15,7 +15,8 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { errorMessage } from '@/lib/api';
 import { isLocalControlUrl } from '@/lib/reachability';
-import { InstallCommand } from './install-command';
+import { ansibleSnippet, cloudInitSnippet, composeSnippet, type InstallParams } from './fleet-snippets';
+import { InstallCommand, Snippet } from './install-command';
 
 export interface EnrollmentInput {
   environmentId: string;
@@ -27,6 +28,68 @@ export interface CreatedEnrollment {
   installCommand: string;
   expiresAt: string;
   maxUses: number;
+  install: InstallParams;
+}
+
+const METHODS = ['One-liner', 'Ansible', 'cloud-init', 'Docker'] as const;
+type Method = (typeof METHODS)[number];
+
+/** UC-05-01..04: the same shown-once token as a one-liner or for the customer's fleet tooling. */
+function InstallMethods({ created }: { created: CreatedEnrollment }) {
+  const [method, setMethod] = useState<Method>('One-liner');
+  const ansible = ansibleSnippet(created.install);
+  return (
+    <div className="space-y-3">
+      <div role="tablist" aria-label="Install method" className="flex flex-wrap gap-1">
+        {METHODS.map((m) => (
+          <Button
+            key={m}
+            role="tab"
+            size="sm"
+            variant={m === method ? 'default' : 'ghost'}
+            aria-selected={m === method}
+            onClick={() => setMethod(m)}
+          >
+            {m}
+          </Button>
+        ))}
+      </div>
+      <div role="tabpanel" aria-label={method} className="space-y-3">
+        {method === 'One-liner' ? <InstallCommand command={created.installCommand} /> : null}
+        {method === 'Ansible' ? (
+          <>
+            <Snippet label="1. Get the role" text={ansible.getRole} />
+            <Snippet label="2. Add to Ansible Vault" text={ansible.vault} />
+            <Snippet label="3. Playbook" text={ansible.playbook} />
+            <p className="text-xs text-muted-foreground">
+              Re-running the playbook leaves enrolled servers as they are.
+            </p>
+          </>
+        ) : null}
+        {method === 'cloud-init' ? (
+          <>
+            <Snippet label="User data for new servers" text={cloudInitSnippet(created.install)} />
+            <p className="text-xs text-muted-foreground">
+              Servers enroll on first boot, so the token must not expire before they are created.
+            </p>
+          </>
+        ) : null}
+        {method === 'Docker' ? (
+          <>
+            <Snippet label="On the Docker host" text={composeSnippet(created.install)} />
+            <p className="text-xs text-muted-foreground">
+              The container reads /proc, /sys, and / read-only; the Docker socket is not mounted.
+            </p>
+          </>
+        ) : null}
+        {method === 'One-liner' ? null : (
+          <p className="text-xs text-muted-foreground">
+            Shown once; these contain a secret enrollment token.
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 const EXPIRY = [
@@ -114,7 +177,7 @@ export function AddServerDialog({
                 scripts/dev-host.sh with this token (installs a test server with metrics).
               </Alert>
             ) : null}
-            <InstallCommand command={created.installCommand} />
+            <InstallMethods created={created} />
             <p className="text-xs text-muted-foreground">
               Works for {created.maxUses} server{created.maxUses === 1 ? '' : 's'} until{' '}
               {new Date(created.expiresAt).toLocaleString()}.
