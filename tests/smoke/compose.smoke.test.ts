@@ -107,6 +107,15 @@ describe.each([
     expect(res.status).toBe(202);
   });
 
+  it('pages carry the CSP and the other security headers (M19.1)', async () => {
+    const res = await fetch(`http://127.0.0.1:${httpPort}/login`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+    expect(res.headers.get('content-security-policy')).not.toContain('unsafe-eval');
+    expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+    expect(res.headers.get('permissions-policy')).toContain('camera=()');
+  });
+
   it('worker is ready with PostgreSQL and Redis', async () => {
     const r = await compose(project, file, [
       'exec',
