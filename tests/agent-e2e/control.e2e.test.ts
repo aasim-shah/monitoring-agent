@@ -721,3 +721,145 @@ describe('live log tail and log-derived metrics (M11 exit gate)', () => {
     );
   });
 });
+
+/** A second member (admin, with MFA) for approvals; returns their session cookie. */
+async function adminMember(): Promise<string> {
+  const ownerCookie = cookie;
+  cookie = '';
+  try {
+    const email = `agent-e2e-admin-${Date.now()}@example.com`;
+    expect((await api('POST', '/api/v1/auth/signup', { email, password: 'agent e2e password' })).status).toBe(
+      202,
+    );
+    const token = await until('admin verification email', async () => {
+      const list = (await (await fetch(`http://127.0.0.1:${MAILPIT_PORT}/api/v1/messages`)).json()) as {
+        messages: Array<{ ID: string; To: Array<{ Address: string }> }>;
+      };
+      const hit = list.messages.find((m) => m.To[0]?.Address === email);
+      if (!hit) return undefined;
+      const full = (await (
+        await fetch(`http://127.0.0.1:${MAILPIT_PORT}/api/v1/message/${hit.ID}`)
+      ).json()) as {
+        Text: string;
+      };
+      return /token=([A-Za-z0-9_-]+)/.exec(full.Text)?.[1];
+    });
+    expect((await api('POST', '/api/v1/auth/verify', { token })).status).toBe(204);
+    const sql = (q: string) =>
+      compose(['exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', 'pcp', '-tAc', q]);
+    const added = await sql(
+      `INSERT INTO organization_members (id, organization_id, user_id, role) SELECT gen_random_uuid(), '${orgId}', id, 'admin' FROM users WHERE email = '${email}'`,
+    );
+    expect(added.status, added.stderr).toBe(0);
+    expect((await api('POST', '/api/v1/auth/login', { email, password: 'agent e2e password' })).status).toBe(
+      200,
+    );
+    const { secret } = (await api('POST', '/api/v1/auth/mfa/enroll', {})).json;
+    expect((await api('POST', '/api/v1/auth/mfa/verify', { code: totp(secret) })).status).toBe(200);
+    return cookie;
+  } finally {
+    cookie = ownerCookie;
+  }
+}
+
+async function asUser<T>(session: string, fn: () => Promise<T>): Promise<T> {
+  const saved = cookie;
+  cookie = session;
+  try {
+    return await fn();
+  } finally {
+    cookie = saved;
+  }
+}
+
+describe('approved service restart through pcp-helper (M16 exit gate)', () => {
+  it('restarts an allowlisted unit after another member approves, verifies it, and refuses units outside the host allowlist', async () => {
+    // Reuses the enrolled systemd host; re-running the installer with --enable-helper adds pcp-helper.
+    const installer = `curl -fsSL http://${CADDY}/install.sh | bash -s --`;
+    const devFlags = `--control-url https://agent.localhost --download-url http://${CADDY}/downloads --ca-file /root/caddy-root.crt`;
+    const install = await inHost(`${installer} ${devFlags} --enable-helper`);
+    expect(install.status, install.stdout + install.stderr).toBe(0);
+    expect((await inHost('systemctl is-active pcp-helper')).stdout.trim()).toBe('active');
+    expect((await inHost('stat -c "%a %U %G" /run/pcp-helper/helper.sock')).stdout.trim()).toBe(
+      '660 root pcp-agent',
+    );
+    expect(
+      (
+        await inHost('stat -c "%a %U" /etc/pcp-agent/task-signing.pub /etc/pcp-agent/helper.yaml')
+      ).stdout.trim(),
+    ).toBe('644 root\n644 root');
+    // The host owner allowlists one unit; the platform cannot change this file.
+    const unit = await inHost(
+      `printf '[Unit]\\nDescription=pcp e2e demo\\n[Service]\\nExecStart=/bin/sleep infinity\\n[Install]\\nWantedBy=multi-user.target\\n' > /etc/systemd/system/demo.service && systemctl daemon-reload && systemctl enable --now demo.service && sed -i 's/units: \\[\\]/units: [demo.service]/' /etc/pcp-agent/helper.yaml && grep -c demo.service /etc/pcp-agent/helper.yaml`,
+    );
+    expect(unit.status, unit.stdout + unit.stderr).toBe(0);
+    const agentId = JSON.parse((await inHost('cat /var/lib/pcp-agent/state.json')).stdout).agentId as string;
+    await until('agent 0.3.0 reporting', async () => {
+      const a = (await api('GET', `/api/v1/agents/${agentId}`)).json;
+      return a.agentVersion === '0.3.0' ? true : undefined;
+    });
+
+    const admin = await adminMember();
+    expect(
+      (
+        await api('PUT', `/api/v1/products/${productId}/action-policies/host.restart_service`, {
+          environmentId,
+          enabled: true,
+          approverRoles: ['owner', 'admin'],
+          requireApproval: true,
+          settings: { units: ['demo.service', 'ghost.service'] },
+        })
+      ).status,
+    ).toBe(200);
+    const started = (
+      await inHost('systemctl show -p ActiveEnterTimestampMonotonic --value demo.service')
+    ).stdout.trim();
+
+    const propose = (u: string) =>
+      api('POST', '/api/v1/actions/proposals', {
+        productId,
+        environmentId,
+        capability: 'host.restart_service',
+        target: { agentId },
+        params: { unit: u },
+        idempotencyKey: `e2e-${u}-${Date.now()}`,
+        reason: 'agent-e2e',
+      });
+    const req = (await propose('demo.service')).json;
+    expect(req.status).toBe('pending_approval');
+    // BR-16-03: the requester cannot approve their own production action.
+    expect((await api('POST', `/api/v1/actions/${req.id}/approve`, {})).status).toBe(403);
+    const approved = await asUser(admin, () =>
+      api('POST', `/api/v1/actions/${req.id}/approve`, { note: 'e2e' }),
+    );
+    expect(approved.status, JSON.stringify(approved.json)).toBe(200);
+
+    const done = await until(
+      'restart verified',
+      async () => {
+        const r = (await api('GET', `/api/v1/actions/${req.id}`)).json;
+        return ['succeeded', 'failed', 'expired'].includes(r.status as string) ? r : undefined;
+      },
+      180_000,
+    );
+    expect(done.status, JSON.stringify(done)).toBe('succeeded');
+    expect((done.executions as Json[])[0]!.verification).toEqual({ activeState: 'active', verified: true });
+    const restarted = (
+      await inHost('systemctl show -p ActiveEnterTimestampMonotonic --value demo.service')
+    ).stdout.trim();
+    expect(restarted).not.toBe(started);
+
+    // TC-16-06: allowed by the platform policy but not by the host's own allowlist → the helper refuses.
+    const ghost = (await propose('ghost.service')).json;
+    await asUser(admin, () => api('POST', `/api/v1/actions/${ghost.id}/approve`, {}));
+    const refused = await until(
+      'helper refusal',
+      async () => {
+        const r = (await api('GET', `/api/v1/actions/${ghost.id}`)).json;
+        return r.status === 'failed' ? r : undefined;
+      },
+      180_000,
+    );
+    expect(refused.reason).toBe('ghost.service is not in the helper allowlist (/etc/pcp-agent/helper.yaml)');
+  });
+});
