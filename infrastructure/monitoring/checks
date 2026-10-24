@@ -1,0 +1,6 @@
+# name=command; exit 0 means healthy. Runs on the Docker host as root.
+api=docker exec pcp-api-1 wget -q -O /dev/null http://127.0.0.1:3000/healthz
+worker=docker exec pcp-worker-1 wget -q -O /dev/null http://127.0.0.1:3002/readyz
+victoriametrics=docker exec pcp-victoriametrics-1 wget -q -O /dev/null http://127.0.0.1:8428/health
+public=curl -sf -o /dev/null --max-time 15 https://monitor.aasimshah.com/healthz
+backup=test -n "$(find /opt/pcp/backups/nightly -name 'pcp-*.dump' -mmin -1560 2>/dev/null | head -1)"

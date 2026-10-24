@@ -1,0 +1,10 @@
+[Unit]
+Description=Product Control Plane independent watchdog
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/pcp/watchdog.env
+ExecStart=/opt/pcp/infrastructure/monitoring/watchdog.sh
+# A failing check exits 1; that is a result, not a unit failure.
+SuccessExitStatus=1
