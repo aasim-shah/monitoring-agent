@@ -114,3 +114,24 @@ CREATE FUNCTION pcp_expire_tenant_exports(p_now timestamptz)
 ALTER FUNCTION pcp_expire_tenant_exports(timestamptz) OWNER TO pcp_rls_definer;
 REVOKE ALL ON FUNCTION pcp_expire_tenant_exports(timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION pcp_expire_tenant_exports(timestamptz) TO pcp_scheduler;
+
+-- The app may never delete audit entries (tamper resistance). Only the purge may, and only for an
+-- organization whose grace period has ended; deleted_organizations keeps the summary.
+GRANT DELETE ON audit_logs TO pcp_rls_definer;
+CREATE FUNCTION pcp_purge_audit_logs(p_org uuid, p_now timestamptz)
+  RETURNS integer
+  LANGUAGE sql VOLATILE SECURITY DEFINER
+  SET search_path = public, pg_temp
+  AS $$
+    WITH gone AS (
+      DELETE FROM audit_logs a
+      USING organizations o
+      WHERE a.organization_id = p_org AND o.id = p_org
+        AND o.deletion_scheduled_for IS NOT NULL AND o.deletion_scheduled_for <= p_now
+      RETURNING 1
+    )
+    SELECT count(*)::int FROM gone
+  $$;
+ALTER FUNCTION pcp_purge_audit_logs(uuid, timestamptz) OWNER TO pcp_rls_definer;
+REVOKE ALL ON FUNCTION pcp_purge_audit_logs(uuid, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pcp_purge_audit_logs(uuid, timestamptz) TO pcp_scheduler;

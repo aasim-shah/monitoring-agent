@@ -16,6 +16,8 @@ export const JOB_KINDS = [
   // M15: one daily report (entity = schedule, window = local date) and one report delivery (entity = delivery).
   'report-generate',
   'report-deliver',
+  // M19: one tenant data export (entity = export).
+  'tenant-export',
 ] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 

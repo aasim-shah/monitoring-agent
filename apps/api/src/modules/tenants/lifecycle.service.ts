@@ -1,9 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, type OnApplicationShutdown } from '@nestjs/common';
+import { createQueues, enqueue, type Queues } from '@pcp/jobs';
 import type { PrismaClient } from '@pcp/database';
 import type { TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 import { ApiException, notFound } from '../../common/errors.js';
-import { CLOCK, PRISMA } from '../../tokens.js';
+import type { AppConfig } from '../../config.js';
+import { APP_CONFIG, CLOCK, PRISMA } from '../../tokens.js';
 import { AgentsService } from '../agents/agents.service.js';
 import { AuditService } from '../auditing/audit.service.js';
 
@@ -15,13 +17,77 @@ export const DELETION_GRACE_DAYS = 30;
  * connections disconnected (their secrets crypto-shredded); the owner can cancel until the purge.
  */
 @Injectable()
-export class LifecycleService {
+export class LifecycleService implements OnApplicationShutdown {
+  private readonly queues: Queues;
+
   constructor(
     @Inject(PRISMA) private readonly prisma: PrismaClient,
     @Inject(CLOCK) private readonly now: () => Date,
+    @Inject(APP_CONFIG) config: AppConfig,
     private readonly agents: AgentsService,
     private readonly audit: AuditService,
-  ) {}
+  ) {
+    this.queues = createQueues(config.redisUrl);
+  }
+
+  async onApplicationShutdown() {
+    await this.queues.close();
+  }
+
+  /** Queues an export (one at a time); the worker writes the archive (WB-17 UC-17-09). */
+  async requestExport(ctx: TenantContext) {
+    const exp = await withTenant(this.prisma, ctx, async (tx) => {
+      const queued = await tx.tenantExport.findFirst({ where: { status: 'queued' } });
+      if (queued) return queued;
+      const created = await tx.tenantExport.create({
+        data: {
+          organizationId: ctx.organizationId,
+          requestedByUserId: ctx.actor.kind === 'user' ? ctx.actor.userId : null,
+          status: 'queued',
+        },
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'organization.export_requested',
+        targetType: 'tenant_export',
+        targetId: created.id,
+      });
+      return created;
+    });
+    await enqueue(this.queues, 'tenant-export', {
+      organizationId: ctx.organizationId,
+      connectionId: exp.id,
+      requestId: ctx.requestId,
+    });
+    return exp;
+  }
+
+  listExports(ctx: TenantContext) {
+    return withTenant(this.prisma, ctx, (tx) =>
+      tx.tenantExport.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { id: true, status: true, sizeBytes: true, error: true, expiresAt: true, createdAt: true },
+      }),
+    );
+  }
+
+  /** The archive while its link is valid: 409 until ready, 410 once expired. */
+  async exportArchive(ctx: TenantContext, id: string) {
+    const exp = await withTenant(this.prisma, ctx, (tx) => tx.tenantExport.findUnique({ where: { id } }));
+    if (!exp) throw notFound();
+    if (exp.status === 'queued')
+      throw new ApiException(409, 'export_not_ready', 'The export is still being built');
+    if (exp.status !== 'ready' || !exp.archive || !exp.expiresAt || exp.expiresAt <= this.now())
+      throw new ApiException(410, 'export_expired', 'This export link has expired; request a new export');
+    await withTenant(this.prisma, ctx, (tx) =>
+      this.audit.record(tx, ctx, {
+        action: 'organization.export_downloaded',
+        targetType: 'tenant_export',
+        targetId: id,
+      }),
+    );
+    return { archive: Buffer.from(exp.archive), createdAt: exp.createdAt };
+  }
 
   async requestDeletion(ctx: TenantContext, confirmName: string) {
     const org = await withTenant(this.prisma, ctx, (tx) =>

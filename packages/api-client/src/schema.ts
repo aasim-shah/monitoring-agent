@@ -301,13 +301,41 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * The latest 10 exports and their state
+         * @description The latest 10 exports and their state. Requires `org.export`.
+         */
+        get: operations["listOrganizationExports"];
         put?: never;
         /**
          * Export organization data
-         * @description Export organization data.
+         * @description Queues a JSON archive of the organization (configuration, assets, incidents, reports, audit log; no secrets). One export is built at a time. Requires `org.export` (owners).
          */
         post: operations["exportOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{orgId}/export/{exportId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+                exportId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download an export archive (gzip JSON) while its 24-hour link is valid
+         * @description 409 while it is being built, 410 once expired. Requires `org.export`.
+         */
+        get: operations["downloadOrganizationExport"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4705,6 +4733,44 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listOrganizationExports: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        exports: {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            status: "queued" | "ready" | "failed" | "expired";
+                            sizeBytes: number | null;
+                            error: string | null;
+                            /** Format: date-time */
+                            expiresAt: string | null;
+                            /** Format: date-time */
+                            createdAt: string;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     exportOrganization: {
         parameters: {
             query?: never;
@@ -4717,9 +4783,67 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Export queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        status: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    downloadOrganizationExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Organization ID */
+                orgId: components["parameters"]["orgId"];
+                exportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/gzip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Not ready yet */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Link expired */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     updateOrganizationSettings: {

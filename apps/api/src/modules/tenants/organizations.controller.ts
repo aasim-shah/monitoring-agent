@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req, Res } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { RequirePermission, SessionOnly, TenantScope } from '../../common/decorators.js';
 import { parseBody } from '../../common/errors.js';
@@ -77,5 +78,34 @@ export class OrganizationsController {
   @HttpCode(204)
   async cancelDeletion(@Req() req: ApiRequest) {
     await this.lifecycle.cancelDeletion(requireTenant(req));
+  }
+
+  @RequirePermission('org.export')
+  @TenantScope({ param: 'orgId' })
+  @Post(':orgId/export')
+  @HttpCode(202)
+  async requestExport(@Req() req: ApiRequest) {
+    const e = await this.lifecycle.requestExport(requireTenant(req));
+    return { id: e.id, status: e.status, createdAt: e.createdAt };
+  }
+
+  @RequirePermission('org.export')
+  @TenantScope({ param: 'orgId' })
+  @Get(':orgId/export')
+  async listExports(@Req() req: ApiRequest) {
+    return { exports: await this.lifecycle.listExports(requireTenant(req)) };
+  }
+
+  @RequirePermission('org.export')
+  @TenantScope({ param: 'orgId' })
+  @Get(':orgId/export/:exportId/download')
+  async download(@Req() req: ApiRequest, @Param('exportId') exportId: string, @Res() reply: FastifyReply) {
+    const { archive, createdAt } = await this.lifecycle.exportArchive(requireTenant(req), exportId);
+    const day = createdAt.toISOString().slice(0, 10);
+    return reply
+      .header('content-type', 'application/gzip')
+      .header('content-disposition', `attachment; filename="pcp-export-${day}.json.gz"`)
+      .header('cache-control', 'no-store')
+      .send(archive);
   }
 }

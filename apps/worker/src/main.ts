@@ -10,6 +10,7 @@ import { alertingHandlers } from './alerting-handlers.js';
 import { dispatchDueReports } from './report-dispatcher.js';
 import { reauthorizationNotice } from './reauth-notice.js';
 import { reportHandlers } from './report-handlers.js';
+import { purgeDueTenants, tenantHandlers } from './tenant-handlers.js';
 import { createReportSources } from './report-sources.js';
 import { websiteProbeHandler } from './website-handler.js';
 import { loadConfig } from './config.js';
@@ -67,7 +68,12 @@ const processors = startProcessors({
   redisUrl: config.redisUrl,
   prisma,
   runtime,
-  handlers: { ...handlers, ...reports, 'website-probe': (ctx, id) => probeWebsite(ctx, id) },
+  handlers: {
+    ...handlers,
+    ...reports,
+    ...tenantHandlers({ prisma, now: () => new Date() }),
+    'website-probe': (ctx, id) => probeWebsite(ctx, id),
+  },
   // A revoked Google grant: tell whoever connected it, and the owners, once (M13b).
   onReauthorizationRequired: reauthorizationNotice({ prisma, ...delivery }),
 });
@@ -86,6 +92,13 @@ const dispatch = () =>
   );
 await dispatch();
 const reportTimer = setInterval(dispatch, 60_000);
+// Tenant purge (M19.8): organizations past their 30-day grace, and expired export links, hourly.
+const purge = () =>
+  purgeDueTenants({ prisma, scheduler, now: () => new Date(), vmUrl: config.vmQueryUrl })
+    .then(({ purged }) => purged.length && console.log(`purged organizations: ${purged.join(', ')}`))
+    .catch((err) => console.error(`tenant purge failed: ${String(err)}`));
+await purge();
+const purgeTimer = setInterval(purge, 3_600_000);
 
 const server = createHealthServer({
   service: 'worker',
@@ -98,6 +111,7 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.on(signal, async () => {
     clearInterval(timer);
     clearInterval(reportTimer);
+    clearInterval(purgeTimer);
     server.close();
     await processors.close();
     await queues.close();

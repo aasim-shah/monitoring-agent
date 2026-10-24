@@ -339,12 +339,80 @@ paths:
       operationId: exportOrganization
       tags: [organizations]
       summary: Export organization data
-      description: Export organization data.
+      description: >-
+        Queues a JSON archive of the organization (configuration, assets, incidents, reports, audit log;
+        no secrets). One export is built at a time. Requires `org.export` (owners).
       security: [{ sessionCookie: [] }]
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Export queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, createdAt]
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string }
+                  createdAt: { type: string, format: date-time }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M19
+    get:
+      operationId: listOrganizationExports
+      tags: [organizations]
+      summary: The latest 10 exports and their state
+      description: The latest 10 exports and their state. Requires `org.export`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exports]
+                properties:
+                  exports:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, status, sizeBytes, error, expiresAt, createdAt]
+                      properties:
+                        id: { type: string, format: uuid }
+                        status: { type: string, enum: [queued, ready, failed, expired] }
+                        sizeBytes: { type: [integer, 'null'] }
+                        error: { type: [string, 'null'] }
+                        expiresAt: { type: [string, 'null'], format: date-time }
+                        createdAt: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M19
+  /api/v1/organizations/{orgId}/export/{exportId}/download:
+    parameters:
+      - { $ref: '#/components/parameters/orgId' }
+      - { name: exportId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: downloadOrganizationExport
+      tags: [organizations]
+      summary: Download an export archive (gzip JSON) while its 24-hour link is valid
+      description: 409 while it is being built, 410 once expired. Requires `org.export`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: The archive
+          content:
+            application/gzip:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Not ready yet
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '410':
+          description: Link expired
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M19
   /api/v1/organizations/{orgId}/settings:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     patch:

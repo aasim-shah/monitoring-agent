@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/app-factory.js';
 import {
@@ -130,5 +131,46 @@ describe('organization deletion (WB-17 UC-17-09)', () => {
     const res = await call('POST', `/api/v1/organizations/${owner.orgId}/deletion/cancel`, owner.cookie, {});
     expect(res.statusCode, res.body).toBe(204);
     expect((await call('GET', `/api/v1/organizations/${owner.orgId}`, analyst)).statusCode).toBe(200);
+  });
+});
+
+describe('organization export (WB-17 UC-17-09)', () => {
+  it('queues one export, lists it, and serves the archive only while its link is valid', async () => {
+    const owner = await ownerWithOrg(t, 'Export Co');
+    const url = `/api/v1/organizations/${owner.orgId}/export`;
+    const created = await call('POST', url, owner.cookie, {});
+    expect(created.statusCode, created.body).toBe(202);
+    const { id } = created.json() as { id: string };
+    expect(created.json()).toMatchObject({ status: 'queued' });
+    // Asking again while one is queued returns the same export.
+    expect((await call('POST', url, owner.cookie, {})).json().id).toBe(id);
+    expect((await call('GET', url, owner.cookie)).json().exports).toEqual([
+      expect.objectContaining({ id, status: 'queued' }),
+    ]);
+    const download = `${url}/${id}/download`;
+    expect((await call('GET', download, owner.cookie)).statusCode).toBe(409);
+
+    // The worker finished it.
+    const archive = gzipSync(JSON.stringify({ organization: { name: 'Export Co' } }));
+    await sql(
+      `UPDATE tenant_exports SET status = 'ready', archive = $2, size_bytes = $3, expires_at = now() + interval '1 hour' WHERE id = $1`,
+      [id, archive, archive.length],
+    );
+    const res = await call('GET', download, owner.cookie);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toBe('application/gzip');
+    expect(res.headers['content-disposition']).toMatch(/attachment; filename="pcp-export-.*\.json\.gz"/);
+    expect(res.rawPayload.equals(archive)).toBe(true);
+
+    await sql(`UPDATE tenant_exports SET expires_at = now() - interval '1 minute' WHERE id = $1`, [id]);
+    expect((await call('GET', download, owner.cookie)).statusCode).toBe(410);
+  });
+
+  it('is for owners only', async () => {
+    const owner = await ownerWithOrg(t, 'Private Co');
+    const admin = await member(owner, 'admin');
+    expect((await call('POST', `/api/v1/organizations/${owner.orgId}/export`, admin, {})).statusCode).toBe(
+      404,
+    );
   });
 });
