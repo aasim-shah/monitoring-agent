@@ -17,6 +17,33 @@ describe('aiConfigFromEnv', () => {
         { provider: 'groq', model: 'llama-x', apiKey: 'q-key-123456' },
       ],
       fake: false,
+      disabled: false,
+    });
+  });
+
+  it('M19.4: a local OpenAI-compatible endpoint needs a base URL and model, not a key', () => {
+    const cfg = aiConfigFromEnv({
+      AI_PROVIDER: 'local',
+      AI_MODEL: 'llama3.1:8b',
+      AI_LOCAL_BASE_URL: 'http://ollama:11434/v1',
+    });
+    expect(cfg.providers).toEqual([
+      { provider: 'local', model: 'llama3.1:8b', apiKey: 'none', baseUrl: 'http://ollama:11434/v1' },
+    ]);
+    expect(providerFromConfig(cfg.providers)?.id).toBe('local');
+    expect(() => aiConfigFromEnv({ AI_PROVIDER: 'local', AI_MODEL: 'm' })).toThrow(/AI_LOCAL_BASE_URL/);
+    expect(() => aiConfigFromEnv({ AI_PROVIDER: 'local', AI_LOCAL_BASE_URL: 'http://x/v1' })).toThrow(
+      /AI_MODEL/,
+    );
+  });
+
+  it('M19.4: AI_DISABLED turns every provider off', () => {
+    expect(
+      aiConfigFromEnv({ AI_DISABLED: '1', AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'g-key-123456' }),
+    ).toEqual({
+      providers: [],
+      fake: false,
+      disabled: true,
     });
   });
 
@@ -24,6 +51,7 @@ describe('aiConfigFromEnv', () => {
     expect(aiConfigFromEnv({ AI_PROVIDER: 'openai', AI_FALLBACK_PROVIDER: '', PCP_AI_FAKE: '1' })).toEqual({
       providers: [],
       fake: true,
+      disabled: false,
     });
     expect(() => aiConfigFromEnv({ AI_PROVIDER: 'anthropicx' })).toThrow(/AI_PROVIDER must be one of/);
     expect(providerFromConfig([])).toBeNull();

@@ -14,6 +14,7 @@ import type { AppConfig } from '../../config.js';
 import { APP_CONFIG } from '../../tokens.js';
 import { AuthService } from './auth.service.js';
 import { GoogleLoginService } from './google-login.service.js';
+import { OidcLoginService } from './oidc-login.service.js';
 import { MfaService } from './mfa.service.js';
 import { RateLimiter } from './rate-limiter.js';
 import { SessionService } from './session.service.js';
@@ -33,6 +34,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly mfa: MfaService,
     private readonly google: GoogleLoginService,
+    private readonly oidc: OidcLoginService,
     private readonly sessions: SessionService,
     private readonly limiter: RateLimiter,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -122,6 +124,31 @@ export class AuthController {
     await this.limit(req, 'reset');
     const { token, password } = parseBody(resetBody, body);
     await this.auth.resetPassword(token, password);
+  }
+
+  /** Which sign-in methods this deployment offers, for the login page (M19.4). */
+  @Public()
+  @Get('providers')
+  providers() {
+    return this.oidc.providers();
+  }
+
+  @Public()
+  @Get('oidc/start')
+  async oidcStart(@Res() reply: FastifyReply) {
+    const { url, state } = await this.oidc.start();
+    setOAuthStateCookie(reply, state, this.config);
+    return reply.redirect(url, 302);
+  }
+
+  @Public()
+  @Get('oidc/callback')
+  async oidcCallback(@Req() req: ApiRequest, @Query() query: unknown, @Res() reply: FastifyReply) {
+    const { code, state } = parseBody(googleCallbackQuery, query);
+    const { token } = await this.oidc.callback(code, state, req.cookies?.[OAUTH_STATE_COOKIE]);
+    clearOAuthStateCookie(reply, this.config);
+    setSessionCookie(reply, token, this.config);
+    return reply.redirect(`${this.config.appOrigin}/`, 302);
   }
 
   @Public()

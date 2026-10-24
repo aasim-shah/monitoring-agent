@@ -6,6 +6,7 @@ import { AuthController, MeController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { CurrentUserGuard } from './current-user.guard.js';
 import { GOOGLE_HTTP, GoogleLoginService, defaultGoogleHttp } from './google-login.service.js';
+import { OidcLoginService } from './oidc-login.service.js';
 import { MfaService } from './mfa.service.js';
 import { RateLimiter } from './rate-limiter.js';
 import { SessionService } from './session.service.js';
@@ -23,6 +24,7 @@ import { SessionService } from './session.service.js';
     AuthService,
     MfaService,
     GoogleLoginService,
+    OidcLoginService,
     CurrentUserGuard,
   ],
   exports: [SessionService, CurrentUserGuard, GOOGLE_HTTP],

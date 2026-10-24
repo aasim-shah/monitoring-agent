@@ -49,6 +49,7 @@ const reports = reportHandlers({
   provider: config.ai.fake
     ? scripted('scripted', () => ({ text: 'The scripted summary covers this report day [S1].' }))
     : providerFromConfig(config.ai.providers),
+  aiDisabled: config.ai.disabled,
   appOrigin: config.appOrigin,
   sources: createReportSources({ prisma, vmQueryUrl: config.vmQueryUrl }),
   delivery,

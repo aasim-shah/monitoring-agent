@@ -24,6 +24,8 @@ export interface ReportDeps {
   now(): Date;
   /** Null when no AI provider is configured: the report goes out without a narrative. */
   provider: ChatProvider | null;
+  /** AI_DISABLED=1 (M19.4): reports carry no narrative on this platform. */
+  aiDisabled?: boolean;
   appOrigin: string;
   sources(ctx: TenantContext, productId: string): ReportSources;
   delivery: DeliveryDeps;
@@ -74,7 +76,9 @@ export function reportHandlers(deps: ReportDeps) {
         const ai = await withTenant(deps.prisma, ctx, (tx) =>
           tx.aiSettings.findUnique({ where: { organizationId: ctx.organizationId } }),
         );
-        const narrative = await narrate(snapshot, deps.provider, { disabled: ai?.disabled ?? false });
+        const narrative = await narrate(snapshot, deps.provider, {
+          disabled: (deps.aiDisabled ?? false) || (ai?.disabled ?? false),
+        });
         const scheduledAt = nextRunAt(schedule.timezone, schedule.localTime, new Date(w.end.getTime() - 1));
         const late = !v && deps.now().getTime() - scheduledAt.getTime() > LATE_AFTER_MS;
         try {

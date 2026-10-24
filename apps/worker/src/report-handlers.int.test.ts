@@ -278,6 +278,18 @@ describe('report-generate and report-deliver (UC-15-02/03)', () => {
     expect(provider.requests).toHaveLength(0);
   });
 
+  it('M19.4: AI_DISABLED keeps every narrative off on this platform', async () => {
+    const s = await seed();
+    const provider = verified();
+    await reportHandlers(deps({ provider, aiDisabled: true }))['report-generate'](
+      ctx(s.org),
+      s.schedule,
+      job('2026-10-25'),
+    );
+    expect((await reports(s))[0]).toMatchObject({ narrative_status: 'disabled' });
+    expect(provider.requests).toHaveLength(0);
+  });
+
   it('TC-15-07: regenerating makes version 2 and leaves version 1 untouched', async () => {
     const s = await seed();
     const h = reportHandlers(deps());

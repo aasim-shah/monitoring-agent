@@ -45,7 +45,11 @@ export class AiService {
     private readonly actions: ActionsService,
   ) {
     this.provider = buildProvider(config);
+    this.platformDisabled = config.ai.disabled;
   }
+
+  /** AI_DISABLED=1 (M19.4): the platform runs without AI for every organization. */
+  private readonly platformDisabled: boolean;
 
   async settings(ctx: TenantContext) {
     const row = await withTenant(this.prisma, ctx, (tx) =>
@@ -53,7 +57,7 @@ export class AiService {
     );
     return {
       disabled: row?.disabled ?? false,
-      available: this.provider !== null,
+      available: this.provider !== null && !this.platformDisabled,
       provider: this.provider?.id ?? null,
       model: this.provider?.model ?? null,
     };
@@ -79,6 +83,8 @@ export class AiService {
   /** 409 when AI is off for the organization or no provider is configured (BR-14-09). */
   private async requireEnabled(ctx: TenantContext): Promise<ChatProvider> {
     const s = await this.settings(ctx);
+    if (this.platformDisabled)
+      throw new ApiException(409, 'ai_disabled', 'AI is turned off on this platform');
     if (s.disabled)
       throw new ApiException(409, 'ai_disabled', 'The AI assistant is turned off for this organization');
     if (!this.provider)

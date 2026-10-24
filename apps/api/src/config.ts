@@ -32,6 +32,12 @@ const schema = z
     /** Test stacks only, with PCP_ALLOW_TEST_PROVIDERS=1: a fake Google (token exchange). */
     PCP_GOOGLE_API_URL: z.string().url().optional(),
     PCP_ALLOW_TEST_PROVIDERS: z.enum(['0', '1']).optional(),
+    /** OIDC sign-in for self-hosted deployments (M19.4): any OpenID Provider with discovery. */
+    OIDC_ISSUER: z.string().url().optional(),
+    OIDC_CLIENT_ID: z.string().min(1).optional(),
+    OIDC_CLIENT_SECRET: z.string().min(1).optional(),
+    OIDC_REDIRECT_URI: z.string().url().optional(),
+    OIDC_DISPLAY_NAME: z.string().min(1).max(60).optional(),
     AGENT_CA_CERT: z.string().min(1).optional(),
     AGENT_CA_KEY: z.string().min(1).optional(),
     AGENT_CA_CHAIN: z.string().min(1).optional(),
@@ -54,14 +60,18 @@ const schema = z
     ALERT_RULES_DIR: z.string().min(1).optional(),
     VMALERT_URL: z.string().url().optional(),
     /** AI assistant (M14): platform providers; keys never reach the browser or the model. */
-    AI_PROVIDER: z.enum(['gemini', 'groq', 'openrouter', 'openai']).optional(),
+    AI_PROVIDER: z.enum(['gemini', 'groq', 'openrouter', 'openai', 'local']).optional(),
     AI_MODEL: z.string().min(1).optional(),
-    AI_FALLBACK_PROVIDER: z.enum(['gemini', 'groq', 'openrouter', 'openai']).optional(),
+    AI_FALLBACK_PROVIDER: z.enum(['gemini', 'groq', 'openrouter', 'openai', 'local']).optional(),
     AI_FALLBACK_MODEL: z.string().min(1).optional(),
     GEMINI_API_KEY: z.string().min(10).optional(),
     GROQ_API_KEY: z.string().min(10).optional(),
     OPENROUTER_API_KEY: z.string().min(10).optional(),
     OPENAI_API_KEY: z.string().min(10).optional(),
+    /** Self-hosted (M19.4): an OpenAI-compatible endpoint (Ollama, vLLM), and a switch to run without AI. */
+    AI_LOCAL_BASE_URL: z.string().url().optional(),
+    AI_LOCAL_API_KEY: z.string().min(1).optional(),
+    AI_DISABLED: z.enum(['0', '1']).optional(),
     /** Tests and the e2e stack: a scripted provider instead of a real one. */
     PCP_AI_FAKE: z.enum(['0', '1']).optional(),
   })
@@ -72,6 +82,16 @@ const schema = z
     {
       message: 'set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI together',
       path: ['GOOGLE_CLIENT_ID'],
+    },
+  )
+  .refine(
+    (c) => {
+      const all = [c.OIDC_ISSUER, c.OIDC_CLIENT_ID, c.OIDC_CLIENT_SECRET, c.OIDC_REDIRECT_URI];
+      return all.every((v) => v === undefined) || all.every((v) => v !== undefined);
+    },
+    {
+      message: 'set OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_REDIRECT_URI together',
+      path: ['OIDC_ISSUER'],
     },
   )
   .refine((c) => !c.GOOGLE_CONNECTIONS_REDIRECT_URI || c.GOOGLE_CLIENT_ID, {
@@ -99,6 +119,14 @@ export interface GoogleConfig {
   connections?: { redirectUri: string; tokenUrl: string };
 }
 
+export interface OidcConfig {
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  displayName: string;
+}
+
 export interface AgentConfig {
   caCertPem: string;
   caKeyPem: string;
@@ -123,6 +151,7 @@ export interface AppConfig {
   platformEgressIp?: string;
   mailFrom: string;
   google?: GoogleConfig;
+  oidc?: OidcConfig;
   agents?: AgentConfig;
   /** Shared secret for private-network service calls; internal routes are off without it. */
   internalToken?: string;
@@ -174,6 +203,16 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
             : {}),
         }
       : undefined,
+    oidc:
+      c.OIDC_ISSUER && c.OIDC_CLIENT_ID && c.OIDC_CLIENT_SECRET && c.OIDC_REDIRECT_URI
+        ? {
+            issuer: c.OIDC_ISSUER.replace(/\/+$/, ''),
+            clientId: c.OIDC_CLIENT_ID,
+            clientSecret: c.OIDC_CLIENT_SECRET,
+            redirectUri: c.OIDC_REDIRECT_URI,
+            displayName: c.OIDC_DISPLAY_NAME ?? 'Single sign-on',
+          }
+        : undefined,
     internalToken: c.INTERNAL_TOKEN,
     installer: {
       runnerUrl: c.INSTALLER_RUNNER_URL?.replace(/\/+$/, ''),

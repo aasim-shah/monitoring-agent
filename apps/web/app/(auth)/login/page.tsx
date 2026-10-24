@@ -6,9 +6,15 @@ import { Suspense } from 'react';
 import { unwrap } from '@pcp/api-client';
 import { AuthCard } from '@/components/auth/auth-card';
 import { LoginForm } from '@/components/auth/login-form';
-import { Button } from '@/components/ui/button';
+import { SsoButtons, type Providers } from '@/components/auth/sso-buttons';
 import { api } from '@/lib/api';
 import { safeNext } from '@/lib/safe-next';
+
+const loadProviders = async (): Promise<Providers> => {
+  const res = await fetch('/api/v1/auth/providers', { credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`providers ${res.status}`);
+  return (await res.json()) as Providers;
+};
 
 function Login() {
   const router = useRouter();
@@ -34,11 +40,7 @@ function Login() {
           router.replace(mfaRequired ? `/mfa?next=${encodeURIComponent(next)}` : next)
         }
       />
-      {process.env.NEXT_PUBLIC_GOOGLE_LOGIN === '1' ? (
-        <Button variant="outline" className="w-full" asChild>
-          <a href="/api/v1/auth/google/start">Continue with Google</a>
-        </Button>
-      ) : null}
+      <SsoButtons load={loadProviders} />
     </AuthCard>
   );
 }

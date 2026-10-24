@@ -86,6 +86,8 @@ model User {
   passwordHash     String?   @map("password_hash")
   emailVerifiedAt  DateTime? @map("email_verified_at") @db.Timestamptz(6)
   googleSub        String?   @unique @map("google_sub")
+  /// OIDC sign-in (M19.4): `<issuer>#<sub>` of the self-hosted identity provider.
+  oidcSubject      String?   @unique @map("oidc_subject")
   /// Serialized EncryptedSecret (@pcp/secrets); AAD "user:<id>:mfa".
   mfaSecret        String?   @map("mfa_secret")
   mfaPendingSecret String?   @map("mfa_pending_secret")
