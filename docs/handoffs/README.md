@@ -30,7 +30,9 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M14 AI assistant | Done | Branch `feat/m14-ai`; deployed; [execution log](M14-execution-log.md) |
 | M7 SaaS integrations and webhooks | Done | Branch `feat/m7-integrations`; deployed; Cloudflare, GitHub, Prometheus, Grafana; [execution log](M7-execution-log.md) |
 | M19 Hardening (production-critical subset) | Done | Branch `feat/m19-hardening`; deployed; backups + restore drill, watchdog, CSP, zod fix, tenant export/deletion, lost-task fix; [execution log](M19-execution-log.md) |
-| M10, M17, M18; M19.2/.4/.7 | Not started | M10 partly delivered in M6b; M13.4 Google Ads gated on a developer token; pentest, load baselines, self-hosted packaging, and pilot need people or a separate host |
+| M10 Monitoring packs (remainder) | Done | Branch `feat/m10-packs`; deployed; usage and limits, live boost (agent 0.4.0), Level 2 guides for Node.js, Kafka, nginx, edge drop-label transform; [execution log](M10-execution-log.md) |
+| M15b Daily report: 24 h activity and trends | Done | Branch `feat/m15b-report-trends`; deployed with M10; database rows added, website speed, Google KPI trends; [execution log](M15b-execution-log.md) |
+| M17, M18; M19.2/.4/.7 | Not started | M13.4 Google Ads gated on a developer token; pentest, load baselines, self-hosted packaging, and pilot need people or a separate host |
 
 ## Maintenance
 
@@ -90,14 +92,14 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M9.2 | Correlation rules | Not started | — |
 | M9.3 | Graph API and traversal | Not started | — |
 | M9.4 | Topology, inventory, review UI | Not started | — |
-| M10.1 | Pack schema and loader | Not started | — |
-| M10.2 | Pack compiler | Not started | — |
-| M10.3 | Pack catalog | Not started | — |
-| M10.4 | Detection, proposals, credential delivery | Not started | — |
-| M10.5 | Level 2 guidance | Not started | — |
-| M10.6 | Usage and limits UI | Not started | — |
-| M10.7 | Live boost | Not started | — |
-| M10.8 | Service dashboards | Not started | — |
+| M10.1 | Pack schema and loader | Done (code catalog) | [M6b-packs-api](M6b-packs-api.md) |
+| M10.2 | Pack compiler | Done | [M6b-agent-packs](M6b-agent-packs.md), [M10-execution-log](M10-execution-log.md) |
+| M10.3 | Pack catalog | Done | [M6b-packs-api](M6b-packs-api.md) |
+| M10.4 | Detection, proposals, credential delivery | Done | [M6b-discovery](M6b-discovery.md) |
+| M10.5 | Level 2 guidance | Done | [M10-execution-log](M10-execution-log.md) |
+| M10.6 | Usage and limits UI | Done | [M10-execution-log](M10-execution-log.md) |
+| M10.7 | Live boost | Done | [M10-execution-log](M10-execution-log.md) |
+| M10.8 | Service dashboards | Done | [M6b-services-ui](M6b-services-ui.md) |
 | M11.1 | Live tail | Done | [M11-agent-tail](M11-agent-tail.md), [M11-live-tail-api](M11-live-tail-api.md), [M11-logs-ui](M11-logs-ui.md) |
 | M11.2 | Log-derived metrics | Done | [M11-log-metrics](M11-log-metrics.md) |
 | M12.1 | Alert rules and compiler | Done | [M12-schema](M12-schema.md), [M12-rule-compiler](M12-rule-compiler.md), [M12-compose](M12-compose.md) |
