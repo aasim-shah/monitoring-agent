@@ -1,0 +1,11 @@
+[Unit]
+Description=Product Control Plane nightly database backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=PCP_DIR=/opt/pcp
+ExecStart=/opt/pcp/infrastructure/scripts/backup.sh
+Nice=10
+IOSchedulingClass=idle
