@@ -26,7 +26,8 @@
     "@pcp/tenant-security": "workspace:*",
     "@pcp/connectors-databases": "workspace:*",
     "@pcp/connectors-custom-http": "workspace:*",
-    "@pcp/connectors-cloudflare": "workspace:*"
+    "@pcp/connectors-cloudflare": "workspace:*",
+    "@pcp/connectors-github": "workspace:*"
   },
   "devDependencies": {
     "@pcp/connectors-mock": "workspace:*",

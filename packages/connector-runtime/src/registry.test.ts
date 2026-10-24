@@ -19,7 +19,7 @@ describe('buildRegistry', () => {
 
   it('registers the M7 provider connectors', async () => {
     const types = (await buildRegistry({})).list().map((c) => c.type);
-    expect(types).toEqual(expect.arrayContaining(['cloudflare']));
+    expect(types).toEqual(expect.arrayContaining(['cloudflare', 'github']));
   });
 
   it('points providers at test servers only with the explicit test flag', async () => {

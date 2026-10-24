@@ -1,0 +1,33 @@
+{
+  "name": "@pcp/connectors-github",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GitHub connector (fine-grained token): repositories, workflows, deployments, releases, webhooks, workflow dispatch (M7.3, WB-06).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pcp/automation": "workspace:*",
+    "@pcp/connector-sdk": "workspace:*",
+    "@pcp/shared-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

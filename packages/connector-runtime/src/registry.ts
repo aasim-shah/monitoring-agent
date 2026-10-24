@@ -1,6 +1,7 @@
 import { ConnectorRegistry, type Connector, type DestinationOptions } from '@pcp/connector-sdk';
 import { createCloudflareConnector } from '@pcp/connectors-cloudflare';
 import { customHttpConnector } from '@pcp/connectors-custom-http';
+import { createGithubConnector } from '@pcp/connectors-github';
 import { mongodbConnector, mysqlConnector, postgresConnector } from '@pcp/connectors-databases';
 
 /**
@@ -8,7 +9,7 @@ import { mongodbConnector, mysqlConnector, postgresConnector } from '@pcp/connec
  * PCP_ALLOW_TEST_PROVIDERS=1, which no production configuration sets; private destinations are
  * then allowed for exactly that host and port.
  */
-const PROVIDER_URL_VARS = { cloudflare: 'PCP_CLOUDFLARE_API_URL' } as const;
+const PROVIDER_URL_VARS = { cloudflare: 'PCP_CLOUDFLARE_API_URL', github: 'PCP_GITHUB_API_URL' } as const;
 
 function provider(
   env: Record<string, string | undefined>,
@@ -40,6 +41,7 @@ export async function buildRegistry(env: Record<string, string | undefined>): Pr
     mongodbConnector,
     customHttpConnector,
     createCloudflareConnector(provider(env, 'cloudflare')),
+    createGithubConnector(provider(env, 'github')),
   ];
   for (const c of production) registry.register(c);
   if (env.PCP_ENABLE_MOCK_CONNECTOR === '1') {
