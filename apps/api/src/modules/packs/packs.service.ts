@@ -21,6 +21,7 @@ const view = (a: Assignment) => ({
   policyVersion: a.policyVersion,
   appliedAt: a.appliedAt,
   updatedAt: a.updatedAt,
+  retainLogs: a.retainLogs,
   // Data inspection settings (M18.2): which keys and topics an owner allowlisted.
   inspection: {
     enabled: (a.inspection as { enabled?: boolean } | null)?.enabled === true,
@@ -126,6 +127,29 @@ export class PacksService {
     });
   }
 
+  /** Retained logs opt-in for one pack (M18.1): the agent reconfigures on its next heartbeat. */
+  setRetainLogs(ctx: TenantContext, agentId: string, packId: string, enabled: boolean) {
+    return withTenant(this.prisma, ctx, async (tx) => {
+      const existing = await tx.agentPackAssignment.findUnique({
+        where: { agentId_packId: { agentId, packId } },
+      });
+      if (!existing || existing.status === 'removing') throw notFound();
+      if (existing.retainLogs === enabled) return view(existing);
+      const policyVersion = await this.bump(tx, agentId);
+      const row = await tx.agentPackAssignment.update({
+        where: { id: existing.id },
+        data: { retainLogs: enabled, status: 'pending', statusMessage: null, policyVersion },
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'pack.retained_logs',
+        targetType: 'agent',
+        targetId: agentId,
+        metadata: { packId, enabled },
+      });
+      return view(row);
+    });
+  }
+
   inventory(ctx: TenantContext, agentId: string) {
     return withTenant(this.prisma, ctx, async (tx) => {
       const agent = await tx.agent.findUnique({
@@ -188,6 +212,7 @@ export class PacksService {
           packId: r.packId,
           settings: r.settings,
           ...(r.sealedCredentials ? { sealedCredentials: r.sealedCredentials } : {}),
+          ...(r.retainLogs ? { retainLogs: true } : {}),
         })),
       };
     });

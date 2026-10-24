@@ -106,7 +106,7 @@ func (a *Applier) Apply(cfg control.AgentConfig) control.ConfigAck {
 			}
 			creds = opened
 		}
-		pc := collector.PackConfig{ID: p.PackId, Settings: p.Settings, Credentials: creds}
+		pc := collector.PackConfig{ID: p.PackId, Settings: p.Settings, Credentials: creds, RetainLogs: p.RetainLogs}
 		if _, err := collector.Config(a.input(pc)); err != nil {
 			fail(p.PackId, err.Error())
 			continue

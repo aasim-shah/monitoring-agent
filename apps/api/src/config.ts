@@ -47,6 +47,8 @@ const schema = z
     VM_QUERY_URL: z.string().url().optional(),
     /** Long-term rollups (M18.4): the 13-month store and when its data begins; both or neither. */
     VM_LONGTERM_URL: z.string().url().optional(),
+    /** Retained logs (M18.1): VictoriaLogs; off when unset. */
+    VLOGS_URL: z.string().url().optional(),
     ROLLUPS_SINCE: z.string().datetime({ offset: true }).optional(),
     /** Where tenant vmalert rule files are written (a volume vmalert reads), and vmalert's URL. */
     ALERT_RULES_DIR: z.string().min(1).optional(),
@@ -129,6 +131,8 @@ export interface AppConfig {
   vmQueryUrl?: string;
   /** Long-term rollups; off unless both the URL and the start date are set. */
   rollups?: { url: string; since: Date };
+  /** VictoriaLogs for retained logs (M18.1); retained logs are off without it. */
+  vlogsUrl?: string;
   alertRulesDir?: string;
   vmalertUrl?: string;
   ai: AiConfig;
@@ -179,6 +183,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
         .filter(Boolean),
     },
     vmQueryUrl: c.VM_QUERY_URL?.replace(/\/+$/, ''),
+    vlogsUrl: c.VLOGS_URL?.replace(/\/+$/, ''),
     rollups:
       c.VM_LONGTERM_URL && c.ROLLUPS_SINCE
         ? { url: c.VM_LONGTERM_URL.replace(/\/+$/, ''), since: new Date(c.ROLLUPS_SINCE) }

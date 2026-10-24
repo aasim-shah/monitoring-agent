@@ -12,6 +12,10 @@ import { useApiQuery } from '@/lib/use-api-query';
 import type { EnablePackBody } from './enable-pack-dialog';
 import { GuidedSetup, type Guide } from './guided-setup';
 import { InspectionPanel, type InspectionApi } from './inspection-panel';
+import { RetainLogsToggle } from './retain-logs-toggle';
+
+/** Packs with log files the agent can ship (the M11 log sources). */
+const PACKS_WITH_LOGS = new Set(['redis', 'postgresql', 'mysql', 'mongodb', 'kafka', 'nginx']);
 import { LiveBoostControl } from './live-boost';
 import { ServicesPanel, type Assignment, type CatalogPack } from './services-panel';
 
@@ -26,11 +30,14 @@ function ServiceCharts({
   boostedUntil,
   onBoost,
   guide,
+  retainLogs,
 }: {
   agentId: string;
   packId: string;
   name: string;
   range: Range;
+  /** Retained logs opt-in for packs with log files (M18.1). */
+  retainLogs?: { enabled: boolean; onChange: (enabled: boolean) => Promise<void> };
   /** Set while a live boost runs: the last 15 minutes, refreshed every 5 s. */
   boostedUntil: string | null;
   onBoost?: () => Promise<void>;
@@ -66,6 +73,9 @@ function ServiceCharts({
                 ) as { status: 'active' | 'not_found'; series: number }
               }
             />
+          ) : null}
+          {retainLogs ? (
+            <RetainLogsToggle name={name} enabled={retainLogs.enabled} onChange={retainLogs.onChange} />
           ) : null}
           {onBoost ? <LiveBoostControl name={name} until={boostedUntil} onStart={onBoost} /> : null}
         </div>

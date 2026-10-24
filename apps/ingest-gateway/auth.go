@@ -16,6 +16,8 @@ type Identity struct {
 	OrganizationID string `json:"organizationId"`
 	ProductID      string `json:"productId"`
 	EnvironmentID  string `json:"environmentId"`
+	// LogsAccountID is the tenant's VictoriaLogs AccountID (M18.1).
+	LogsAccountID uint32 `json:"logsAccountId"`
 }
 
 var errUnknownAgent = errors.New("unknown, revoked, or expired agent certificate")

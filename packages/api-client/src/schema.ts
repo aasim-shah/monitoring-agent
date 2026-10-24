@@ -1529,6 +1529,31 @@ export interface paths {
         patch: operations["updatePackInspection"];
         trace?: never;
     };
+    "/api/v1/agents/{id}/packs/{packId}/retained-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+                /** @description Monitoring pack ID */
+                packId: components["parameters"]["packId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Keep this pack's redacted log lines for 7 days
+         * @description Off by default. Lines are redacted on the host before they leave it (BR-12-04) and stored per tenant (BR-12-08). The agent reconfigures on its next heartbeat. Needs retained logs enabled on the platform; otherwise 409. Requires `pack.manage`.
+         */
+        patch: operations["setPackRetainedLogs"];
+        trace?: never;
+    };
     "/api/v1/agents/{id}/live-boost": {
         parameters: {
             query?: never;
@@ -1648,19 +1673,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/products/{id}/logs/search": {
+    "/api/v1/products/{productId}/logs/search": {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Resource ID */
-                id: components["parameters"]["id"];
+                /** @description Product ID */
+                productId: components["parameters"]["productId"];
             };
             cookie?: never;
         };
         /**
          * Search retained logs
-         * @description Search retained logs.
+         * @description LogsQL filters (no pipes) over the product's retained logs, newest first, at most 500 lines. The tenant (AccountID) and product filter are always applied by the platform (BR-12-08). Requires `logs.tail`.
          */
         get: operations["searchLogs"];
         put?: never;
@@ -4351,6 +4376,8 @@ export interface components {
             appliedAt: string | null;
             /** Format: date-time */
             updatedAt: string;
+            /** @description Redacted log lines kept 7 days (M18.1) */
+            retainLogs: boolean;
             inspection: components["schemas"]["InspectionSettings"];
         };
         Inventory: {
@@ -6789,6 +6816,40 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    setPackRetainedLogs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+                /** @description Monitoring pack ID */
+                packId: components["parameters"]["packId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackAssignment"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     listLiveBoosts: {
         parameters: {
             query?: never;
@@ -7021,19 +7082,43 @@ export interface operations {
     };
     searchLogs: {
         parameters: {
-            query?: never;
+            query?: {
+                query?: string;
+                range?: "1h" | "6h" | "24h" | "7d";
+                agentId?: string;
+            };
             header?: never;
             path: {
-                /** @description Resource ID */
-                id: components["parameters"]["id"];
+                /** @description Product ID */
+                productId: components["parameters"]["productId"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        range: string;
+                        truncated: boolean;
+                        lines: {
+                            time: string;
+                            message: string;
+                            agentId: string | null;
+                            service: string | null;
+                            level: string | null;
+                        }[];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     createInstallSession: {

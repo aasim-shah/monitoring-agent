@@ -53,3 +53,16 @@ CREATE FUNCTION pcp_resolve_inspection_request(p_id uuid, p_user uuid)
 ALTER FUNCTION pcp_resolve_inspection_request(uuid, uuid) OWNER TO pcp_rls_definer;
 REVOKE ALL ON FUNCTION pcp_resolve_inspection_request(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION pcp_resolve_inspection_request(uuid, uuid) TO pcp_app;
+
+-- ===== Part 3: retained logs (M18.1) =====
+-- AlterTable
+ALTER TABLE "organizations" ADD COLUMN     "logs_account_id" SERIAL NOT NULL;
+
+-- AlterTable
+ALTER TABLE "agent_pack_assignments" ADD COLUMN     "retain_logs" BOOLEAN NOT NULL DEFAULT false;
+
+-- CreateIndex
+CREATE UNIQUE INDEX "organizations_logs_account_id_key" ON "organizations"("logs_account_id");
+
+-- The app creates organizations, so it draws AccountIDs from the sequence.
+GRANT USAGE, SELECT ON SEQUENCE organizations_logs_account_id_seq TO pcp_app;

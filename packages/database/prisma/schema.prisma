@@ -151,6 +151,8 @@ model Organization {
   name                      String
   timezone                  String    @default("UTC")
   settings                  Json      @default("{}")
+  /// The tenant's VictoriaLogs AccountID for retained logs (M18.1, BR-12-08).
+  logsAccountId             Int       @unique @default(autoincrement()) @map("logs_account_id")
   createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   /// Deletion requested (WB-17 UC-17-09): members lose access; owners may cancel until the purge.
   deletionRequestedAt       DateTime? @map("deletion_requested_at") @db.Timestamptz(6)
@@ -676,6 +678,8 @@ model AgentPackAssignment {
   sealedCredentials String?    @map("sealed_credentials")
   /// Data inspection (M18.2): `{enabled, redisKeys[], peekTopics[]}`; off until an owner or admin turns it on.
   inspection        Json       @default("{\"enabled\": false}")
+  /// Ship this pack's redacted log lines to retained-log storage (M18.1); off by default.
+  retainLogs        Boolean    @default(false) @map("retain_logs")
   status            PackStatus @default(pending)
   statusMessage     String?    @map("status_message")
   policyVersion     Int        @map("policy_version")

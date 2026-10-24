@@ -1,4 +1,16 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 import { RequirePermission, SessionOnly, TenantScope } from '../../common/decorators.js';
 import { parseBody } from '../../common/errors.js';
@@ -10,14 +22,19 @@ import { LiveBoostService } from './live-boost.service.js';
 import { PacksService } from './packs.service.js';
 import { z } from 'zod';
 import { enablePackBody } from './schemas.js';
+import type { AppConfig } from '../../config.js';
+import { ApiException } from '../../common/errors.js';
+import { APP_CONFIG } from '../../tokens.js';
 
 const boostBody = z.object({ packId: z.string().min(1).max(40) }).strict();
+const retainBody = z.object({ enabled: z.boolean() }).strict();
 
 @Controller('api/v1')
 export class PacksController {
   constructor(
     private readonly packs: PacksService,
     private readonly boosts: LiveBoostService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   @SessionOnly()
@@ -74,6 +91,25 @@ export class PacksController {
   @HttpCode(202)
   disable(@Req() req: ApiRequest, @Param('id') id: string, @Param('packId') packId: string) {
     return this.packs.disable(requireTenant(req), id, packId);
+  }
+
+  /** Retained logs (M18.1): keep this pack's redacted log lines for 7 days. */
+  @RequirePermission('pack.manage')
+  @TenantScope(AGENT)
+  @Patch('agents/:id/packs/:packId/retained-logs')
+  retainLogs(
+    @Req() req: ApiRequest,
+    @Param('id') id: string,
+    @Param('packId') packId: string,
+    @Body() body: unknown,
+  ) {
+    if (!this.config.vlogsUrl)
+      throw new ApiException(
+        409,
+        'retained_logs_unavailable',
+        'Retained logs are not enabled on this platform',
+      );
+    return this.packs.setRetainLogs(requireTenant(req), id, packId, parseBody(retainBody, body).enabled);
   }
 
   /** Live boost (M10.7): one pack at 5 s for 10 minutes; the agent reverts on its own. */

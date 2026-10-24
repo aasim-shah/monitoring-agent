@@ -5,10 +5,28 @@ import type { ApiRequest } from '../../common/request.js';
 import { requireTenant } from '../../common/tenant.js';
 import { AGENT } from '../agents/agents.controller.js';
 import { TailService } from './tail.service.js';
+import { LogSearchService } from './search.service.js';
 
 @Controller('api/v1')
 export class LogsController {
-  constructor(private readonly tail: TailService) {}
+  constructor(
+    private readonly tail: TailService,
+    private readonly searchService: LogSearchService,
+  ) {}
+
+  /** Retained-log search (M18.1); the same permission as the live tail. */
+  @RequirePermission('logs.tail')
+  @TenantScope({ param: 'productId' })
+  @Get('products/:productId/logs/search')
+  search(
+    @Req() req: ApiRequest,
+    @Param('productId') productId: string,
+    @Query('query') query?: string,
+    @Query('range') range?: string,
+    @Query('agentId') agentId?: string,
+  ) {
+    return this.searchService.search(requireTenant(req), productId, { query, range, agentId });
+  }
 
   @RequirePermission('agent.view')
   @TenantScope(AGENT)

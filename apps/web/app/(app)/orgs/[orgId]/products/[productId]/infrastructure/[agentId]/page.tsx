@@ -136,7 +136,9 @@ export default function HostMetricsPage() {
           range={range === '30d' || range === '90d' ? '7d' : range}
         />
       ) : null}
-      {agent.data ? <LogsSection agentId={agentId} canTail={roleCan(role, 'logs.tail')} /> : null}
+      {agent.data ? (
+        <LogsSection agentId={agentId} productId={productId} canTail={roleCan(role, 'logs.tail')} />
+      ) : null}
     </div>
   );
 }

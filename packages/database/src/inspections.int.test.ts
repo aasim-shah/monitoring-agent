@@ -54,3 +54,29 @@ describe('data inspection (M18.2)', () => {
     }
   });
 });
+
+describe('retained logs (M18.1)', () => {
+  it('every organization gets its own logs AccountID, also when the app creates it', async () => {
+    const c = new pg.Client({ connectionString: db.appUrl });
+    await c.connect();
+    const ids: number[] = [];
+    try {
+      for (const id of [randomUUID(), randomUUID()]) {
+        await c.query('BEGIN');
+        await c.query(`SELECT set_config('app.organization_id', $1, true)`, [id]);
+        ids.push(
+          (
+            await c.query(`INSERT INTO organizations (id, name) VALUES ($1, 'L') RETURNING logs_account_id`, [
+              id,
+            ])
+          ).rows[0].logs_account_id,
+        );
+        await c.query('COMMIT');
+      }
+    } finally {
+      await c.end();
+    }
+    expect(ids[0]).toBeGreaterThan(0);
+    expect(ids[1]).not.toBe(ids[0]);
+  });
+});

@@ -146,3 +146,15 @@ func TestApplyReportsCredentialsItCannotOpen(t *testing.T) {
 		t.Errorf("ack = %+v", ack)
 	}
 }
+
+func TestApplyCarriesTheRetainedLogsOptIn(t *testing.T) {
+	f := newFixture(t, ok)
+	cfg := control.AgentConfig{PolicyVersion: 3, Packs: []control.PackAssignment{{PackId: "redis", Settings: map[string]any{"endpoint": "127.0.0.1:6379"}, RetainLogs: true}}}
+	if ack := f.a.Apply(cfg); results(ack)["redis"].Status != "applied" {
+		t.Fatalf("ack = %+v", ack)
+	}
+	st, err := LoadStore(f.a.Dir)
+	if err != nil || len(st.Packs) != 1 || !st.Packs[0].RetainLogs {
+		t.Fatalf("store = %+v %v", st, err)
+	}
+}

@@ -12,6 +12,8 @@ type PackConfig struct {
 	ID          string            `json:"id"`
 	Settings    map[string]any    `json:"settings"`
 	Credentials map[string]string `json:"credentials,omitempty"`
+	// RetainLogs ships the pack's log lines, redacted, to retained-log storage (M18.1).
+	RetainLogs bool `json:"retainLogs,omitempty"`
 }
 
 type packReceiver struct {

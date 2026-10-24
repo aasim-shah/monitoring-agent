@@ -29,6 +29,8 @@ type Config struct {
 	MaxBodyBytes    int
 	Now             func() time.Time
 	Client          *http.Client
+	// VLogsURL is VictoriaLogs; empty means retained logs are off (M18.1).
+	VLogsURL string
 }
 
 // Gateway authenticates agents, rewrites tenant labels, enforces limits, and forwards
@@ -57,6 +59,7 @@ func NewGateway(cfg Config) *Gateway {
 		mux:     http.NewServeMux(),
 	}
 	g.mux.HandleFunc("POST /prometheus/api/v1/write", g.write)
+	g.mux.HandleFunc("POST /v1/logs", g.logs)
 	notYet := func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "OTLP ingest arrives in a later release; use remote_write", http.StatusNotImplemented)
 	}

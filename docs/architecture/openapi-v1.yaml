@@ -1886,6 +1886,35 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M18
+  /api/v1/agents/{id}/packs/{packId}/retained-logs:
+    parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/packId' }]
+    patch:
+      operationId: setPackRetainedLogs
+      tags: [logs]
+      summary: Keep this pack's redacted log lines for 7 days
+      description: >-
+        Off by default. Lines are redacted on the host before they leave it (BR-12-04) and stored per tenant
+        (BR-12-08). The agent reconfigures on its next heartbeat. Needs retained logs enabled on the platform;
+        otherwise 409. Requires `pack.manage`.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200':
+          description: Saved
+          content: { application/json: { schema: { $ref: '#/components/schemas/PackAssignment' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M18
   /api/v1/agents/{id}/live-boost:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
@@ -2089,18 +2118,47 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M18
-  /api/v1/products/{id}/logs/search:
-    parameters: [{ $ref: '#/components/parameters/id' }]
+  /api/v1/products/{productId}/logs/search:
+    parameters: [{ $ref: '#/components/parameters/productId' }]
     get:
       operationId: searchLogs
       tags: [logs]
       summary: Search retained logs
-      description: Search retained logs.
+      description: >-
+        LogsQL filters (no pipes) over the product's retained logs, newest first, at most 500 lines. The tenant
+        (AccountID) and product filter are always applied by the platform (BR-12-08). Requires `logs.tail`.
       security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: query, in: query, schema: { type: string, maxLength: 1000 } }
+        - { name: range, in: query, schema: { type: string, enum: ['1h', '6h', '24h', '7d'], default: '1h' } }
+        - { name: agentId, in: query, schema: { type: string, format: uuid } }
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [range, lines, truncated]
+                properties:
+                  range: { type: string }
+                  truncated: { type: boolean }
+                  lines:
+                    type: array
+                    items:
+                      type: object
+                      required: [time, message, agentId, service, level]
+                      properties:
+                        time: { type: string }
+                        message: { type: string }
+                        agentId: { type: [string, 'null'] }
+                        service: { type: [string, 'null'] }
+                        level: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M18
   /api/v1/environments/{environmentId}/install-sessions:
     parameters: [{ $ref: '#/components/parameters/environmentId' }]
     post:
@@ -5467,7 +5525,8 @@ components:
             troubleshooting: { type: array, items: { type: string } }
     PackAssignment:
       type: object
-      required: [packId, settings, status, statusMessage, policyVersion, appliedAt, updatedAt, inspection]
+      required:
+        [packId, settings, status, statusMessage, policyVersion, appliedAt, updatedAt, retainLogs, inspection]
       properties:
         packId: { type: string }
         settings: { type: object, additionalProperties: true }
@@ -5476,6 +5535,7 @@ components:
         policyVersion: { type: integer }
         appliedAt: { type: [string, 'null'], format: date-time }
         updatedAt: { type: string, format: date-time }
+        retainLogs: { type: boolean, description: Redacted log lines kept 7 days (M18.1) }
         inspection: { $ref: '#/components/schemas/InspectionSettings' }
     Inventory:
       type: object

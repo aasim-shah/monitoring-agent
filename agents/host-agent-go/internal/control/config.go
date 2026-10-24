@@ -11,6 +11,8 @@ type PackAssignment struct {
 	PackId            string         `json:"packId"`
 	Settings          map[string]any `json:"settings"`
 	SealedCredentials string         `json:"sealedCredentials,omitempty"`
+	// RetainLogs ships the pack's redacted log lines to retained-log storage (M18.1).
+	RetainLogs bool `json:"retainLogs,omitempty"`
 }
 
 // AgentConfig is the pack configuration for a policy version.

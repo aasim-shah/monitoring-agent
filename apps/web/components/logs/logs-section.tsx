@@ -7,10 +7,20 @@ import { QueryState } from '@/lib/page-guard';
 import { openEventStream } from '@/lib/sse';
 import { useApiQuery } from '@/lib/use-api-query';
 import { LogSources } from './log-sources';
+import { LogSearch } from './log-search';
 import { LogViewer, type Connect, type LogSource } from './log-viewer';
 
 /** "Logs" on a server page: the applied packs' sources plus the system journal, one tail at a time. */
-export function LogsSection({ agentId, canTail }: { agentId: string; canTail: boolean }) {
+export function LogsSection({
+  agentId,
+  productId,
+  canTail,
+}: {
+  agentId: string;
+  /** Retained-log search runs per product, filtered to this host (M18.1). */
+  productId?: string;
+  canTail: boolean;
+}) {
   const [open, setOpen] = useState<LogSource | null>(null);
   const sources = useApiQuery(
     ['log-sources', agentId],
@@ -52,6 +62,17 @@ export function LogsSection({ agentId, canTail }: { agentId: string; canTail: bo
       </QueryState>
       {open ? (
         <LogViewer key={open.id} source={open} connect={connect} onClose={() => setOpen(null)} />
+      ) : null}
+      {productId ? (
+        <LogSearch
+          search={async (query, range) =>
+            unwrap(
+              await api.GET('/api/v1/products/{productId}/logs/search', {
+                params: { path: { productId }, query: { query, range, agentId } },
+              }),
+            )
+          }
+        />
       ) : null}
     </section>
   );

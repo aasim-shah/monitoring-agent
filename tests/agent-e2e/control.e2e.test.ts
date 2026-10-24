@@ -93,8 +93,10 @@ beforeAll(async () => {
     MAILPIT_PORT: String(MAILPIT_PORT),
     EDGE_SUBNET: `${SUBNET}.0/24`,
     CADDY_ADDRESS: `${SUBNET}.10`,
+    // Retained logs (M18.1) run with the `logs` profile.
+    VLOGS_URL: 'http://victorialogs:9428',
   });
-  const up = await compose(['up', '-d', '--build', '--wait', '--wait-timeout', '1700']);
+  const up = await compose(['--profile', 'logs', 'up', '-d', '--build', '--wait', '--wait-timeout', '1700']);
   if (up.status !== 0) throw new Error(`compose up failed: ${up.stderr.slice(-4000)}`);
   const ca = await compose([
     'cp',
@@ -107,7 +109,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await run('docker', ['rm', '-f', HOST, ...FLEET, COMPOSE_AGENT, ...ASSISTED]);
-  if (file) await compose(['down', '-v', '--remove-orphans']);
+  if (file) await compose(['--profile', 'logs', 'down', '-v', '--remove-orphans']);
 });
 
 let orgId = '';
@@ -532,6 +534,37 @@ describe('service discovery and monitoring packs (M6b exit gate)', () => {
       expect.objectContaining({ key: 'jobs', type: 'list', length: 3 }),
     ]);
     expect(JSON.stringify(inspected)).not.toContain('secret-payload');
+
+    // M18.1 retained logs: the Redis pack opts in; a line with secrets reaches search redacted.
+    const retain = await api('PATCH', `/api/v1/agents/${agentId}/packs/redis/retained-logs`, {
+      enabled: true,
+    });
+    expect(retain.status, JSON.stringify(retain.json)).toBe(200);
+    await until('redis pack reapplied with retained logs', async () => {
+      const list = (await api('GET', `/api/v1/agents/${agentId}/packs`)).json.packs as Json[];
+      return list.find((p) => p.packId === 'redis' && p.status === 'applied' && p.retainLogs)
+        ? true
+        : undefined;
+    });
+    expect((await inHost('grep -c otlphttp/logs /var/lib/pcp-agent/collector.yaml')).stdout.trim()).not.toBe(
+      '0',
+    );
+    const marker = `pcp-e2e-retained-${Date.now()}`;
+    const shipped = await until(
+      'retained redis log line',
+      async () => {
+        await inHost(
+          `echo "${marker} password=hunter2-e2e from buyer@example.com" >> /var/log/redis/redis-server.log`,
+        );
+        const found = await api('GET', `/api/v1/products/${productId}/logs/search?query=${marker}&range=1h`);
+        return (found.json.lines as Json[] | undefined)?.find((l) => String(l.message).includes(marker));
+      },
+      180_000,
+    );
+    expect(shipped.message).toContain('password=[REDACTED]');
+    expect(shipped.message).toContain('[EMAIL]');
+    expect(shipped.message).not.toContain('hunter2-e2e');
+    expect(shipped.agentId).toBe(agentId);
 
     // Disabling removes the receiver; the assignment disappears after the agent acknowledges.
     expect((await api('DELETE', `/api/v1/agents/${agentId}/packs/redis`)).status).toBe(202);

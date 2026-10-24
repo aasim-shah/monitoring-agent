@@ -53,6 +53,8 @@ func main() {
 		AgentSamplesPS:  10_000,
 		MaxBodyBytes:    10 << 20,
 		Now:             time.Now,
+		// Retained logs (M18.1) are off unless VictoriaLogs is configured.
+		VLogsURL: os.Getenv("VLOGS_URL"),
 	})
 
 	// Per-tenant usage to the API every minute (M10.6); a failed report is retried with the next.

@@ -121,6 +121,8 @@ services:
       # Long-term rollups (M18.4): both set to turn routing on (the `rollups` profile must run).
       VM_LONGTERM_URL: ${VM_LONGTERM_URL:-}
       ROLLUPS_SINCE: ${ROLLUPS_SINCE:-}
+      # Retained logs (M18.1): http://victorialogs:9428 with the `logs` profile.
+      VLOGS_URL: ${VLOGS_URL:-}
       AGENT_INGEST_URL: ${AGENT_INGEST_URL:-}
       AGENT_OPAMP_URL: ${AGENT_OPAMP_URL:-}
     volumes: ['alert-rules:/var/lib/pcp/alert-rules']
@@ -261,6 +263,25 @@ services:
       retries: 12
     restart: unless-stopped
 
+  # Retained logs (M18.1), off unless the `logs` profile runs and VLOGS_URL points here: redacted
+  # lines from opted-in packs, 7 days, tenant-isolated by AccountID (BR-12-08).
+  victorialogs:
+    profiles: [logs]
+    image: victoriametrics/victoria-logs:v1.51.1
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=7d
+      - -httpListenAddr=:9428
+    volumes: [vlogs-data:/storage]
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:9428/health']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy: { resources: { limits: { memory: 128m } } }
+    restart: unless-stopped
+
   # Long-term rollups (M18.4), off unless the `rollups` profile is started: 5-minute aggregates kept
   # 13 months. The api reads them for ranges older than raw retention when ROLLUPS_SINCE is set.
   victoriametrics-longterm:
@@ -335,6 +356,7 @@ services:
       API_INTERNAL_URL: http://api:3000
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN must be set (see .env.example)}
       TRUSTED_PROXY_ADDRESSES: ${CADDY_ADDRESS:-172.30.0.10}
+      VLOGS_URL: ${VLOGS_URL:-}
     networks: [edge, internal]
     depends_on:
       victoriametrics: { condition: service_healthy }
@@ -382,3 +404,4 @@ volumes:
   redis-data: {}
   vm-data: {}
   vm-longterm-data: {}
+  vlogs-data: {}

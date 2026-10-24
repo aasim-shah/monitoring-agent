@@ -28,6 +28,7 @@ export interface Assignment {
   status: 'pending' | 'applied' | 'failed' | 'removing';
   statusMessage: string | null;
   inspection?: { enabled: boolean; redisKeys: string[]; peekTopics: string[] };
+  retainLogs?: boolean;
 }
 
 const hostPort = (a: string, p: number) => (a.includes(':') ? `[${a}]:${p}` : `${a}:${p}`);

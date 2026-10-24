@@ -34,6 +34,8 @@ describe('internal agent lookup (for the ingest gateway)', () => {
       organizationId: owner.orgId,
       productId,
       environmentId,
+      // M18.1: the gateway stamps retained logs with the tenant's AccountID.
+      logsAccountId: expect.any(Number),
     });
   });
 

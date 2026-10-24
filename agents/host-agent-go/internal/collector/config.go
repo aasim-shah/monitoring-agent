@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"pcp.local/hostagent/internal/redact"
 )
 
 // Input is what the agent knows after enrollment.
@@ -110,6 +112,28 @@ func Config(in Input) ([]byte, error) {
 		metricsReceivers = append(metricsReceivers, "prometheus/logcounts")
 		filter = allowlist(prefixes, append(keep, `^log_(lines|pattern)_total$`)...)
 	}
+	// Retained logs (M18.1): opted-in packs' lines, redacted on the host, to the gateway over mTLS.
+	var retained []string
+	for _, p := range in.Packs {
+		if p.RetainLogs && contains(logIDs, "filelog/"+p.ID) {
+			retained = append(retained, "filelog/"+p.ID)
+		}
+	}
+	if len(retained) > 0 {
+		processors["transform/redact_logs"] = redactLogs()
+		pipelines["logs/retained"] = map[string]any{
+			"receivers":  retained,
+			"processors": []string{"memory_limiter", "transform/redact_logs", "batch"},
+			"exporters":  []string{"otlphttp/logs"},
+		}
+		exporters["otlphttp/logs"] = map[string]any{
+			"logs_endpoint":    strings.TrimRight(in.IngestURL, "/") + "/v1/logs",
+			"tls":              tls,
+			"compression":      "gzip",
+			"retry_on_failure": enabled,
+			"sending_queue":    map[string]any{"enabled": true, "queue_size": 1000},
+		}
+	}
 	processors["filter/allowlist"] = filter
 	pipelines["metrics"] = map[string]any{
 		"receivers":  metricsReceivers,
@@ -175,4 +199,27 @@ func dropLabels() map[string]any {
 			map[string]any{"context": "resource", "statements": res},
 		},
 	}
+}
+
+// redactLogs is the host-side masking for retained logs: the live tail's rules as OTTL, with every
+// 13–19 digit run masked as a card number.
+func redactLogs() map[string]any {
+	var st []string
+	for _, r := range redact.Rules {
+		st = append(st, fmt.Sprintf(`replace_pattern(body, %q, %q)`, r.Pattern, ottlReplacement(r.Replacement)))
+	}
+	st = append(st, fmt.Sprintf(`replace_pattern(body, %q, "[CARD]")`, redact.CardLike))
+	return map[string]any{
+		"error_mode":     "ignore",
+		"log_statements": []any{map[string]any{"context": "log", "statements": st}},
+	}
+}
+
+// ottlReplacement writes `${1}` as `$$1`: the collector expands `${...}` from the environment, and
+// OTTL reads `$1` as the capture group.
+func ottlReplacement(r string) string {
+	for _, n := range []string{"1", "2"} {
+		r = strings.ReplaceAll(r, "${"+n+"}", "$$"+n)
+	}
+	return r
 }

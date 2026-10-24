@@ -184,3 +184,39 @@ func attributeKeys(m map[string]any) string {
 	}
 	return strings.Join(keys, ",")
 }
+
+// M18.1: a pack with retained logs ships its redacted lines to the gateway; others only count them.
+func TestRetainedLogsShipRedactedToTheGatewayForOptedInPacks(t *testing.T) {
+	cfg := logsConfig(t,
+		PackConfig{ID: "redis", Settings: map[string]any{"endpoint": "127.0.0.1:6379"}, RetainLogs: true},
+		PackConfig{ID: "nginx", Settings: map[string]any{"endpoint": "http://127.0.0.1/status"}},
+	)
+	pipes := cfg["service"].(map[string]any)["pipelines"].(map[string]any)
+	retained, ok := pipes["logs/retained"].(map[string]any)
+	if !ok {
+		t.Fatalf("no logs/retained pipeline: %v", pipes)
+	}
+	if got := toStrings(retained["receivers"]); len(got) != 1 || got[0] != "filelog/redis" {
+		t.Errorf("receivers = %v", got)
+	}
+	if got := toStrings(retained["processors"]); len(got) != 3 || got[1] != "transform/redact_logs" {
+		t.Errorf("processors = %v", got)
+	}
+	exp := cfg["exporters"].(map[string]any)["otlphttp/logs"].(map[string]any)
+	if exp["logs_endpoint"] != "https://ingest.example.com/v1/logs" || exp["tls"] == nil {
+		t.Errorf("exporter = %v", exp)
+	}
+	raw, _ := json.Marshal(cfg["processors"].(map[string]any)["transform/redact_logs"])
+	for _, want := range []string{"[REDACTED]", "[TOKEN]", "[JWT]", "[EMAIL]", "[CARD]"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("redaction %s missing: %s", want, raw)
+		}
+	}
+	none := logsConfig(t, PackConfig{ID: "redis", Settings: map[string]any{"endpoint": "127.0.0.1:6379"}})
+	if _, ok := none["service"].(map[string]any)["pipelines"].(map[string]any)["logs/retained"]; ok {
+		t.Error("logs retained without opt-in")
+	}
+	if _, ok := none["exporters"].(map[string]any)["otlphttp/logs"]; ok {
+		t.Error("log exporter without opt-in")
+	}
+}
