@@ -21,6 +21,9 @@ type packReceiver struct {
 
 const packInterval = "30s"
 
+// BoostInterval is a live-boosted pack's collection interval (BR-11-08).
+const BoostInterval = "5s"
+
 func withCreds(cfg map[string]any, creds map[string]string, keys ...string) map[string]any {
 	for _, k := range keys {
 		if v := creds[k]; v != "" {
@@ -71,7 +74,7 @@ var packReceivers = map[string]packReceiver{
 }
 
 // addPacks adds each pack's receiver and returns the receiver IDs and the metric prefixes to keep.
-func addPacks(receivers map[string]any, packs []PackConfig) ([]string, []string, error) {
+func addPacks(receivers map[string]any, packs []PackConfig, boosted map[string]bool) ([]string, []string, error) {
 	var ids []string
 	prefixes := []string{"system", "process"}
 	for _, p := range packs {
@@ -83,7 +86,11 @@ func addPacks(receivers map[string]any, packs []PackConfig) ([]string, []string,
 		if endpoint == "" && p.ID != "nodejs" {
 			return nil, nil, fmt.Errorf("pack %s: endpoint is required", p.ID)
 		}
-		receivers[r.name] = r.build(endpoint, p.Credentials)
+		recv := r.build(endpoint, p.Credentials)
+		if boosted[p.ID] {
+			recv["collection_interval"] = BoostInterval
+		}
+		receivers[r.name] = recv
 		ids = append(ids, r.name)
 		if !contains(prefixes, r.prefix) {
 			prefixes = append(prefixes, r.prefix)

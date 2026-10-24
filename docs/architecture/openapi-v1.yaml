@@ -1848,12 +1848,65 @@ paths:
       operationId: startLiveBoost
       tags: [packs]
       summary: 5 s collection for 10 min
-      description: 5 s collection for 10 min.
+      description: >-
+        Sends a signed task: the pack collects every 5 s and the agent reverts on its own after 10 minutes,
+        even if disconnected. At most 3 active boosts per organization; asking again while active returns
+        the same boost. Needs agent 0.4.0. Requires `telemetry.query`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packId]
+              additionalProperties: false
+              properties:
+                packId: { type: string }
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Boost started (or already active)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packId, expiresAt]
+                properties:
+                  packId: { type: string }
+                  expiresAt: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Agent too old, or 3 boosts already active
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M10
+    get:
+      operationId: listLiveBoosts
+      tags: [packs]
+      summary: Active live boosts on this agent
+      description: Active live boosts on this agent. Requires `telemetry.query`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [boosts]
+                properties:
+                  boosts:
+                    type: array
+                    items:
+                      type: object
+                      required: [packId, expiresAt]
+                      properties:
+                        packId: { type: string }
+                        expiresAt: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M10
   /api/v1/agents/{id}/log-sources:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:

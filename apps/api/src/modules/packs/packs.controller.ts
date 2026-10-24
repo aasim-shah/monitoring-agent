@@ -6,12 +6,19 @@ import type { ApiRequest } from '../../common/request.js';
 import { requireTenant } from '../../common/tenant.js';
 import { AGENT } from '../agents/agents.controller.js';
 import { PACKS } from './catalog.js';
+import { LiveBoostService } from './live-boost.service.js';
 import { PacksService } from './packs.service.js';
+import { z } from 'zod';
 import { enablePackBody } from './schemas.js';
+
+const boostBody = z.object({ packId: z.string().min(1).max(40) }).strict();
 
 @Controller('api/v1')
 export class PacksController {
-  constructor(private readonly packs: PacksService) {}
+  constructor(
+    private readonly packs: PacksService,
+    private readonly boosts: LiveBoostService,
+  ) {}
 
   @SessionOnly()
   @Get('monitoring-packs')
@@ -66,5 +73,21 @@ export class PacksController {
   @HttpCode(202)
   disable(@Req() req: ApiRequest, @Param('id') id: string, @Param('packId') packId: string) {
     return this.packs.disable(requireTenant(req), id, packId);
+  }
+
+  /** Live boost (M10.7): one pack at 5 s for 10 minutes; the agent reverts on its own. */
+  @RequirePermission('telemetry.query')
+  @TenantScope(AGENT)
+  @Post('agents/:id/live-boost')
+  @HttpCode(202)
+  startBoost(@Req() req: ApiRequest, @Param('id') id: string, @Body() body: unknown) {
+    return this.boosts.start(requireTenant(req), id, parseBody(boostBody, body).packId);
+  }
+
+  @RequirePermission('telemetry.query')
+  @TenantScope(AGENT)
+  @Get('agents/:id/live-boost')
+  async boostsFor(@Req() req: ApiRequest, @Param('id') id: string) {
+    return { boosts: await this.boosts.active(requireTenant(req), id) };
   }
 }

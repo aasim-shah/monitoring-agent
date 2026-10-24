@@ -22,6 +22,8 @@ type Input struct {
 	// LogFiles returns a pack's log file paths (globs allowed); their lines are counted
 	// into log.lines and log.pattern. Nil means no log-derived metrics.
 	LogFiles func(packID string) []string
+	// Boosted packs collect every 5 s instead of 30 s (live boost, BR-11-08).
+	Boosted map[string]bool
 }
 
 // Config returns the collector configuration as JSON (a subset of YAML, so the
@@ -51,7 +53,7 @@ func Config(in Input) ([]byte, error) {
 			},
 		},
 	}
-	packIDs, prefixes, err := addPacks(receivers, in.Packs)
+	packIDs, prefixes, err := addPacks(receivers, in.Packs, in.Boosted)
 	if err != nil {
 		return nil, err
 	}

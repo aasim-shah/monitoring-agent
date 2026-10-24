@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"pcp.local/hostagent/internal/collector"
 	"pcp.local/hostagent/internal/control"
@@ -68,6 +70,10 @@ type Applier struct {
 	Open     func(sealed string) (map[string]string, error)
 	Validate func(path string) error // pcp-otelcol validate --config <path>
 	Restart  func()
+	Now      func() time.Time
+
+	mu     sync.Mutex
+	boosts map[string]time.Time // pack → until; kept in memory, so a restart ends every boost
 }
 
 // Apply never replaces the running configuration with one the collector rejects
@@ -150,7 +156,87 @@ func (a *Applier) Apply(cfg control.AgentConfig) control.ConfigAck {
 func (a *Applier) input(packs ...collector.PackConfig) collector.Input {
 	in := a.Base
 	in.Packs = packs
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.boosts) > 0 {
+		in.Boosted = map[string]bool{}
+		for id := range a.boosts {
+			in.Boosted[id] = true
+		}
+	}
 	return in
+}
+
+func (a *Applier) now() time.Time {
+	if a.Now != nil {
+		return a.Now()
+	}
+	return time.Now()
+}
+
+// MaxBoost is the longest live boost the agent accepts (10 minutes plus clock slack, BR-11-08).
+const MaxBoost = 11 * time.Minute
+
+// StartBoost makes one enabled pack collect every 5 s until `until` (live boost, BR-11-08).
+func (a *Applier) StartBoost(packID string, until time.Time) error {
+	now := a.now()
+	if !until.After(now) || until.Sub(now) > MaxBoost {
+		return fmt.Errorf("boost must end within %s from now", MaxBoost)
+	}
+	st, err := LoadStore(a.Dir)
+	if err != nil {
+		return err
+	}
+	enabled := false
+	for _, p := range st.Packs {
+		enabled = enabled || p.ID == packID
+	}
+	if !enabled {
+		return fmt.Errorf("pack %s is not enabled on this host", packID)
+	}
+	a.mu.Lock()
+	if a.boosts == nil {
+		a.boosts = map[string]time.Time{}
+	}
+	a.boosts[packID] = until
+	a.mu.Unlock()
+	return a.rewrite(st)
+}
+
+// ExpireBoosts reverts boosts past their TTL; true when something reverted. The agent calls it on a
+// timer, so a boost ends even while the control plane is unreachable.
+func (a *Applier) ExpireBoosts() bool {
+	now := a.now()
+	a.mu.Lock()
+	changed := false
+	for id, until := range a.boosts {
+		if !now.Before(until) {
+			delete(a.boosts, id)
+			changed = true
+		}
+	}
+	a.mu.Unlock()
+	if !changed {
+		return false
+	}
+	if st, err := LoadStore(a.Dir); err == nil {
+		_ = a.rewrite(st)
+	}
+	return true
+}
+
+// rewrite regenerates the running configuration for the stored packs (no new validation: only
+// collection intervals change) and restarts the collector.
+func (a *Applier) rewrite(st Store) error {
+	data, err := collector.Config(a.input(st.Packs...))
+	if err != nil {
+		return err
+	}
+	if err := writePrivate(filepath.Join(a.Dir, ConfigFile), data); err != nil {
+		return err
+	}
+	a.Restart()
+	return nil
 }
 
 // check writes a candidate configuration next to the running one and validates it.

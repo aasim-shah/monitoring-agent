@@ -29,7 +29,7 @@ import (
 )
 
 // Set at build time with -ldflags "-X main.version=…".
-var version = "0.3.0"
+var version = "0.4.0"
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.LUTC)
@@ -213,6 +213,21 @@ func run(args []string) error {
 		}
 	}()
 	go reportInventory(ctx, &client)
+	// Live boosts end at their deadline even when the control plane is unreachable.
+	go func() {
+		t := time.NewTicker(15 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if applier.ExpireBoosts() {
+					log.Printf("live boost ended; back to 30 s")
+				}
+			}
+		}
+	}()
 	tails := make(chan struct{}, 2)
 	actions := make(chan struct{}, 1)
 	for ctx.Err() == nil {
@@ -249,6 +264,21 @@ func run(args []string) error {
 						log.Printf("action %s → %s %s", t.Id, res.Status, res.Error)
 					}
 				}(t)
+				continue
+			}
+			if t.Type == "live_boost" {
+				// One pack at 5 s until the deadline; the agent reverts on its own timer (BR-11-08).
+				res := control.TaskResult{Status: "succeeded"}
+				packID, _ := t.Payload["packId"].(string)
+				until, _ := t.Payload["untilEpoch"].(float64)
+				if err := applier.StartBoost(packID, time.Unix(int64(until), 0)); err != nil {
+					res = control.TaskResult{Status: "failed", Error: err.Error()}
+				}
+				if err := c.PostResult(ctx, t.Id, res); err != nil {
+					log.Printf("result for boost %s: %v", t.Id, err)
+				} else {
+					log.Printf("live boost %s for %s → %s %s", t.Id, packID, res.Status, res.Error)
+				}
 				continue
 			}
 			if t.Type == "log_tail" {

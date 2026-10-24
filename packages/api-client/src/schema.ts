@@ -1515,11 +1515,15 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Active live boosts on this agent
+         * @description Active live boosts on this agent. Requires `telemetry.query`.
+         */
+        get: operations["listLiveBoosts"];
         put?: never;
         /**
          * 5 s collection for 10 min
-         * @description 5 s collection for 10 min.
+         * @description Sends a signed task: the pack collects every 5 s and the agent reverts on its own after 10 minutes, even if disconnected. At most 3 active boosts per organization; asking again while active returns the same boost. Needs agent 0.4.0. Requires `telemetry.query`.
          */
         post: operations["startLiveBoost"];
         delete?: never;
@@ -6625,7 +6629,7 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    startLiveBoost: {
+    listLiveBoosts: {
         parameters: {
             query?: never;
             header?: never;
@@ -6637,9 +6641,68 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        boosts: {
+                            packId: string;
+                            /** Format: date-time */
+                            expiresAt: string;
+                        }[];
+                    };
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    startLiveBoost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    packId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Boost started (or already active) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        packId: string;
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description Agent too old, or 3 boosts already active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listLogSources: {

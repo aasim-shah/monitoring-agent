@@ -10,6 +10,7 @@ import { QueryState } from '@/lib/page-guard';
 import { sealCredentials } from '@/lib/seal';
 import { useApiQuery } from '@/lib/use-api-query';
 import type { EnablePackBody } from './enable-pack-dialog';
+import { LiveBoostControl } from './live-boost';
 import { ServicesPanel, type Assignment, type CatalogPack } from './services-panel';
 
 type Range = '15m' | '1h' | '6h' | '24h' | '7d';
@@ -19,13 +20,20 @@ function ServiceCharts({
   agentId,
   packId,
   name,
-  range,
+  range: chosen,
+  boostedUntil,
+  onBoost,
 }: {
   agentId: string;
   packId: string;
   name: string;
   range: Range;
+  /** Set while a live boost runs: the last 15 minutes, refreshed every 5 s. */
+  boostedUntil: string | null;
+  onBoost?: () => Promise<void>;
 }) {
+  const live = boostedUntil !== null && Date.parse(boostedUntil) > Date.now();
+  const range: Range = live ? '15m' : chosen;
   const metrics = useApiQuery(
     ['service-metrics', agentId, packId, range],
     async () =>
@@ -34,12 +42,15 @@ function ServiceCharts({
           params: { path: { id: agentId, packId }, query: { range } },
         }),
       ),
-    { refetchInterval: 30_000 },
+    { refetchInterval: live ? 5_000 : 30_000 },
   );
   const multiDay = range === '24h' || range === '7d';
   return (
     <section className="space-y-2" aria-label={`${name} metrics`}>
-      <h3 className="text-sm font-medium">{name}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">{name}</h3>
+        {onBoost ? <LiveBoostControl name={name} until={boostedUntil} onStart={onBoost} /> : null}
+      </div>
       <QueryState query={metrics} label={`Loading ${name} metrics`}>
         <div className="grid gap-4 lg:grid-cols-2">
           {metrics.data?.charts.map((c) => (
@@ -89,6 +100,21 @@ export function ServicesSection({
     },
   );
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['agent-packs', agentId] });
+  const boosts = useApiQuery(
+    ['live-boosts', agentId],
+    async () =>
+      unwrap(await api.GET('/api/v1/agents/{id}/live-boost', { params: { path: { id: agentId } } })).boosts,
+    { refetchInterval: 30_000 },
+  );
+  const onBoost = async (packId: string) => {
+    unwrap(
+      await api.POST('/api/v1/agents/{id}/live-boost', {
+        params: { path: { id: agentId } },
+        body: { packId },
+      }),
+    );
+    await queryClient.invalidateQueries({ queryKey: ['live-boosts', agentId] });
+  };
 
   const seal = async (fields: Record<string, string>) => {
     if (!x25519PublicKey)
@@ -139,6 +165,8 @@ export function ServicesSection({
           packId={a.packId}
           name={cat.find((p) => p.id === a.packId)?.name ?? a.packId}
           range={range}
+          boostedUntil={(boosts.data ?? []).find((b) => b.packId === a.packId)?.expiresAt?.toString() ?? null}
+          onBoost={a.status === 'applied' ? () => onBoost(a.packId) : undefined}
         />
       ))}
     </section>

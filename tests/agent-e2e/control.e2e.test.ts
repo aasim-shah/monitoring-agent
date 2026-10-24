@@ -796,9 +796,9 @@ describe('approved service restart through pcp-helper (M16 exit gate)', () => {
     );
     expect(unit.status, unit.stdout + unit.stderr).toBe(0);
     const agentId = JSON.parse((await inHost('cat /var/lib/pcp-agent/state.json')).stdout).agentId as string;
-    await until('agent 0.3.0 reporting', async () => {
+    await until('agent 0.4.0 reporting', async () => {
       const a = (await api('GET', `/api/v1/agents/${agentId}`)).json;
-      return a.agentVersion === '0.3.0' ? true : undefined;
+      return a.agentVersion === '0.4.0' ? true : undefined;
     });
 
     const admin = await adminMember();
