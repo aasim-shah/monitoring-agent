@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { sealCredentials } from '../../apps/web/lib/seal.js';
 import { SECRETS, compose as composeRun, envFile, repoRoot, run } from '../smoke/compose.js';
+import { assertFreeDisk } from '../disk-guard.js';
 
 // M5 exit gate: a Go client enrolls through Caddy's mTLS edge (Caddyfile.local), heartbeats,
 // answers a signed task, rotates its certificate, and is then revoked.
@@ -77,6 +78,7 @@ async function until<T>(what: string, fn: () => Promise<T | undefined>, timeoutM
 }
 
 beforeAll(async () => {
+  assertFreeDisk();
   file = envFile({
     ...SECRETS,
     ...(await pki()),

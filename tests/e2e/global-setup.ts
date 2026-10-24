@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertFreeDisk } from '../disk-guard';
 import { BASE_URL, CADDY_ADDRESS, E2E_HTTP_PORT, E2E_WORK_DIR, MAILPIT_PORT, PROJECT } from './helpers/env';
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
@@ -63,6 +64,7 @@ function compose(envFile: string, args: string[]): Promise<void> {
 
 /** Brings up the full stack (plus Mailpit) once; returns the teardown. */
 export default async function globalSetup() {
+  assertFreeDisk();
   // Inside the repository so the Go agent container (mounted at /src) can read the Caddy root.
   const dir = E2E_WORK_DIR;
   mkdirSync(dir, { recursive: true });
