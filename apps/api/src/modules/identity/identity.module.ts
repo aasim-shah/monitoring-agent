@@ -25,6 +25,6 @@ import { SessionService } from './session.service.js';
     GoogleLoginService,
     CurrentUserGuard,
   ],
-  exports: [SessionService, CurrentUserGuard],
+  exports: [SessionService, CurrentUserGuard, GOOGLE_HTTP],
 })
 export class IdentityModule {}

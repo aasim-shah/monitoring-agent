@@ -15,6 +15,8 @@ const DB_PROVIDERS = ['postgres', 'mysql', 'mongodb'];
 import { AuditService } from '../auditing/audit.service.js';
 import { CONNECTOR_REGISTRY, CONNECTOR_RUNTIME, QUEUES } from './registry.provider.js';
 
+/** Providers whose credentials come only from an OAuth callback (M13b). */
+const OAUTH_PROVIDERS = ['google'];
 const TERMINAL: ConnectionStatus[] = ['disconnected', 'revoked'];
 
 const withScopes = { scopes: { orderBy: { createdAt: 'asc' } } } satisfies Prisma.ConnectionInclude;
@@ -199,6 +201,8 @@ export class ConnectionsService {
   async authorize(ctx: TenantContext, id: string, credentials: Record<string, string>) {
     const current = await this.get(ctx, id);
     if (TERMINAL.includes(current.status)) throw closed();
+    if (OAUTH_PROVIDERS.includes(current.provider))
+      throw new ApiException(400, 'oauth_required', 'Connect this provider with its sign-in flow');
     if (current.executionLocation === 'private')
       throw new ApiException(
         400,
@@ -296,6 +300,45 @@ export class ConnectionsService {
       connectionId,
       requestId: ctx.requestId,
     });
+  }
+
+  /**
+   * Stores what an OAuth callback returned (M13b): the refresh token (kept when the provider sends
+   * none on a repeat grant), the granted scopes, and the granting account; then validates.
+   */
+  async completeOAuth(
+    ctx: TenantContext,
+    id: string,
+    grant: { refreshToken?: string; grantedScopes: string[]; accountEmail: string | null },
+  ) {
+    const current = await this.get(ctx, id);
+    if (TERMINAL.includes(current.status)) throw closed();
+    if (!grant.refreshToken && !(await this.hasCredentials(ctx, id)))
+      throw new ApiException(
+        502,
+        'oauth_no_refresh_token',
+        'Google did not return offline access; remove the app in your Google account and connect again',
+      );
+    await withTenant(this.prisma, ctx, async (tx) => {
+      if (grant.refreshToken)
+        await storeCredentials(tx, ctx, id, { refreshToken: grant.refreshToken }, this.keys);
+      await tx.connection.update({
+        where: { id },
+        data: {
+          status: transition(current.status, 'auth_completed'),
+          statusReason: null,
+          grantedScopes: grant.grantedScopes,
+          accountEmail: grant.accountEmail,
+        },
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'connection.authorized',
+        targetType: 'connection',
+        targetId: id,
+        metadata: { grantedScopes: grant.grantedScopes, accountEmail: grant.accountEmail },
+      });
+    });
+    await this.queue(ctx, 'connection-validate', id);
   }
 
   /** Runs discovery now and returns the provider's resources for scoping. */

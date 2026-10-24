@@ -17,6 +17,8 @@ interface ConnectionRow {
   lastValidatedAt: Date | null;
   createdAt: Date;
   scopes: ScopeRow[];
+  grantedScopes: string[];
+  accountEmail: string | null;
 }
 
 interface ScopeRow {
@@ -47,6 +49,8 @@ const connectionView = (c: ConnectionRow) => ({
   lastValidatedAt: c.lastValidatedAt,
   createdAt: c.createdAt,
   scopes: c.scopes.map(scopeView),
+  grantedScopes: c.grantedScopes,
+  accountEmail: c.accountEmail,
 });
 
 const CONNECTION = { param: 'id', resource: 'connection' } as const;

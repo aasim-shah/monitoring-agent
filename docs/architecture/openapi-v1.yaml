@@ -868,6 +868,59 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M4
+  /api/v1/connections/{id}/oauth/google/start:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: startGoogleConnection
+      tags: [connections]
+      summary: Start the Google consent flow for a Google connection
+      description: >-
+        Returns the Google authorization URL (offline access, consent, PKCE S256, incremental grants).
+        `missingOnly` asks only for scopes not granted yet. Requires `connection.configure`.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId]
+              additionalProperties: false
+              properties:
+                productId: { type: string, format: uuid }
+                missingOnly: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string, format: uri }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M13b
+  /api/v1/connections/oauth/google/callback:
+    get:
+      operationId: googleConnectionCallback
+      tags: [connections]
+      summary: Google redirects here after consent
+      description: >-
+        Checks the single-use state (same member, 10 minutes), exchanges the code, stores the refresh
+        token and granted scopes, and redirects to the connection page.
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: state, in: query, required: true, schema: { type: string } }
+        - { name: code, in: query, required: false, schema: { type: string } }
+        - { name: error, in: query, required: false, schema: { type: string } }
+      responses:
+        '302': { description: Back to the connection page }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+      x-implemented-in: M13b
   /api/v1/connections/{id}/authorize:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
@@ -4577,6 +4630,13 @@ components:
         lastValidatedAt: { type: [string, 'null'], format: date-time }
         createdAt: { type: string, format: date-time }
         scopes: { type: array, items: { $ref: '#/components/schemas/ResourceScope' } }
+        grantedScopes:
+          type: array
+          items: { type: string }
+          description: OAuth connections (Google) — the scopes the provider granted (BR-08-03).
+        accountEmail:
+          type: [string, 'null']
+          description: OAuth connections — the account that granted access ("Connected as").
     ConnectionDetail:
       allOf:
         - $ref: '#/components/schemas/Connection'

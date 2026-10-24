@@ -729,6 +729,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/connections/{id}/oauth/google/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start the Google consent flow for a Google connection
+         * @description Returns the Google authorization URL (offline access, consent, PKCE S256, incremental grants). `missingOnly` asks only for scopes not granted yet. Requires `connection.configure`.
+         */
+        post: operations["startGoogleConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/oauth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Google redirects here after consent
+         * @description Checks the single-use state (same member, 10 minutes), exchanges the code, stores the refresh token and granted scopes, and redirects to the connection page.
+         */
+        get: operations["googleConnectionCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/connections/{id}/authorize": {
         parameters: {
             query?: never;
@@ -3811,6 +3854,10 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             scopes: components["schemas"]["ResourceScope"][];
+            /** @description OAuth connections (Google) — the scopes the provider granted (BR-08-03). */
+            grantedScopes?: string[];
+            /** @description OAuth connections — the account that granted access ("Connected as"). */
+            accountEmail?: string | null;
         };
         ConnectionDetail: components["schemas"]["Connection"] & {
             hasCredentials: boolean;
@@ -5243,6 +5290,68 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    startGoogleConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    productId: string;
+                    /** @default false */
+                    missingOnly?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        url: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    googleConnectionCallback: {
+        parameters: {
+            query: {
+                state: string;
+                code?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Back to the connection page */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
         };
     };
     authorizeConnection: {

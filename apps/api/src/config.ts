@@ -27,6 +27,11 @@ const schema = z
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     GOOGLE_REDIRECT_URI: z.string().url().optional(),
+    /** Google data connections (M13b) return here; needs the client above (BR-08-01: never the sign-in redirect). */
+    GOOGLE_CONNECTIONS_REDIRECT_URI: z.string().url().optional(),
+    /** Test stacks only, with PCP_ALLOW_TEST_PROVIDERS=1: a fake Google (token exchange). */
+    PCP_GOOGLE_API_URL: z.string().url().optional(),
+    PCP_ALLOW_TEST_PROVIDERS: z.enum(['0', '1']).optional(),
     AGENT_CA_CERT: z.string().min(1).optional(),
     AGENT_CA_KEY: z.string().min(1).optional(),
     AGENT_CA_CHAIN: z.string().min(1).optional(),
@@ -61,6 +66,14 @@ const schema = z
       path: ['GOOGLE_CLIENT_ID'],
     },
   )
+  .refine((c) => !c.GOOGLE_CONNECTIONS_REDIRECT_URI || c.GOOGLE_CLIENT_ID, {
+    message: 'GOOGLE_CONNECTIONS_REDIRECT_URI needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET',
+    path: ['GOOGLE_CONNECTIONS_REDIRECT_URI'],
+  })
+  .refine((c) => !c.PCP_GOOGLE_API_URL || c.PCP_ALLOW_TEST_PROVIDERS === '1', {
+    message: 'PCP_GOOGLE_API_URL is for test stacks only and needs PCP_ALLOW_TEST_PROVIDERS=1',
+    path: ['PCP_GOOGLE_API_URL'],
+  })
   .superRefine((c, issues) => {
     const set = AGENT_KEYS.filter((k) => c[k] !== undefined);
     if (set.length === 0 || set.length === AGENT_KEYS.length) return;
@@ -74,6 +87,8 @@ export interface GoogleConfig {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  /** Google data connections (M13b): their own redirect, and the token endpoint. */
+  connections?: { redirectUri: string; tokenUrl: string };
 }
 
 export interface AgentConfig {
@@ -134,6 +149,16 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
           clientId: c.GOOGLE_CLIENT_ID,
           clientSecret: c.GOOGLE_CLIENT_SECRET!,
           redirectUri: c.GOOGLE_REDIRECT_URI!,
+          ...(c.GOOGLE_CONNECTIONS_REDIRECT_URI
+            ? {
+                connections: {
+                  redirectUri: c.GOOGLE_CONNECTIONS_REDIRECT_URI,
+                  tokenUrl: c.PCP_GOOGLE_API_URL
+                    ? `${c.PCP_GOOGLE_API_URL.replace(/\/+$/, '')}/oauth2.googleapis.com/token`
+                    : 'https://oauth2.googleapis.com/token',
+                },
+              }
+            : {}),
         }
       : undefined,
     internalToken: c.INTERNAL_TOKEN,
