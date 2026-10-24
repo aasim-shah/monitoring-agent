@@ -42,7 +42,7 @@ func TestPackReceiversCarryCredentialsOnlyInTheFile(t *testing.T) {
 		t.Error("nodejs uses the host_metrics process scraper")
 	}
 	got := strings.Join(toStrings(pipeline(cfg)["receivers"]), ",")
-	if got != "host_metrics,redis,postgresql,host_metrics/nodejs" {
+	if got != "host_metrics,redis,postgresql,host_metrics/nodejs,otlp/app" {
 		t.Errorf("pipeline receivers = %s", got)
 	}
 	if strings.Count(raw, "s3cret") != 1 {
@@ -74,7 +74,12 @@ func TestEveryPackBuildsAReceiver(t *testing.T) {
 		{ID: "nginx", Settings: map[string]any{"endpoint": "http://127.0.0.1/nginx_status"}},
 	} {
 		cfg, _ := packConfig(t, p)
-		if n := len(toStrings(pipeline(cfg)["receivers"])); n != 2 {
+		// host_metrics, the pack's receiver, and for kafka the Level 2 JMX scrape.
+		want := 2
+		if p.ID == "kafka" {
+			want = 3
+		}
+		if n := len(toStrings(pipeline(cfg)["receivers"])); n != want {
 			t.Errorf("%s: %d receivers", p.ID, n)
 		}
 	}
@@ -132,5 +137,32 @@ func TestEveryConfigDropsHighCardinalityLabels(t *testing.T) {
 				t.Errorf("%s: %s is not normalized", name, attr)
 			}
 		}
+	}
+}
+
+// UC-11-04 Level 2: an app instrumented with the OpenTelemetry SDK sends to the agent on loopback only.
+func TestNodejsPackAcceptsOTLPOnLoopbackOnly(t *testing.T) {
+	cfg, raw := packConfig(t, PackConfig{ID: "nodejs", Settings: map[string]any{}})
+	recv := cfg["receivers"].(map[string]any)["otlp/app"].(map[string]any)
+	http := recv["protocols"].(map[string]any)["http"].(map[string]any)
+	if http["endpoint"] != "127.0.0.1:4318" {
+		t.Errorf("otlp endpoint = %v (loopback only, BR-11-07)", http["endpoint"])
+	}
+	if !strings.Contains(strings.Join(toStrings(pipeline(cfg)["receivers"]), ","), "otlp/app") {
+		t.Error("otlp/app feeds the metrics pipeline")
+	}
+	if !strings.Contains(raw, `^(system|process|http|v8js|nodejs)[.]`) {
+		t.Errorf("the allowlist keeps http, v8js, and nodejs metrics")
+	}
+}
+
+// UC-11-04 Level 2 (Kafka JVM): the platform scrapes the JMX exporter the customer adds on 127.0.0.1:7071.
+func TestKafkaPackScrapesTheJMXExporterOnLoopback(t *testing.T) {
+	cfg, raw := packConfig(t, PackConfig{ID: "kafka", Settings: map[string]any{"endpoint": "127.0.0.1:9092"}})
+	if _, ok := cfg["receivers"].(map[string]any)["prometheus/kafka_jmx"]; !ok {
+		t.Fatal("no JMX scrape receiver")
+	}
+	if !strings.Contains(raw, `"127.0.0.1:7071"`) || !strings.Contains(raw, `not IsMatch(name, \"^kafka_(server|network|controller|log)_\")`) {
+		t.Error("scrapes 127.0.0.1:7071 and keeps the JMX kafka_* metrics")
 	}
 }

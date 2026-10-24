@@ -2,6 +2,7 @@ package collector
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -74,17 +75,51 @@ var packReceivers = map[string]packReceiver{
 }
 
 // addPacks adds each pack's receiver and returns the receiver IDs and the metric prefixes to keep.
+// level2 are the extra receivers a pack adds for Level 2 guided setups (spec §8.9, UC-11-04):
+// the customer's change sends or exposes richer metrics on loopback, and the agent picks them up.
+type level2 struct {
+	receivers map[string]map[string]any
+	prefixes  []string // dotted OTLP metric prefixes kept by the allowlist
+	keep      []string // whole-name patterns kept (scraped Prometheus metrics)
+}
+
+var level2Receivers = map[string]level2{
+	// OpenTelemetry Node.js SDK → the agent's OTLP/HTTP receiver, loopback only (BR-11-07).
+	"nodejs": {
+		receivers: map[string]map[string]any{
+			"otlp/app": {"protocols": map[string]any{"http": map[string]any{"endpoint": "127.0.0.1:4318"}}},
+		},
+		prefixes: []string{"http", "v8js", "nodejs"},
+	},
+	// The JMX exporter javaagent on the broker, bound to 127.0.0.1:7071.
+	"kafka": {
+		receivers: map[string]map[string]any{
+			"prometheus/kafka_jmx": {"config": map[string]any{"scrape_configs": []any{map[string]any{
+				"job_name":        "kafka-jmx",
+				"scrape_interval": packInterval,
+				"static_configs":  []any{map[string]any{"targets": []string{"127.0.0.1:7071"}}},
+			}}}},
+		},
+		keep: []string{`^kafka_(server|network|controller|log)_`},
+	},
+}
+
 func addPacks(receivers map[string]any, packs []PackConfig, boosted map[string]bool) ([]string, []string, error) {
-	var ids []string
+	ids, prefixes, _, err := addPacksKeep(receivers, packs, boosted)
+	return ids, prefixes, err
+}
+
+func addPacksKeep(receivers map[string]any, packs []PackConfig, boosted map[string]bool) ([]string, []string, []string, error) {
+	var ids, keep []string
 	prefixes := []string{"system", "process"}
 	for _, p := range packs {
 		r, ok := packReceivers[p.ID]
 		if !ok {
-			return nil, nil, fmt.Errorf("unknown pack %q", p.ID)
+			return nil, nil, nil, fmt.Errorf("unknown pack %q", p.ID)
 		}
 		endpoint, _ := p.Settings["endpoint"].(string)
 		if endpoint == "" && p.ID != "nodejs" {
-			return nil, nil, fmt.Errorf("pack %s: endpoint is required", p.ID)
+			return nil, nil, nil, fmt.Errorf("pack %s: endpoint is required", p.ID)
 		}
 		recv := r.build(endpoint, p.Credentials)
 		if boosted[p.ID] {
@@ -95,8 +130,29 @@ func addPacks(receivers map[string]any, packs []PackConfig, boosted map[string]b
 		if !contains(prefixes, r.prefix) {
 			prefixes = append(prefixes, r.prefix)
 		}
+		if l2, ok := level2Receivers[p.ID]; ok {
+			for _, name := range sortedKeys(l2.receivers) {
+				receivers[name] = l2.receivers[name]
+				ids = append(ids, name)
+			}
+			for _, pre := range l2.prefixes {
+				if !contains(prefixes, pre) {
+					prefixes = append(prefixes, pre)
+				}
+			}
+			keep = append(keep, l2.keep...)
+		}
 	}
-	return ids, prefixes, nil
+	return ids, prefixes, keep, nil
+}
+
+func sortedKeys(m map[string]map[string]any) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // allowlist drops every metric outside the enabled prefixes (BR-11-06). OTTL drops

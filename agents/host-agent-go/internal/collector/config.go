@@ -53,7 +53,7 @@ func Config(in Input) ([]byte, error) {
 			},
 		},
 	}
-	packIDs, prefixes, err := addPacks(receivers, in.Packs, in.Boosted)
+	packIDs, prefixes, keep, err := addPacksKeep(receivers, in.Packs, in.Boosted)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func Config(in Input) ([]byte, error) {
 	}
 	pipelines := map[string]any{}
 	exporters := map[string]any{}
-	filter := allowlist(prefixes)
+	filter := allowlist(prefixes, keep...)
 	if len(logIDs) > 0 {
 		// The count connector emits only when lines arrive. A loopback Prometheus exporter
 		// keeps the running totals and the collector scrapes them every 30 s, so a burst of
@@ -91,7 +91,7 @@ func Config(in Input) ([]byte, error) {
 		}
 		receivers["prometheus/logcounts"] = logCountsScrape()
 		metricsReceivers = append(metricsReceivers, "prometheus/logcounts")
-		filter = allowlist(prefixes, `^log_(lines|pattern)_total$`)
+		filter = allowlist(prefixes, append(keep, `^log_(lines|pattern)_total$`)...)
 	}
 	processors["filter/allowlist"] = filter
 	pipelines["metrics"] = map[string]any{
