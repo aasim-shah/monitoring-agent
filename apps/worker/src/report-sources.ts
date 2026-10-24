@@ -193,7 +193,9 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
                 provider: c.provider,
                 status: h ? (h.ok ? 'healthy' : (h.reason ?? 'failing')) : 'no health check yet',
                 ok: h ? h.ok : null,
-                ...(end ? { activity: databaseActivity(parse(start?.detail ?? null), parse(end.detail)) } : {}),
+                ...(end
+                  ? { activity: databaseActivity(parse(start?.detail ?? null), parse(end.detail)) }
+                  : {}),
               };
             }),
           );
@@ -209,7 +211,11 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
           }),
         );
         if (!monitors.length) return null;
-        const prev: ReportWindow = { ...w, start: new Date(w.start.getTime() - w.hours * 3_600_000), end: w.start };
+        const prev: ReportWindow = {
+          ...w,
+          start: new Date(w.start.getTime() - w.hours * 3_600_000),
+          end: w.start,
+        };
         const per = async (promql: string, win: ReportWindow) =>
           byAgent(
             (await vm(promql.replaceAll('$R', `${win.hours}h`), win))?.map((s) => ({
@@ -302,7 +308,10 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
                 .filter((sc) => GOOGLE_SOURCE[sc.resourceType])
                 .map((sc) => {
                   const mine = rows.filter(
-                    (r) => r.connectionId === c.id && r.resourceType === sc.resourceType && r.externalId === sc.externalId,
+                    (r) =>
+                      r.connectionId === c.id &&
+                      r.resourceType === sc.resourceType &&
+                      r.externalId === sc.externalId,
                   );
                   const values = kpisFor(sc.resourceType).map((def) => {
                     const days = mine.filter((r) => r.metric === def.metric && r.value !== null);

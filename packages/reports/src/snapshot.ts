@@ -210,7 +210,9 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
       ...(s.avgMs !== undefined ? { avgMs: ms(s.avgMs) } : {}),
       ...(s.p95Ms !== undefined ? { p95Ms: ms(s.p95Ms) } : {}),
       ...(s.failedChecks !== undefined ? { failedChecks: s.failedChecks } : {}),
-      ...(s.previousUptimePercent !== undefined ? { previousUptimePercent: r1(s.previousUptimePercent) } : {}),
+      ...(s.previousUptimePercent !== undefined
+        ? { previousUptimePercent: r1(s.previousUptimePercent) }
+        : {}),
       ...(s.previousAvgMs !== undefined ? { previousAvgMs: ms(s.previousAvgMs) } : {}),
     })) ?? null;
   const cpu = mean(hosts?.map((h) => h.cpuAvg) ?? []);

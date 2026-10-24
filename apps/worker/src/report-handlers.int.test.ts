@@ -411,9 +411,9 @@ describe('24 h activity and trends (M15b)', () => {
     const h = reportHandlers(deps());
     await h['report-generate'](ctx(s.org), s.schedule, job('2026-10-25'));
     const [report] = await reports(s);
-    return (report!.snapshot as { sections: Array<{ key: string; status: string; data: unknown }> }).sections.find(
-      (x) => x.key === key,
-    )!;
+    return (
+      report!.snapshot as { sections: Array<{ key: string; status: string; data: unknown }> }
+    ).sections.find((x) => x.key === key)!;
   };
   const postgres = async (s: Seeded) => {
     const conn = randomUUID();
