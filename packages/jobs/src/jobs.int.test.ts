@@ -148,6 +148,32 @@ describe('job processors', () => {
     expect(await runs(id)).toEqual([{ kind: 'discover', status: 'succeeded', items: 2 }]);
   });
 
+  it('stores what discovery found, replacing the previous inventory (M7)', async () => {
+    const id = await connection('ok');
+    const inventory = () =>
+      sql(
+        `SELECT resource_type, external_id, name FROM connection_inventory WHERE connection_id = $1 ORDER BY external_id`,
+        [id],
+      );
+    await enqueue(queues, 'connection-discover', {
+      organizationId: org,
+      connectionId: id,
+      requestId: 'inv-1',
+    });
+    await eventually(inventory, (r) => r.length === 2);
+    expect(await inventory()).toEqual([
+      { resource_type: 'mock_resource', external_id: 'mock-1', name: 'Mock resource 1' },
+      { resource_type: 'mock_resource', external_id: 'mock-2', name: 'Mock resource 2' },
+    ]);
+    await sql(`UPDATE connections SET config = '{"behavior":"ok","resources":1}' WHERE id = $1`, [id]);
+    await enqueue(queues, 'connection-discover', {
+      organizationId: org,
+      connectionId: id,
+      requestId: 'inv-2',
+    });
+    await eventually(inventory, (r) => r.length === 1);
+  });
+
   it('dead-letters a job after 5 failed attempts', async () => {
     const id = await connection('unavailable');
     const job = await enqueue(queues, 'connection-discover', {

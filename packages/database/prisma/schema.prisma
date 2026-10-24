@@ -308,6 +308,9 @@ model Connection {
   scopes       ConnectionResourceScope[]
   health       ConnectionHealth[]
   syncRuns     SyncRun[]
+  deliveries   WebhookDelivery[]
+  changeEvents ChangeEvent[]
+  inventory    ConnectionInventoryItem[]
 
   @@unique([organizationId, id])
   @@index([organizationId, provider])
@@ -1433,4 +1436,65 @@ model ActionExecution {
 
   @@index([organizationId, requestId])
   @@map("action_executions")
+}
+
+/// One webhook delivery's metadata (WB-06 UC-06-10); payloads are never stored (BR-06-05).
+model WebhookDelivery {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  connectionId   String   @map("connection_id") @db.Uuid
+  provider       String
+  deliveryId     String   @map("delivery_id")
+  eventType      String   @map("event_type")
+  /// processed, duplicate, rejected, or ignored.
+  result         String
+  detail         String?
+  receivedAt     DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  connection Connection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([provider, deliveryId])
+  @@index([organizationId, connectionId, receivedAt(sort: Desc)])
+  @@map("webhook_deliveries")
+}
+
+/// A deployment, failed workflow, release, push, DNS change, or security event from a provider (spec §13.4).
+model ChangeEvent {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  connectionId   String   @map("connection_id") @db.Uuid
+  productId      String?  @map("product_id") @db.Uuid
+  provider       String
+  kind           String
+  title          String
+  url            String?
+  actor          String?
+  externalId     String   @map("external_id")
+  occurredAt     DateTime @map("occurred_at") @db.Timestamptz(6)
+  attributes     Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  connection Connection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([connectionId, kind, externalId])
+  @@index([organizationId, occurredAt(sort: Desc)])
+  @@map("change_events")
+}
+
+/// What a connector's last discovery found (zones, repositories, targets, dashboards).
+model ConnectionInventoryItem {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  connectionId   String   @map("connection_id") @db.Uuid
+  resourceType   String   @map("resource_type")
+  externalId     String   @map("external_id")
+  name           String
+  attributes     Json     @default("{}")
+  observedAt     DateTime @default(now()) @map("observed_at") @db.Timestamptz(6)
+
+  connection Connection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([connectionId, resourceType, externalId])
+  @@index([organizationId, connectionId])
+  @@map("connection_inventory")
 }

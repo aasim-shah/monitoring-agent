@@ -262,6 +262,27 @@ beforeAll(async () => {
          VALUES ($1, $2, 'k', 'agent', 'host.restart_service', '0.3.0')`,
         [org, actionRequest],
       );
+      const ghConn = randomUUID();
+      await c.query(
+        `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, updated_at)
+         VALUES ($1, $2, 'github', 'GH', 'connected', 'cloud', now())`,
+        [ghConn, org],
+      );
+      await c.query(
+        `INSERT INTO webhook_deliveries (organization_id, connection_id, provider, delivery_id, event_type, result)
+         VALUES ($1, $2, 'github', $3, 'push', 'processed')`,
+        [org, ghConn, randomUUID()],
+      );
+      await c.query(
+        `INSERT INTO change_events (organization_id, connection_id, provider, kind, title, occurred_at, external_id)
+         VALUES ($1, $2, 'github', 'push', 'push', now(), 'x')`,
+        [org, ghConn],
+      );
+      await c.query(
+        `INSERT INTO connection_inventory (organization_id, connection_id, resource_type, external_id, name)
+         VALUES ($1, $2, 'github_repository', 'r', 'acme/shop')`,
+        [org, ghConn],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

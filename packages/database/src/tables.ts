@@ -49,6 +49,9 @@ export const TENANT_TABLES = [
   'action_requests',
   'action_approvals',
   'action_executions',
+  'webhook_deliveries',
+  'change_events',
+  'connection_inventory',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];
