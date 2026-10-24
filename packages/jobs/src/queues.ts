@@ -6,6 +6,8 @@ export const JOB_KINDS = [
   'connection-validate',
   'connection-discover',
   'connection-health',
+  // M13b: hourly KPI sync for connections with daily values (Google).
+  'connection-sync',
   // M12: per-organization alert tick (entity = organization) and one notification delivery (entity = delivery).
   'alert-tick',
   'notification-deliver',

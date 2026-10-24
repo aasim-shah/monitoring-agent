@@ -299,6 +299,10 @@ model Connection {
   /// Non-secret configuration only.
   config            Json              @default("{}")
   createdByUserId   String?           @map("created_by_user_id") @db.Uuid
+  /// OAuth connections (Google): the scopes the provider actually granted (BR-08-03).
+  grantedScopes     String[]          @default([]) @map("granted_scopes")
+  /// OAuth connections: the account that granted access, shown as "Connected as" (BR-08-07).
+  accountEmail      String?           @map("account_email")
   lastValidatedAt   DateTime?         @map("last_validated_at") @db.Timestamptz(6)
   createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -311,6 +315,7 @@ model Connection {
   deliveries   WebhookDelivery[]
   changeEvents ChangeEvent[]
   inventory    ConnectionInventoryItem[]
+  metrics      MetricAggregate[]
 
   @@unique([organizationId, id])
   @@index([organizationId, provider])
@@ -1497,4 +1502,28 @@ model ConnectionInventoryItem {
   @@unique([connectionId, resourceType, externalId])
   @@index([organizationId, connectionId])
   @@map("connection_inventory")
+}
+
+/// One daily KPI value from a provider (GA4, Search Console, Play vitals). A failed window has no row,
+/// never a zero (WB-09 BR-09-05); `partial` marks a day the provider is still processing.
+model MetricAggregate {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  connectionId   String   @map("connection_id") @db.Uuid
+  resourceType   String   @map("resource_type")
+  externalId     String   @map("external_id")
+  metric         String
+  /// A breakdown value (e.g. a channel group), or '' for the total.
+  dimension      String   @default("")
+  day            DateTime @db.Date
+  value          Float?
+  /// complete or partial.
+  completeness   String
+  fetchedAt      DateTime @default(now()) @map("fetched_at") @db.Timestamptz(6)
+
+  connection Connection @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Cascade)
+
+  @@unique([connectionId, resourceType, externalId, metric, dimension, day])
+  @@index([organizationId, connectionId, day])
+  @@map("metric_aggregates")
 }

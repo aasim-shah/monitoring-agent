@@ -38,7 +38,7 @@ export const mockConnector: Connector = {
     { name: 'token', label: 'Token', secret: true },
     { name: 'webhookSecret', label: 'Webhook secret', secret: true, required: false },
   ],
-  capabilities: () => ['config_validation', 'validate', 'discover', 'health', 'events'],
+  capabilities: () => ['config_validation', 'validate', 'discover', 'health', 'events', 'sync'],
   configSchema: () => ({
     type: 'object',
     properties: {
@@ -85,6 +85,21 @@ export const mockConnector: Connector = {
   async health(ctx) {
     await failFor(ctx);
     return { ok: true };
+  },
+  /** One point per scoped resource; the value is the look-back, the gaps echo the granted scopes. */
+  async sync(ctx, input) {
+    await failFor(ctx);
+    return {
+      points: input.scopes.map((s) => ({
+        resourceType: s.resourceType,
+        externalId: s.externalId,
+        metric: 'mock_days',
+        day: '2026-10-24',
+        value: input.days,
+        completeness: 'complete' as const,
+      })),
+      gaps: (ctx.grantedScopes ?? []).map((g) => `granted: ${g}`),
+    };
   },
   /** `x-mock-signature: sha256=<hex HMAC of the body>`, `x-mock-delivery`, `x-mock-event`. */
   verifyWebhook(req, credentials) {

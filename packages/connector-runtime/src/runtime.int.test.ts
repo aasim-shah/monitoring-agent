@@ -236,13 +236,59 @@ describe('ConnectorRuntime.health (managed databases)', () => {
   it('schedules a 5-minute health check once a cloud connection with health is connected', async () => {
     const id = await connection('ok');
     await runtime.validate(ctx(orgA), id);
-    const defs = await sql(`SELECT kind, every_seconds, enabled FROM job_definitions WHERE entity_id = $1`, [
-      id,
-    ]);
+    const defs = await sql(
+      `SELECT kind, every_seconds, enabled FROM job_definitions WHERE entity_id = $1 AND kind = 'connection-health'`,
+      [id],
+    );
     expect(defs).toEqual([{ kind: 'connection-health', every_seconds: 300, enabled: true }]);
     await runtime.validate(ctx(orgA), id); // idempotent
+    // The mock also syncs, so it gets an hourly sync definition too (M13b).
     expect(await sql(`SELECT count(*)::int AS n FROM job_definitions WHERE entity_id = $1`, [id])).toEqual([
-      { n: 1 },
+      { n: 2 },
     ]);
+  });
+});
+
+describe('ConnectorRuntime.sync (M13b)', () => {
+  it('passes the scoped resources, the look-back, and the granted scopes; returns points and gaps', async () => {
+    const id = await connection('ok', p1);
+    await sql(
+      `UPDATE connections SET status = 'connected', granted_scopes = ARRAY['scope:a'] WHERE id = $1`,
+      [id],
+    );
+    const out = await runtime.sync(ctx(orgA), id, { days: 3 });
+    expect(out.points).toEqual([
+      {
+        resourceType: 'mock_resource',
+        externalId: 'mock-1',
+        metric: 'mock_days',
+        day: '2026-10-24',
+        value: 3,
+        completeness: 'complete',
+      },
+    ]);
+    expect(out.gaps).toEqual(['granted: scope:a']);
+  });
+
+  it('a revoked grant marks the connection reauthorization_required once (Review Focus #2)', async () => {
+    const id = await connection('unauthorized', p1);
+    await sql(`UPDATE connections SET status = 'connected' WHERE id = $1`, [id]);
+    await expect(runtime.sync(ctx(orgA), id, { days: 3 })).rejects.toMatchObject({
+      reason: 'reauthorization_required',
+    });
+    expect(await runtime.markReauthorizationRequired(ctx(orgA), id)).toBe(true);
+    expect(await runtime.markReauthorizationRequired(ctx(orgA), id)).toBe(false);
+    const [row] = await sql(`SELECT status, status_reason FROM connections WHERE id = $1`, [id]);
+    expect(row).toEqual({ status: 'degraded', status_reason: 'reauthorization_required' });
+  });
+
+  it('schedules an hourly sync when a connector with sync validates', async () => {
+    const id = await connection('ok');
+    await runtime.validate(ctx(orgA), id);
+    const rows = await sql(
+      `SELECT every_seconds FROM job_definitions WHERE entity_id = $1 AND kind = 'connection-sync'`,
+      [id],
+    );
+    expect(rows).toEqual([{ every_seconds: 3600 }]);
   });
 });

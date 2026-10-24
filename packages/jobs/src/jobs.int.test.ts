@@ -30,6 +30,8 @@ let scheduler: PrismaClient;
 let queues: Queues;
 let processors: Processors;
 const org = randomUUID();
+const product = randomUUID();
+const reauthNotices: string[] = [];
 const key = randomBytes(32);
 const keyRing = { active: { version: 1, key }, ring: new Map([[1, key]]) };
 const ctx: TenantContext = {
@@ -85,6 +87,7 @@ beforeAll(async () => {
   prisma = createPrismaClient(db.appUrl);
   scheduler = createPrismaClient(withCredentials(db.superuserUrl, 'pcp_scheduler', TEST_PASSWORDS.scheduler));
   await sql(`INSERT INTO organizations (id, name) VALUES ($1, 'Org')`, [org]);
+  await sql(`INSERT INTO products (id, organization_id, name) VALUES ($1, $2, 'P')`, [product, org]);
   const registry = new ConnectorRegistry();
   registry.register(mockConnector);
   queues = createQueues(redis.url, { backoffMs: 20 });
@@ -92,6 +95,9 @@ beforeAll(async () => {
     redisUrl: redis.url,
     prisma,
     runtime: new ConnectorRuntime(prisma, registry, keyRing),
+    onReauthorizationRequired: async (_ctx, connectionId) => {
+      reauthNotices.push(connectionId);
+    },
   });
 }, 180_000);
 
@@ -105,7 +111,63 @@ afterAll(async () => {
 const runs = (connectionId: string) =>
   sql(`SELECT kind, status, items FROM sync_runs WHERE connection_id = $1`, [connectionId]);
 
+/** A connected mock connection with one resource scoped to the product, ready to sync. */
+async function syncable(behavior: string): Promise<string> {
+  const id = await connection(behavior);
+  await sql(`UPDATE connections SET status = 'connected' WHERE id = $1`, [id]);
+  await sql(
+    `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id)
+     VALUES ($1, $2, 'mock-1', 'mock_resource', 'R', $3)`,
+    [org, id, product],
+  );
+  return id;
+}
+
+const values = (connectionId: string) =>
+  sql(`SELECT metric, value, completeness FROM metric_aggregates WHERE connection_id = $1`, [connectionId]);
+
 describe('job processors', () => {
+  it('stores synced KPI values: 28 days back on the first run, then 3, replacing the day (M13b)', async () => {
+    const id = await syncable('ok');
+    const sync = (requestId: string) =>
+      enqueue(queues, 'connection-sync', { organizationId: org, connectionId: id, requestId });
+    await sync('s1');
+    await eventually(
+      () => values(id),
+      (r) => r.length === 1,
+    );
+    expect(await values(id)).toEqual([{ metric: 'mock_days', value: 28, completeness: 'complete' }]);
+    await eventually(
+      () => runs(id),
+      (r) => r[0]?.status === 'succeeded',
+    );
+    await sync('s2');
+    await eventually(
+      () => values(id),
+      (r) => r[0]?.value === 3,
+    );
+    expect(await values(id)).toHaveLength(1);
+    expect((await runs(id)).map((r) => [r.kind, r.status, r.items])).toEqual([
+      ['sync', 'succeeded', 1],
+      ['sync', 'succeeded', 1],
+    ]);
+  });
+
+  it('a revoked grant stops sync, writes no value, and tells the owner once (Review Focus #2)', async () => {
+    const id = await syncable('unauthorized');
+    for (const requestId of ['u1', 'u2']) {
+      await enqueue(queues, 'connection-sync', { organizationId: org, connectionId: id, requestId });
+      await eventually(
+        () => runs(id),
+        (r) => r.filter((x) => x.status === 'failed').length === (requestId === 'u1' ? 1 : 2),
+      );
+    }
+    expect(await values(id)).toEqual([]);
+    expect(reauthNotices.filter((c) => c === id)).toHaveLength(1);
+    const [c] = await sql(`SELECT status, status_reason FROM connections WHERE id = $1`, [id]);
+    expect(c).toEqual({ status: 'degraded', status_reason: 'reauthorization_required' });
+  });
+
   it('validates a connection and records the run', async () => {
     const id = await connection('ok');
     await enqueue(queues, 'connection-validate', { organizationId: org, connectionId: id, requestId: 'r1' });

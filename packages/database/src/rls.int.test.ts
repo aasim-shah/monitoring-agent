@@ -283,6 +283,11 @@ beforeAll(async () => {
          VALUES ($1, $2, 'github_repository', 'r', 'acme/shop')`,
         [org, ghConn],
       );
+      await c.query(
+        `INSERT INTO metric_aggregates (organization_id, connection_id, resource_type, external_id, metric, day, value, completeness)
+         VALUES ($1, $2, 'google_ga4_property', 'properties/1', 'activeUsers', '2026-10-24', 1, 'complete')`,
+        [org, ghConn],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

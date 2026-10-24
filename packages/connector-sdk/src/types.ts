@@ -24,6 +24,8 @@ export interface ExecutionContext {
   config: Record<string, unknown>;
   /** Decrypted credentials, loaded on demand. */
   credentials(): Promise<Record<string, string>>;
+  /** OAuth connections: the scopes the provider granted (BR-08-03). */
+  grantedScopes?: string[];
 }
 
 export interface ConfigValidation {
@@ -58,9 +60,31 @@ export interface CredentialField {
   required?: boolean;
 }
 
-export interface SyncPage {
-  observations: Observation[];
-  nextCursor?: string;
+/** One daily value for a scoped resource (M13b). A day the provider could not answer has no point. */
+export interface MetricPoint {
+  resourceType: string;
+  externalId: string;
+  metric: string;
+  /** A breakdown value (e.g. a channel group); absent for the total. */
+  dimension?: string;
+  /** YYYY-MM-DD in the provider's reporting timezone. */
+  day: string;
+  value: number | null;
+  /** `partial` while the provider is still processing that day. */
+  completeness: 'complete' | 'partial';
+}
+
+export interface SyncInput {
+  /** The resources scoped to a product; only these are read. */
+  scopes: Array<{ resourceType: string; externalId: string }>;
+  /** How many days back to read, today included. */
+  days: number;
+}
+
+export interface SyncResult {
+  points: MetricPoint[];
+  /** Services that could not be read this run, in words (e.g. "Search Console: permission denied"). */
+  gaps: string[];
 }
 
 /** Connector contract (spec §9). Declare a capability if and only if its method exists. */
@@ -84,7 +108,8 @@ export interface Connector {
   ): Promise<{ credentials: Record<string, string> }>;
   validate(ctx: ExecutionContext): Promise<ConnectionValidation>;
   discover?(ctx: ExecutionContext, cursor?: string): Promise<DiscoveryPage>;
-  sync?(ctx: ExecutionContext, cursor?: string): Promise<SyncPage>;
+  /** Daily KPI values for the scoped resources (M13b). */
+  sync?(ctx: ExecutionContext, input: SyncInput): Promise<SyncResult>;
   health?(ctx: ExecutionContext): Promise<HealthResult>;
   collect?(ctx: ExecutionContext, query: MetricQuery): Promise<MetricResult>;
   /**

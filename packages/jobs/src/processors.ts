@@ -1,6 +1,7 @@
 import { Worker, type Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { NotFoundError, type ConnectorRuntime } from '@pcp/connector-runtime';
+import type { MetricPoint } from '@pcp/connector-sdk';
 import type { Prisma, PrismaClient } from '@pcp/database';
 import type { Observation, TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
@@ -14,6 +15,8 @@ export interface ProcessorDeps {
   now?: () => Date;
   /** Which queues to consume; all kinds by default (the worker). */
   kinds?: readonly JobKind[];
+  /** Called once when a sync finds the grant revoked (WB-08 UC-08-10): tell the owner. */
+  onReauthorizationRequired?: (ctx: TenantContext, connectionId: string) => Promise<void>;
   /** Handlers for kinds that are not connection jobs (alert-tick, notification-deliver). */
   handlers?: Partial<Record<JobKind, (ctx: TenantContext, entityId: string, job: Job) => Promise<unknown>>>;
 }
@@ -65,9 +68,52 @@ async function storeInventory(
   });
 }
 
-const SYNC_KIND: Record<'connection-validate' | 'connection-discover', 'validate' | 'discover'> = {
+/** Days read on a connection's first sync, then on every later one (late provider corrections). */
+const FIRST_SYNC_DAYS = 28;
+const SYNC_DAYS = 3;
+
+/** Upserts daily values; a null value is never stored (no zero for missing data, BR-09-05). */
+async function storeMetrics(
+  prisma: PrismaClient,
+  ctx: TenantContext,
+  connectionId: string,
+  points: MetricPoint[],
+  fetchedAt: Date,
+): Promise<number> {
+  const rows = points
+    .filter((p) => p.value !== null && Number.isFinite(p.value))
+    .map((p) => ({
+      resource_type: p.resourceType,
+      external_id: p.externalId,
+      metric: p.metric,
+      dimension: p.dimension ?? '',
+      day: p.day,
+      value: p.value,
+      completeness: p.completeness,
+    }));
+  if (!rows.length) return 0;
+  await withTenant(
+    prisma,
+    ctx,
+    (tx) =>
+      tx.$executeRaw`
+      INSERT INTO metric_aggregates
+        (organization_id, connection_id, resource_type, external_id, metric, dimension, day, value, completeness, fetched_at)
+      SELECT ${ctx.organizationId}::uuid, ${connectionId}::uuid, r.resource_type, r.external_id, r.metric,
+             r.dimension, r.day::date, r.value, r.completeness, ${fetchedAt}
+      FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb)
+        AS r(resource_type text, external_id text, metric text, dimension text, day text, value float8, completeness text)
+      ON CONFLICT (connection_id, resource_type, external_id, metric, dimension, day)
+      DO UPDATE SET value = EXCLUDED.value, completeness = EXCLUDED.completeness, fetched_at = EXCLUDED.fetched_at`,
+  );
+  return rows.length;
+}
+
+type RunKind = 'connection-validate' | 'connection-discover' | 'connection-sync';
+const SYNC_KIND: Record<RunKind, 'validate' | 'discover' | 'sync'> = {
   'connection-validate': 'validate',
   'connection-discover': 'discover',
+  'connection-sync': 'sync',
 };
 
 /** BullMQ workers for connection jobs; each run is recorded in sync_runs, outcomes in job_executions. */
@@ -78,7 +124,12 @@ export function startProcessors(deps: ProcessorDeps): Processors {
   const process = (kind: JobKind) => async (job: Job<ConnectionJobPayload>) => {
     const { organizationId, connectionId } = job.data;
     const ctx = systemContext(organizationId, job);
-    if (kind !== 'connection-validate' && kind !== 'connection-discover' && kind !== 'connection-health') {
+    if (
+      kind !== 'connection-validate' &&
+      kind !== 'connection-discover' &&
+      kind !== 'connection-sync' &&
+      kind !== 'connection-health'
+    ) {
       const handler = deps.handlers?.[kind];
       return handler ? handler(ctx, connectionId, job) : { skipped: 'no handler' };
     }
@@ -113,7 +164,15 @@ export function startProcessors(deps: ProcessorDeps): Processors {
     try {
       let items: number | null = null;
       if (kind === 'connection-validate') await deps.runtime.validate(ctx, connectionId);
-      else {
+      else if (kind === 'connection-sync') {
+        const seen = await withTenant(deps.prisma, ctx, (tx) =>
+          tx.metricAggregate.count({ where: { connectionId } }),
+        );
+        const { points } = await deps.runtime.sync(ctx, connectionId, {
+          days: seen ? SYNC_DAYS : FIRST_SYNC_DAYS,
+        });
+        items = await storeMetrics(deps.prisma, ctx, connectionId, points, now());
+      } else {
         const { observations } = await deps.runtime.discover(ctx, connectionId);
         items = observations.length;
         await storeInventory(deps.prisma, ctx, connectionId, observations, now());
@@ -130,6 +189,8 @@ export function startProcessors(deps: ProcessorDeps): Processors {
         return { skipped: 'connection not found' };
       }
       const e = err as Error & { reason?: string };
+      // A revoked grant stops syncing until someone reconnects: no retries, the owner is told once.
+      const revoked = kind === 'connection-sync' && e.reason === 'reauthorization_required';
       await withTenant(deps.prisma, ctx, (tx) =>
         tx.syncRun.updateMany({
           where: { id: run.id },
@@ -141,6 +202,11 @@ export function startProcessors(deps: ProcessorDeps): Processors {
           },
         }),
       );
+      if (revoked) {
+        if (await deps.runtime.markReauthorizationRequired(ctx, connectionId))
+          await deps.onReauthorizationRequired?.(ctx, connectionId);
+        return { skipped: 'reauthorization_required' };
+      }
       throw err;
     }
   };

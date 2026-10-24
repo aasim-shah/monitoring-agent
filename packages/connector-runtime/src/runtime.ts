@@ -4,6 +4,7 @@ import {
   transition,
   type ConnectorRegistry,
   type ExecutionContext,
+  type SyncResult,
   type WebhookRequest,
 } from '@pcp/connector-sdk';
 import type { Prisma, PrismaClient } from '@pcp/database';
@@ -15,6 +16,8 @@ import { decryptCredentials } from './secrets.js';
 const OPERATION_TIMEOUT_MS = 30_000;
 /** Managed (cloud) connections with a health check are checked every 5 minutes. */
 export const HEALTH_EVERY_SECONDS = 300;
+/** KPI sources update at most hourly (GA4 processing, quotas). */
+export const SYNC_EVERY_SECONDS = 3600;
 const MAX_DETAIL_BYTES = 256 * 1024;
 
 /** The connection does not exist for this caller (other tenant or out of product scope). */
@@ -94,6 +97,7 @@ export class ConnectorRuntime {
         if (!creds) throw new ConnectorError('reauthorization_required', 'no credentials stored');
         return creds;
       },
+      grantedScopes: c.grantedScopes ?? [],
     };
     try {
       return await fn(exec);
@@ -104,6 +108,42 @@ export class ConnectorRuntime {
       }
       throw new ConnectorError('provider_unavailable', message);
     }
+  }
+
+  /** Daily KPI values for the connection's product-scoped resources (M13b). */
+  async sync(ctx: TenantContext, connectionId: string, input: { days: number }): Promise<SyncResult> {
+    const c = await this.load(ctx, connectionId);
+    if (c.status !== 'connected' && c.status !== 'degraded')
+      throw new ConnectorError('invalid_config', `the connection is ${c.status}`);
+    const connector = this.registry.get(c.provider);
+    if (!connector.sync) throw new ConnectorError('invalid_config', `${c.provider} does not sync`);
+    const scopes = await withTenant(this.prisma, ctx, (tx) =>
+      tx.connectionResourceScope.findMany({
+        where: { connectionId },
+        select: { resourceType: true, externalId: true },
+        distinct: ['resourceType', 'externalId'],
+      }),
+    );
+    if (!scopes.length) return { points: [], gaps: [] };
+    return this.execute(ctx, c, (e) => connector.sync!(e, { scopes, days: input.days }));
+  }
+
+  /**
+   * Marks a revoked grant (`invalid_grant`): degraded with reauthorization_required. Returns true
+   * only when this call made the change, so the owner is told once (WB-08 UC-08-10).
+   */
+  async markReauthorizationRequired(ctx: TenantContext, connectionId: string): Promise<boolean> {
+    return withTenant(this.prisma, ctx, async (tx) => {
+      const { count } = await tx.connection.updateMany({
+        where: {
+          id: connectionId,
+          status: { in: ['connected', 'degraded'] },
+          OR: [{ statusReason: null }, { statusReason: { not: 'reauthorization_required' } }],
+        },
+        data: { status: 'degraded', statusReason: 'reauthorization_required' },
+      });
+      return count === 1;
+    });
   }
 
   async discover(ctx: TenantContext, connectionId: string): Promise<DiscoveryPage> {
@@ -236,6 +276,24 @@ export class ConnectorRuntime {
             everySeconds: HEALTH_EVERY_SECONDS,
           },
           update: { enabled: true, everySeconds: HEALTH_EVERY_SECONDS },
+        });
+      // KPI connectors (Google) also sync hourly.
+      if (outcome.status === 'connected' && c.executionLocation === 'cloud' && connector.sync)
+        await tx.jobDefinition.upsert({
+          where: {
+            organizationId_kind_entityId: {
+              organizationId: c.organizationId,
+              kind: 'connection-sync',
+              entityId: c.id,
+            },
+          },
+          create: {
+            organizationId: c.organizationId,
+            kind: 'connection-sync',
+            entityId: c.id,
+            everySeconds: SYNC_EVERY_SECONDS,
+          },
+          update: { enabled: true, everySeconds: SYNC_EVERY_SECONDS },
         });
     });
     return outcome;
