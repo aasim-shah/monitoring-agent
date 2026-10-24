@@ -53,8 +53,8 @@ func TestPackReceiversCarryCredentialsOnlyInTheFile(t *testing.T) {
 func TestFilterAllowlistsEnabledPacks(t *testing.T) {
 	cfg, _ := packConfig(t, PackConfig{ID: "redis", Settings: map[string]any{"endpoint": "127.0.0.1:6379"}})
 	procs := toStrings(pipeline(cfg)["processors"])
-	if procs[0] != "memory_limiter" || procs[1] != "filter/allowlist" || procs[len(procs)-1] != "batch" {
-		t.Errorf("processors = %v (memory_limiter first, allowlist, batch last; BR-11-06)", procs)
+	if procs[0] != "memory_limiter" || procs[1] != "transform/drop_labels" || procs[2] != "filter/allowlist" || procs[len(procs)-1] != "batch" {
+		t.Errorf("processors = %v (memory_limiter first, drop labels, allowlist, batch last; BR-11-06)", procs)
 	}
 	conds := cfg["processors"].(map[string]any)["filter/allowlist"].(map[string]any)["metrics"].(map[string]any)["metric"].([]any)
 	if len(conds) != 1 || conds[0] != `not IsMatch(name, "^(system|process|redis)[.]")` {
@@ -107,5 +107,30 @@ func TestNodeProcessesAreLabelledWithoutCommandLines(t *testing.T) {
 	exp := cfg["exporters"].(map[string]any)["prometheus_remote_write"].(map[string]any)
 	if exp["resource_to_telemetry_conversion"].(map[string]any)["enabled"] != true {
 		t.Error("resource attributes (process.pid, process.executable.name) must become labels")
+	}
+}
+
+// Spec §11.6: the edge drops per-user and per-request labels and normalizes routes, in every config.
+func TestEveryConfigDropsHighCardinalityLabels(t *testing.T) {
+	for name, packs := range map[string][]PackConfig{
+		"host only": nil,
+		"redis":     {{ID: "redis", Settings: map[string]any{"endpoint": "127.0.0.1:6379"}}},
+		"nodejs":    {{ID: "nodejs", Settings: map[string]any{}}},
+	} {
+		cfg, raw := packConfig(t, packs...)
+		procs := toStrings(pipeline(cfg)["processors"])
+		if procs[1] != "transform/drop_labels" {
+			t.Errorf("%s: processors = %v", name, procs)
+		}
+		for _, label := range []string{"user_id", "session_id", "request_id", "trace_id", "span_id", "url.full", "http.url", "http.target", "url.query"} {
+			if !strings.Contains(raw, `delete_key(attributes, \"`+label+`\")`) {
+				t.Errorf("%s: %s is not dropped", name, label)
+			}
+		}
+		for _, attr := range []string{"http.route", "url.path"} {
+			if !strings.Contains(raw, `replace_pattern(attributes[\"`+attr+`\"]`) {
+				t.Errorf("%s: %s is not normalized", name, attr)
+			}
+		}
 	}
 }

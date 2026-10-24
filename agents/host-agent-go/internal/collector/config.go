@@ -4,6 +4,7 @@ package collector
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 )
@@ -56,9 +57,10 @@ func Config(in Input) ([]byte, error) {
 	}
 	logIDs := addLogReceivers(receivers, in.Packs, in.LogFiles)
 	metricsReceivers := append([]string{"host_metrics"}, packIDs...)
-	metricsProcessors := []string{"memory_limiter", "filter/allowlist", "resource_detection", "batch"}
+	metricsProcessors := []string{"memory_limiter", "transform/drop_labels", "filter/allowlist", "resource_detection", "batch"}
 	processors := map[string]any{
-		"memory_limiter": map[string]any{"check_interval": "1s", "limit_mib": 100, "spike_limit_mib": 20},
+		"memory_limiter":        map[string]any{"check_interval": "1s", "limit_mib": 100, "spike_limit_mib": 20},
+		"transform/drop_labels": dropLabels(),
 		"resource_detection": map[string]any{
 			"detectors": []string{"system"},
 			"system":    map[string]any{"hostname_sources": []string{"os"}},
@@ -124,4 +126,34 @@ func Config(in Input) ([]byte, error) {
 		cfg["connectors"] = map[string]any{"count": countConnector()}
 	}
 	return json.MarshalIndent(cfg, "", "  ")
+}
+
+// droppedLabels never leave the host (spec §11.6): per-user and per-request identifiers and raw URLs
+// would create a series per user or request.
+var droppedLabels = []string{"user_id", "session_id", "request_id", "trace_id", "span_id", "url.full", "http.url", "http.target", "url.query"}
+
+// dropLabels removes droppedLabels from data points and resources, and replaces numeric and UUID
+// path segments of routes with ":id" (twice, because adjacent segments share a slash).
+func dropLabels() map[string]any {
+	var dp, res []string
+	for _, l := range droppedLabels {
+		dp = append(dp, fmt.Sprintf("delete_key(attributes, %q)", l))
+		res = append(res, fmt.Sprintf("delete_key(attributes, %q)", l))
+	}
+	const uuid = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+	for _, attr := range []string{"http.route", "url.path"} {
+		for i := 0; i < 2; i++ {
+			dp = append(dp,
+				fmt.Sprintf(`replace_pattern(attributes[%q], "/[0-9]+(/|$)", "/:id$$1")`, attr),
+				fmt.Sprintf(`replace_pattern(attributes[%q], "/%s(/|$)", "/:id$$1")`, attr, uuid),
+			)
+		}
+	}
+	return map[string]any{
+		"error_mode": "ignore",
+		"metric_statements": []any{
+			map[string]any{"context": "datapoint", "statements": dp},
+			map[string]any{"context": "resource", "statements": res},
+		},
+	}
 }
