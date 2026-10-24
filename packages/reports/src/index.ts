@@ -24,3 +24,4 @@ export {
 } from './snapshot.js';
 export { narrate, summarize, type NarrativeStatus } from './narrative.js';
 export { renderReport, sectionLines, type ReportMessage, type RenderableReport } from './render.js';
+export { databaseActivity, trend, type DatabaseActivity } from './activity.js';

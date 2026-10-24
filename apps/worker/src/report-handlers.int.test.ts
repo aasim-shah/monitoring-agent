@@ -26,6 +26,7 @@ let queues: Queues;
 let vm: Server;
 let vmPort = 0;
 const vmQueries: string[] = [];
+let websiteMonitor = '';
 let mails: Array<{ to: string[]; subject: string; text: string }> = [];
 const bouncing = new Set<string>();
 
@@ -144,7 +145,15 @@ beforeAll(async () => {
     else if (q.includes('system_cpu')) result = [series({ agent_id: 'a-1' }, 93.5)];
     else if (q.includes('system_memory')) result = [series({ agent_id: 'a-1' }, 55)];
     else if (q.includes('system_filesystem')) result = [series({ agent_id: 'a-1' }, 71.2)];
-    else if (q.includes('level="error"')) result = [series({}, 12)];
+    else if (q.includes('website_')) {
+      // The previous window is read at its own end (the report window's start).
+      const prev = Number(url.searchParams.get('time')) < Date.parse('2026-10-25T12:00:00Z') / 1000;
+      const m = { monitor_id: websiteMonitor };
+      if (q.includes('count_le_over_time')) result = [series(m, 3)];
+      else if (q.includes('quantile_over_time')) result = [series(m, 410.4)];
+      else if (q.includes('website_response_seconds')) result = [series(m, prev ? 200 : 230.6)];
+      else result = [series(m, prev ? 100 : 99.52)];
+    } else if (q.includes('level="error"')) result = [series({}, 12)];
     else if (q.includes('level="warn"')) result = [series({}, 30)];
     res.setHeader('content-type', 'application/json');
     res.end(JSON.stringify({ status: 'success', data: { resultType: 'vector', result } }));
@@ -394,6 +403,149 @@ describe('report-generate and report-deliver (UC-15-02/03)', () => {
     expect(res).toMatchObject({ name: 'Shop web', source: 'GA4', partial: true });
     expect(res!.values.find((x) => x.label === 'Active users')!.value).toBe(120);
     expect(res!.values.find((x) => x.label === 'Sessions')!.value).toBeNull();
+  });
+});
+
+describe('24 h activity and trends (M15b)', () => {
+  const section = async (s: Seeded, key: string) => {
+    const h = reportHandlers(deps());
+    await h['report-generate'](ctx(s.org), s.schedule, job('2026-10-25'));
+    const [report] = await reports(s);
+    return (report!.snapshot as { sections: Array<{ key: string; status: string; data: unknown }> }).sections.find(
+      (x) => x.key === key,
+    )!;
+  };
+  const postgres = async (s: Seeded) => {
+    const conn = randomUUID();
+    await sql(
+      `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, updated_at)
+       VALUES ($1, $2, 'postgres', 'Shop DB', 'connected', 'cloud', now())`,
+      [conn, s.org],
+    );
+    await sql(
+      `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id)
+       VALUES ($1, $2, 'shop', 'postgres_database', 'shop', $3)`,
+      [s.org, conn, s.product],
+    );
+    const health = (at: string, orders: [number, number], size: number, ok = true) =>
+      sql(
+        `INSERT INTO connection_health (organization_id, connection_id, checked_at, ok, detail) VALUES ($1, $2, $3, $4, $5)`,
+        [
+          s.org,
+          conn,
+          at,
+          ok,
+          JSON.stringify({
+            databases: [{ name: 'shop', bytes: size }],
+            tables: [
+              { name: 'public.orders', rows: orders[0], inserted: orders[1] },
+              { name: 'public.users', rows: 50, inserted: 50 },
+            ],
+          }),
+        ],
+      );
+    return { conn, health };
+  };
+
+  it('counts rows added between the snapshots at the window start and end', async () => {
+    const s = await seed();
+    const { health } = await postgres(s);
+    // Window for 2026-10-25 in Berlin: 2026-10-24T22:00Z to 2026-10-25T23:00Z (DST ends).
+    await health('2026-10-24T21:30:00Z', [1000, 1200], 10_000_000);
+    await health('2026-10-25T22:30:00Z', [1300, 1500], 12_000_000);
+    await health('2026-10-25T22:45:00Z', [0, 0], 0, false);
+    await health('2026-10-26T05:00:00Z', [9999, 9999], 99_000_000);
+    const db = await section(s, 'databases');
+    expect(db.status).toBe('ok');
+    expect((db.data as { databases: unknown[] }).databases[0]).toMatchObject({
+      name: 'Shop DB',
+      // The last check failed; activity still compares the last good snapshots.
+      ok: false,
+      activity: {
+        baseline: 'ok',
+        approximate: false,
+        rowsAdded: 300,
+        sizeBytes: 12_000_000,
+        sizeChangeBytes: 2_000_000,
+        top: [{ name: 'public.orders', added: 300, total: 1300 }],
+      },
+    });
+  });
+
+  it('has no baseline when the last snapshot before the window is more than 6 h older', async () => {
+    const s = await seed();
+    const { health } = await postgres(s);
+    await health('2026-10-24T15:00:00Z', [1000, 1200], 10_000_000);
+    await health('2026-10-25T22:30:00Z', [1300, 1500], 12_000_000);
+    const db = await section(s, 'databases');
+    expect((db.data as { databases: Array<{ activity: unknown }> }).databases[0]!.activity).toMatchObject({
+      baseline: 'none',
+      rowsAdded: null,
+    });
+  });
+
+  it('reports website speed, failed checks, and the previous window', async () => {
+    const s = await seed();
+    websiteMonitor = randomUUID();
+    await sql(
+      `INSERT INTO website_monitors (id, organization_id, product_id, url, host, verify_token, status, updated_at)
+       VALUES ($1, $2, $3, 'https://shop.example.com/?token=x', 'shop.example.com', 't', 'active', now())`,
+      [websiteMonitor, s.org, s.product],
+    );
+    const site = await section(s, 'availability');
+    expect((site.data as { websites: unknown[] }).websites[0]).toEqual({
+      url: 'https://shop.example.com/',
+      uptimePercent: 99.5,
+      tlsDays: null,
+      avgMs: 231,
+      p95Ms: 410,
+      failedChecks: 3,
+      previousUptimePercent: 100,
+      previousAvgMs: 200,
+    });
+  });
+
+  it('reports the latest published day and the day before for each Google KPI', async () => {
+    const s = await seed();
+    const conn = randomUUID();
+    await sql(
+      `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, updated_at)
+       VALUES ($1, $2, 'google', 'Google', 'connected', 'cloud', now())`,
+      [conn, s.org],
+    );
+    const scope = (externalId: string, type: string, name: string) =>
+      sql(
+        `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [s.org, conn, externalId, type, name, s.product],
+      );
+    await scope('sc-domain:shop.example.com', 'google_search_console_site', 'shop.example.com');
+    await scope('1:123:web:abc', 'google_firebase_app', 'Shop iOS');
+    const v = (d: string, metric: string, value: number) =>
+      sql(
+        `INSERT INTO metric_aggregates (organization_id, connection_id, resource_type, external_id, metric, day, value, completeness)
+         VALUES ($1, $2, 'google_search_console_site', 'sc-domain:shop.example.com', $3, $4, $5, 'complete')`,
+        [s.org, conn, metric, d, value],
+      );
+    // Search Console publishes about 2 days late: nothing yet for 10-25 or 10-24.
+    await v('2026-10-23', 'clicks', 120);
+    await v('2026-10-22', 'clicks', 100);
+    await v('2026-10-26', 'clicks', 999);
+    const analytics = await section(s, 'analytics');
+    const data = analytics.data as {
+      reportDay: string;
+      firebaseApps: string[];
+      resources: Array<{ name: string; values: Array<Record<string, unknown>> }>;
+    };
+    expect(data.reportDay).toBe('2026-10-25');
+    expect(data.firebaseApps).toEqual(['Shop iOS']);
+    const site = data.resources.find((r) => r.name === 'shop.example.com')!;
+    expect(site.values.find((x) => x.label === 'Search clicks')).toMatchObject({
+      value: 120,
+      day: '2026-10-23',
+      previous: 100,
+      previousDay: '2026-10-22',
+    });
   });
 });
 

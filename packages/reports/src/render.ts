@@ -1,3 +1,4 @@
+import { trend } from './activity.js';
 import type { NarrativeStatus } from './narrative.js';
 import type {
   AnalyticsStats,
@@ -34,6 +35,64 @@ const escape = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const pct = (v: number | null) => (v === null ? 'no data' : `${v.toFixed(1)} %`);
+const count = (v: number) => Math.round(v).toLocaleString('en-US');
+function bytes(v: number): string {
+  const a = Math.abs(v);
+  const [n, u] =
+    a >= 1024 ** 3
+      ? [v / 1024 ** 3, 'GB']
+      : a >= 1024 ** 2
+        ? [v / 1024 ** 2, 'MB']
+        : a >= 1024
+          ? [v / 1024, 'KB']
+          : [v, 'B'];
+  return `${u === 'B' ? Math.round(n) : Math.round(n * 10) / 10} ${u}`;
+}
+const signedBytes = (v: number) => `${v >= 0 ? '+' : '-'}${bytes(Math.abs(v))}`;
+/** " (▲ 12%)" or " (▲ 12% vs 2026-10-24)"; empty when there is nothing to compare. */
+const vs = (
+  current: number | null | undefined,
+  previous: number | null | undefined,
+  label?: string | null,
+) => {
+  const t = trend(current, previous);
+  return t ? ` (${t}${label ? ` vs ${label}` : ''})` : '';
+};
+
+function databaseLines(d: DatabaseStats): string[] {
+  const a = d.activity;
+  const head = `${d.name} (${d.provider}): ${d.status}`;
+  if (!a) return [head];
+  const size =
+    a.sizeBytes === null
+      ? ''
+      : `; size ${bytes(a.sizeBytes)}${a.sizeChangeBytes === null ? '' : ` (${signedBytes(a.sizeChangeBytes)})`}`;
+  const records =
+    a.baseline === 'none'
+      ? 'new records: no baseline yet, counted from tomorrow'
+      : a.baseline === 'reset'
+        ? 'new records: statistics were reset in this window'
+        : `${count(a.rowsAdded ?? 0)} new records in 24 h${a.approximate ? ' (estimated)' : ''}`;
+  return [
+    `${head}; ${records}${size}`,
+    ...a.top
+      .filter((t) => t.added !== null)
+      .map((t) =>
+        t.isNew
+          ? `  ${t.name}: new, ${count(t.total)} records`
+          : `  ${t.name}: +${count(t.added!)} (now ${count(t.total)})`,
+      ),
+  ];
+}
+
+function websiteLine(w: WebsiteStats): string {
+  const parts = [`uptime ${pct(w.uptimePercent)}${vs(w.uptimePercent, w.previousUptimePercent)}`];
+  if (w.avgMs != null) parts.push(`avg ${Math.round(w.avgMs)} ms${vs(w.avgMs, w.previousAvgMs)}`);
+  if (w.p95Ms != null) parts.push(`p95 ${Math.round(w.p95Ms)} ms`);
+  if (w.failedChecks != null) parts.push(`${count(w.failedChecks)} failed checks`);
+  if (w.tlsDays !== null) parts.push(`certificate ${w.tlsDays} days left`);
+  return `${w.url}: ${parts.join(', ')}`;
+}
 
 /** Plain lines for one section; numbers come straight from the snapshot (emails and the web view). */
 export function sectionLines(s: Section): string[] {
@@ -62,9 +121,7 @@ export function sectionLines(s: Section): string[] {
       return [`Log errors: ${d.errors}, warnings: ${d.warnings}`];
     }
     case 'databases':
-      return (s.data as { databases: DatabaseStats[] }).databases.map(
-        (d) => `${d.name} (${d.provider}): ${d.status}`,
-      );
+      return (s.data as { databases: DatabaseStats[] }).databases.flatMap(databaseLines);
     case 'analytics': {
       const d = s.data as AnalyticsStats;
       const fmt = (v: { value: number | null; unit: string }) =>
@@ -72,21 +129,29 @@ export function sectionLines(s: Section): string[] {
           ? 'no data'
           : v.unit === 'ratio'
             ? `${Math.round(v.value * 1000) / 10} %`
-            : String(Math.round(v.value * 100) / 100);
-      return d.resources.map(
-        (r) =>
-          `${r.name} (${r.source}${r.partial ? ', partial day' : ''}): ${r.values.map((v) => `${v.label} ${fmt(v)}`).join(', ')}`,
-      );
+            : count(v.value) === String(Math.round(v.value)) && Number.isInteger(v.value)
+              ? count(v.value)
+              : String(Math.round(v.value * 100) / 100);
+      const line = (v: AnalyticsStats['resources'][number]['values'][number]) =>
+        v.value === null
+          ? `${v.label} no data`
+          : `${v.label} ${fmt(v)}${v.day && d.reportDay && v.day !== d.reportDay ? ` on ${v.day}` : ''}${vs(v.value, v.previous, v.previousDay)}`;
+      return [
+        ...d.resources.map(
+          (r) =>
+            `${r.name} (${r.source}${r.partial ? ', partial day' : ''}): ${r.values.map(line).join(', ')}`,
+        ),
+        ...(d.firebaseApps?.length
+          ? [`Firebase apps: ${d.firebaseApps.join(', ')} (crash data needs the Crashlytics BigQuery export)`]
+          : []),
+      ];
     }
     case 'deployments': {
       const d = s.data as { deployed: number; failed: number; items: Array<{ title: string }> };
       return [`Deployments: ${d.deployed}, failed: ${d.failed}`, ...d.items.slice(0, 10).map((i) => i.title)];
     }
     case 'availability':
-      return (s.data as { websites: WebsiteStats[] }).websites.map(
-        (w) =>
-          `${w.url}: uptime ${pct(w.uptimePercent)}${w.tlsDays === null ? '' : `, certificate ${w.tlsDays} days left`}`,
-      );
+      return (s.data as { websites: WebsiteStats[] }).websites.map(websiteLine);
     case 'anomalies': {
       const a = s.data as Anomaly[];
       return a.length

@@ -19,22 +19,45 @@ export interface DatabaseStats {
   provider: string;
   status: string;
   ok: boolean | null;
+  /** New records and growth over the window (M15b). */
+  activity?: DatabaseActivity;
 }
 export interface WebsiteStats {
   url: string;
   uptimePercent: number | null;
   tlsDays: number | null;
+  /** Response time over the window and failed checks (M15b). */
+  avgMs?: number | null;
+  p95Ms?: number | null;
+  failedChecks?: number | null;
+  /** The same figures for the 24 h before (trend). */
+  previousUptimePercent?: number | null;
+  previousAvgMs?: number | null;
 }
 /** The report day's values per Google property, site, or app (M13b); null values stay null. */
 export interface AnalyticsStats {
+  /** The report's local date; values from another day say which (M15b). */
+  reportDay?: string;
   resources: Array<{
     name: string;
     source: string;
     /** The provider is still processing that day. */
     partial: boolean;
-    values: Array<{ label: string; value: number | null; unit: string }>;
+    values: Array<{
+      label: string;
+      value: number | null;
+      unit: string;
+      /** The latest published day the value is from (Search Console and Play lag 2 days). */
+      day?: string | null;
+      previous?: number | null;
+      previousDay?: string | null;
+    }>;
   }>;
+  /** Scoped Firebase apps (names; their crash data needs BigQuery exports). */
+  firebaseApps?: string[];
 }
+
+import type { DatabaseActivity } from './activity.js';
 
 export interface DeploymentStats {
   deployed: number;
@@ -92,6 +115,7 @@ const NOT_CONNECTED: Partial<Record<SectionKey, { source: string; reason: string
 };
 
 const r1 = (v: number | null) => (v === null ? null : Math.round(v * 10) / 10);
+const ms = (v: number | null) => (v === null ? null : Math.round(v));
 
 /** A URL without its query string or fragment: tokens never reach a report or the LLM (BR-15-02). */
 function bareUrl(raw: string): string {
@@ -183,6 +207,11 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
       url: bareUrl(s.url),
       uptimePercent: r1(s.uptimePercent),
       tlsDays: s.tlsDays === null ? null : Math.floor(s.tlsDays),
+      ...(s.avgMs !== undefined ? { avgMs: ms(s.avgMs) } : {}),
+      ...(s.p95Ms !== undefined ? { p95Ms: ms(s.p95Ms) } : {}),
+      ...(s.failedChecks !== undefined ? { failedChecks: s.failedChecks } : {}),
+      ...(s.previousUptimePercent !== undefined ? { previousUptimePercent: r1(s.previousUptimePercent) } : {}),
+      ...(s.previousAvgMs !== undefined ? { previousAvgMs: ms(s.previousAvgMs) } : {}),
     })) ?? null;
   const cpu = mean(hosts?.map((h) => h.cpuAvg) ?? []);
   const anomalies = [

@@ -10,10 +10,13 @@ import type {
   ReportWindow,
   WebsiteStats,
 } from '@pcp/reports';
+import { databaseActivity } from '@pcp/reports';
 import { kpisFor, type TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 
 const DB_PROVIDERS = ['postgres', 'mysql', 'mongodb'];
+/** How far before the window's start a health snapshot may be and still count as its baseline. */
+const BASELINE_SLACK_MS = 6 * 3_600_000;
 /** Google resources with daily KPI values, and how a report names their source. */
 const GOOGLE_SOURCE: Record<string, string> = {
   google_ga4_property: 'GA4',
@@ -152,21 +155,48 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
           const conns = await tx.connection.findMany({
             where: { provider: { in: DB_PROVIDERS }, scopes: { some: { productId } } },
             select: {
+              id: true,
               displayName: true,
               provider: true,
               health: { where: { checkedAt: { lt: w.end } }, orderBy: { checkedAt: 'desc' }, take: 1 },
             },
           });
           if (!conns.length) return null;
-          return conns.map((c) => {
-            const h = c.health[0];
-            return {
-              name: c.displayName,
-              provider: c.provider,
-              status: h ? (h.ok ? 'healthy' : (h.reason ?? 'failing')) : 'no health check yet',
-              ok: h ? h.ok : null,
-            };
-          });
+          const parse = (detail: string | null) => {
+            try {
+              return detail ? (JSON.parse(detail) as Record<string, unknown>) : null;
+            } catch {
+              return null;
+            }
+          };
+          return Promise.all(
+            conns.map(async (c) => {
+              const h = c.health[0];
+              // Activity: the last good snapshot before the window's end against the last good one at
+              // its start, no more than 6 h earlier (M15b, Review Focus #3).
+              const [end, start] = await Promise.all([
+                tx.connectionHealth.findFirst({
+                  where: { connectionId: c.id, ok: true, checkedAt: { lt: w.end, gt: w.start } },
+                  orderBy: { checkedAt: 'desc' },
+                }),
+                tx.connectionHealth.findFirst({
+                  where: {
+                    connectionId: c.id,
+                    ok: true,
+                    checkedAt: { lte: w.start, gte: new Date(w.start.getTime() - BASELINE_SLACK_MS) },
+                  },
+                  orderBy: { checkedAt: 'desc' },
+                }),
+              ]);
+              return {
+                name: c.displayName,
+                provider: c.provider,
+                status: h ? (h.ok ? 'healthy' : (h.reason ?? 'failing')) : 'no health check yet',
+                ok: h ? h.ok : null,
+                ...(end ? { activity: databaseActivity(parse(start?.detail ?? null), parse(end.detail)) } : {}),
+              };
+            }),
+          );
         }),
       );
 
@@ -179,18 +209,35 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
           }),
         );
         if (!monitors.length) return null;
-        const uptime = byAgent(
-          (await vm(`100 * avg by (monitor_id) (avg_over_time(website_up[${w.hours}h]))`, w))?.map((s) => ({
-            labels: { agent_id: s.labels.monitor_id ?? '' },
-            value: s.value,
-          })) ?? null,
-        );
+        const prev: ReportWindow = { ...w, start: new Date(w.start.getTime() - w.hours * 3_600_000), end: w.start };
+        const per = async (promql: string, win: ReportWindow) =>
+          byAgent(
+            (await vm(promql.replaceAll('$R', `${win.hours}h`), win))?.map((s) => ({
+              labels: { agent_id: s.labels.monitor_id ?? '' },
+              value: s.value,
+            })) ?? null,
+          );
+        const UP = '100 * avg by (monitor_id) (avg_over_time(website_up[$R]))';
+        const AVG = '1000 * avg by (monitor_id) (avg_over_time(website_response_seconds[$R]))';
+        const [uptime, avg, p95, failed, prevUptime, prevAvg] = await Promise.all([
+          per(UP, w),
+          per(AVG, w),
+          per('1000 * max by (monitor_id) (quantile_over_time(0.95, website_response_seconds[$R]))', w),
+          per('sum by (monitor_id) (count_le_over_time(website_up[$R], 0))', w),
+          per(UP, prev),
+          per(AVG, prev),
+        ]);
         return monitors.map((m) => ({
           url: m.url,
           uptimePercent: uptime.get(m.id) ?? null,
           tlsDays: m.tlsExpiresAt
             ? Math.floor((m.tlsExpiresAt.getTime() - w.end.getTime()) / 86_400_000)
             : null,
+          avgMs: avg.get(m.id) ?? null,
+          p95Ms: p95.get(m.id) ?? null,
+          failedChecks: failed.get(m.id) ?? (uptime.has(m.id) ? 0 : null),
+          previousUptimePercent: prevUptime.get(m.id) ?? null,
+          previousAvgMs: prevAvg.get(m.id) ?? null,
         }));
       });
 
@@ -222,7 +269,10 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
         }),
       );
 
-    /** The report's local date of each scoped Google property, site, or app (M13b). */
+    /**
+     * Each scoped Google property, site, or app (M13b): per KPI the latest day at or before the report
+     * date that has a value, and the day before it (Search Console and Play publish ~2 days late).
+     */
     const analytics = (w: ReportWindow) =>
       once<AnalyticsStats | null>('analytics', w, () =>
         db(async (tx) => {
@@ -232,36 +282,50 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
               status: { notIn: ['disconnected', 'revoked'] },
               scopes: { some: { productId } },
             },
-            include: { scopes: { where: { productId, resourceType: { in: Object.keys(GOOGLE_SOURCE) } } } },
+            include: { scopes: { where: { productId } } },
           });
           if (!connections.length) return null;
+          const reportDay = new Date(`${w.localDate}T00:00:00Z`);
           const rows = await tx.metricAggregate.findMany({
             where: {
               connectionId: { in: connections.map((c) => c.id) },
-              day: new Date(`${w.localDate}T00:00:00Z`),
+              day: { lte: reportDay, gte: new Date(reportDay.getTime() - 10 * 86_400_000) },
               dimension: '',
             },
+            orderBy: { day: 'desc' },
           });
+          const iso = (d: Date) => d.toISOString().slice(0, 10);
           return {
+            reportDay: w.localDate,
             resources: connections.flatMap((c) =>
-              c.scopes.map((sc) => {
-                const mine = rows.filter(
-                  (r) =>
-                    r.connectionId === c.id &&
-                    r.resourceType === sc.resourceType &&
-                    r.externalId === sc.externalId,
-                );
-                return {
-                  name: sc.name,
-                  source: GOOGLE_SOURCE[sc.resourceType]!,
-                  partial: mine.some((r) => r.completeness === 'partial'),
-                  values: kpisFor(sc.resourceType).map((def) => ({
-                    label: def.label,
-                    unit: def.unit,
-                    value: mine.find((r) => r.metric === def.metric)?.value ?? null,
-                  })),
-                };
-              }),
+              c.scopes
+                .filter((sc) => GOOGLE_SOURCE[sc.resourceType])
+                .map((sc) => {
+                  const mine = rows.filter(
+                    (r) => r.connectionId === c.id && r.resourceType === sc.resourceType && r.externalId === sc.externalId,
+                  );
+                  const values = kpisFor(sc.resourceType).map((def) => {
+                    const days = mine.filter((r) => r.metric === def.metric && r.value !== null);
+                    const [latest, before] = days;
+                    return {
+                      label: def.label,
+                      unit: def.unit,
+                      value: latest?.value ?? null,
+                      day: latest ? iso(latest.day) : null,
+                      previous: before?.value ?? null,
+                      previousDay: before ? iso(before.day) : null,
+                    };
+                  });
+                  return {
+                    name: sc.name,
+                    source: GOOGLE_SOURCE[sc.resourceType]!,
+                    partial: mine.some((r) => iso(r.day) === w.localDate && r.completeness === 'partial'),
+                    values,
+                  };
+                }),
+            ),
+            firebaseApps: connections.flatMap((c) =>
+              c.scopes.filter((sc) => sc.resourceType === 'google_firebase_app').map((sc) => sc.name),
             ),
           };
         }),
