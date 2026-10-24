@@ -27,7 +27,9 @@
     "@pcp/connectors-databases": "workspace:*",
     "@pcp/connectors-custom-http": "workspace:*",
     "@pcp/connectors-cloudflare": "workspace:*",
-    "@pcp/connectors-github": "workspace:*"
+    "@pcp/connectors-github": "workspace:*",
+    "@pcp/connectors-prometheus": "workspace:*",
+    "@pcp/connectors-grafana": "workspace:*"
   },
   "devDependencies": {
     "@pcp/connectors-mock": "workspace:*",

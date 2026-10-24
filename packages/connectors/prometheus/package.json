@@ -1,0 +1,32 @@
+{
+  "name": "@pcp/connectors-prometheus",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Prometheus Mode A: targets and on-demand queries, never copied (M7.4, WB-06).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pcp/connector-sdk": "workspace:*",
+    "@pcp/shared-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

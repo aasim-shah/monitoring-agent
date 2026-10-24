@@ -2,6 +2,8 @@ import { ConnectorRegistry, type Connector, type DestinationOptions } from '@pcp
 import { createCloudflareConnector } from '@pcp/connectors-cloudflare';
 import { customHttpConnector } from '@pcp/connectors-custom-http';
 import { createGithubConnector } from '@pcp/connectors-github';
+import { grafanaConnector } from '@pcp/connectors-grafana';
+import { prometheusConnector } from '@pcp/connectors-prometheus';
 import { mongodbConnector, mysqlConnector, postgresConnector } from '@pcp/connectors-databases';
 
 /**
@@ -42,6 +44,8 @@ export async function buildRegistry(env: Record<string, string | undefined>): Pr
     customHttpConnector,
     createCloudflareConnector(provider(env, 'cloudflare')),
     createGithubConnector(provider(env, 'github')),
+    prometheusConnector,
+    grafanaConnector,
   ];
   for (const c of production) registry.register(c);
   if (env.PCP_ENABLE_MOCK_CONNECTOR === '1') {
