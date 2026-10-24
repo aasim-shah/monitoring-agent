@@ -50,6 +50,7 @@ describe('compose configuration', () => {
           'PCP_ALLOW_TEST_PROVIDERS',
           'PCP_GITHUB_API_URL',
           'PCP_CLOUDFLARE_API_URL',
+          'PCP_GOOGLE_API_URL',
           'PCP_ENABLE_MOCK_CONNECTOR',
           'PCP_AI_FAKE',
         ])

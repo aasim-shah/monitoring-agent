@@ -6,6 +6,8 @@ import { startProcessors, type Processors } from '@pcp/jobs';
 import { loadKeyRing } from '@pcp/secrets';
 import { inject } from 'vitest';
 import { MASTER_KEY, createTestApp, type TestApp } from '../../../test/app-factory.js';
+import type { Queues } from '@pcp/jobs';
+import { QUEUES } from './registry.provider.js';
 import {
   createProduct,
   enrollMfa,
@@ -229,6 +231,22 @@ describe('connections API', () => {
       [conn.id],
     );
     expect(rows.map((r) => r.external_id)).toEqual(['mock-2', 'mock-3']);
+  });
+
+  it('saving a scope starts a sync right away for connectors with daily values (M13b)', async () => {
+    const owner = await ownerWithOrg(t);
+    const product = await createProduct(t, owner, 'A');
+    const conn = await mockConnection(owner);
+    await sql(`UPDATE connections SET status = 'connected' WHERE id = $1`, [conn.id]);
+    const res = await call('POST', `/api/v1/connections/${conn.id}/resource-scopes`, owner.cookie, {
+      scopes: [{ externalId: 'mock-1', resourceType: 'mock_resource', name: 'R', productId: product }],
+    });
+    expect(res.statusCode).toBe(200);
+    const queued = await t.app
+      .get<Queues>(QUEUES)
+      .get('connection-sync')
+      .getJobs(['waiting', 'delayed', 'active', 'completed']);
+    expect(queued.map((j) => j.data.connectionId)).toContain(conn.id);
   });
 
   it('hides connection management from viewers (404)', async () => {

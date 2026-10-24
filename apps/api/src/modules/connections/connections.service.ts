@@ -357,8 +357,8 @@ export class ConnectionsService {
   async setScopes(ctx: TenantContext, id: string, scopes: ScopeInput[]) {
     const allowed = ctx.productIds;
     if (allowed !== 'all' && scopes.some((s) => !allowed.includes(s.productId))) throw notFound();
-    return withTenant(this.prisma, ctx, async (tx) => {
-      const c = await tx.connection.findUnique({ where: { id }, select: { status: true } });
+    const saved = await withTenant(this.prisma, ctx, async (tx) => {
+      const c = await tx.connection.findUnique({ where: { id }, select: { status: true, provider: true } });
       if (!c) throw notFound();
       if (TERMINAL.includes(c.status)) throw closed();
       const productIds = [...new Set(scopes.map((s) => s.productId))];
@@ -385,11 +385,16 @@ export class ConnectionsService {
         targetId: id,
         metadata: { count: scopes.length, productIds },
       });
-      return tx.connectionResourceScope.findMany({
+      const rows = await tx.connectionResourceScope.findMany({
         where: allowed === 'all' ? { connectionId: id } : { connectionId: id, productId: { in: allowed } },
         orderBy: { createdAt: 'asc' },
       });
+      return { rows, provider: c.provider, live: c.status === 'connected' || c.status === 'degraded' };
     });
+    // New scopes of a KPI connector (Google) sync now rather than at the next hourly run (M13b).
+    if (saved.live && this.registry.has(saved.provider) && this.registry.get(saved.provider).sync)
+      await this.queue(ctx, 'connection-sync', id);
+    return saved.rows;
   }
 
   syncRuns(ctx: TenantContext, id: string) {

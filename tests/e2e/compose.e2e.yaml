@@ -25,6 +25,19 @@ services:
       timeout: 3s
       retries: 20
 
+  # Stand-in for Google's token endpoint and read APIs (M13b exit gate).
+  fake-google:
+    image: node:22.20.0-alpine
+    command: ['node', '/srv/fake-google.mjs']
+    volumes:
+      - ./tests/e2e/fixtures/fake-google.mjs:/srv/fake-google.mjs:ro
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/healthz']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   api:
     environment:
       SMTP_URL: smtp://mailpit:1025
@@ -33,9 +46,16 @@ services:
       # GitHub calls go to the stand-in; the flag is never set in compose.yaml (compose test).
       PCP_ALLOW_TEST_PROVIDERS: '1'
       PCP_GITHUB_API_URL: http://fake-github:8080
+      # Google data connections against the stand-in; the browser never reaches Google (the test intercepts).
+      GOOGLE_CLIENT_ID: e2e-client.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: e2e-client-secret
+      GOOGLE_REDIRECT_URI: ${APP_ORIGIN}/api/v1/auth/google/callback
+      GOOGLE_CONNECTIONS_REDIRECT_URI: ${APP_ORIGIN}/api/v1/connections/oauth/google/callback
+      PCP_GOOGLE_API_URL: http://fake-google:8080
     depends_on:
       mailpit: { condition: service_healthy }
       fake-github: { condition: service_healthy }
+      fake-google: { condition: service_healthy }
 
   # Incident notifications are sent by the worker (M12.3).
   worker:
@@ -49,8 +69,12 @@ services:
       PCP_AI_FAKE: '1'
       PCP_ALLOW_TEST_PROVIDERS: '1'
       PCP_GITHUB_API_URL: http://fake-github:8080
+      GOOGLE_CLIENT_ID: e2e-client.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: e2e-client-secret
+      PCP_GOOGLE_API_URL: http://fake-google:8080
     # Mailpit sits on the edge network; production mail goes out over egress.
     networks: [internal, egress, edge]
     depends_on:
       mailpit: { condition: service_healthy }
       fake-github: { condition: service_healthy }
+      fake-google: { condition: service_healthy }
