@@ -64,8 +64,6 @@ export default function IntegrationDetailPage() {
     <QueryState query={detail} label="Loading integration">
       {detail.data ? (
         <ConnectionDetail
-          // Remount when the stored scopes change so the checkboxes start from them.
-          key={detail.data.connection.scopes.map((s) => s.externalId).join(',')}
           data={detail.data}
           canConfigure={roleCan(role, 'connection.configure')}
           onScope={async (scopes) => {

@@ -35,6 +35,27 @@ describe('compose configuration', () => {
     }
     expect((services.caddy!.ports ?? []).length).toBe(2);
   });
+
+  it.each([[[]], [['-f', 'deploy/vps/compose.vps.yaml']]])(
+    'production compose (%j) never enables test providers or fakes',
+    async (extra) => {
+      const r = await compose('pcp-smoke-config', envFile(SECRETS), [...extra, 'config', '--format', 'json']);
+      expect(r.status, r.stderr).toBe(0);
+      const services = JSON.parse(r.stdout).services as Record<
+        string,
+        { environment?: Record<string, string> }
+      >;
+      for (const [name, svc] of Object.entries(services))
+        for (const key of [
+          'PCP_ALLOW_TEST_PROVIDERS',
+          'PCP_GITHUB_API_URL',
+          'PCP_CLOUDFLARE_API_URL',
+          'PCP_ENABLE_MOCK_CONNECTOR',
+          'PCP_AI_FAKE',
+        ])
+          expect(svc.environment?.[key] ?? '', `${name} sets ${key}`).toBe('');
+    },
+  );
 });
 
 describe.each([

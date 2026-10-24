@@ -14,6 +14,10 @@
 		reverse_proxy api:3000
 	}
 
+	handle /webhooks/* {
+		reverse_proxy api:3000
+	}
+
 	# Agent installer and release artifacts (M6.7).
 	@downloads path /install.sh /downloads/*
 	handle @downloads {

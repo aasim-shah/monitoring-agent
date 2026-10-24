@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -52,6 +52,17 @@ function validate(config: string, extraArgs: string[] = []) {
     'caddyfile',
   ]);
 }
+
+describe('caddy routes', () => {
+  // Bootstrap (plain HTTP before TLS) refuses webhooks with 503 instead; see compose.smoke.test.ts.
+  it.each(['Caddyfile.local', 'Caddyfile.production', 'Caddyfile.behind-proxy'])(
+    '%s sends provider webhooks to the API, not the dashboard',
+    (name) => {
+      const config = readFileSync(`${repoRoot}infrastructure/caddy/${name}`, 'utf8');
+      expect(config).toMatch(/handle \/webhooks\/\* \{\s*reverse_proxy api:3000\s*\}/);
+    },
+  );
+});
 
 describe('caddy configs validate', () => {
   it('bootstrap config is valid', async () => {

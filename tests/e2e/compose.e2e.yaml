@@ -11,13 +11,31 @@ services:
       timeout: 3s
       retries: 12
 
+  # Stand-in for api.github.com (M7 exit gate): the e2e stack has no internet.
+  fake-github:
+    image: node:22.20.0-alpine
+    command: ['node', '/srv/fake-github.mjs']
+    volumes:
+      # Relative to the project directory (the repository root, where compose.yaml is).
+      - ./tests/e2e/fixtures/fake-github.mjs:/srv/fake-github.mjs:ro
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8080/healthz']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
   api:
     environment:
       SMTP_URL: smtp://mailpit:1025
       # Deterministic AI provider (M14 exit gate); real providers are never called in tests.
       PCP_AI_FAKE: '1'
+      # GitHub calls go to the stand-in; the flag is never set in compose.yaml (compose test).
+      PCP_ALLOW_TEST_PROVIDERS: '1'
+      PCP_GITHUB_API_URL: http://fake-github:8080
     depends_on:
       mailpit: { condition: service_healthy }
+      fake-github: { condition: service_healthy }
 
   # Incident notifications are sent by the worker (M12.3).
   worker:
@@ -29,7 +47,10 @@ services:
       RECONCILE_EVERY_SECONDS: '10'
       # Report narratives come from the scripted provider, as the assistant's do.
       PCP_AI_FAKE: '1'
+      PCP_ALLOW_TEST_PROVIDERS: '1'
+      PCP_GITHUB_API_URL: http://fake-github:8080
     # Mailpit sits on the edge network; production mail goes out over egress.
     networks: [internal, egress, edge]
     depends_on:
       mailpit: { condition: service_healthy }
+      fake-github: { condition: service_healthy }
