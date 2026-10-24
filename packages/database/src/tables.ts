@@ -53,6 +53,7 @@ export const TENANT_TABLES = [
   'change_events',
   'connection_inventory',
   'metric_aggregates',
+  'tenant_exports',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];

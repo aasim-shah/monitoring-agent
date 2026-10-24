@@ -260,7 +260,7 @@ export interface paths {
         post?: never;
         /**
          * Request organization deletion (30-day grace)
-         * @description Request organization deletion (30-day grace).
+         * @description Owner only, with the organization name typed back. Members lose access at once; agents are revoked and connections disconnected; the purge runs after 30 days. Requires `org.delete`.
          */
         delete: operations["requestOrganizationDeletion"];
         options?: never;
@@ -282,7 +282,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel pending deletion
-         * @description Cancel pending deletion.
+         * @description Restores member access during the grace period. Agents and connections stay revoked and must be enrolled or reconnected. Requires `org.delete`.
          */
         post: operations["cancelOrganizationDeletion"];
         delete?: never;
@@ -3706,6 +3706,11 @@ export interface components {
             settings: Record<string, never>;
             /** Format: date-time */
             createdAt: string;
+            /**
+             * Format: date-time
+             * @description Set while a deletion is pending — when the organization is purged.
+             */
+            deletionScheduledFor?: string | null;
             /** @enum {string} */
             role?: "owner" | "admin" | "operator" | "analyst" | "viewer";
         };
@@ -4661,9 +4666,24 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    confirmName: string;
+                };
+            };
+        };
         responses: {
-            202: components["responses"]["Accepted"];
+            /** @description Deletion scheduled */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Organization"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };

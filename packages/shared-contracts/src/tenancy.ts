@@ -8,6 +8,9 @@ export const PERMISSIONS = [
   'org.view',
   'org.members.manage',
   'org.settings.manage',
+  /** Owner only: tenant data export and deletion (WB-17 UC-17-09). */
+  'org.export',
+  'org.delete',
   'product.view',
   'product.manage',
   'connection.view',

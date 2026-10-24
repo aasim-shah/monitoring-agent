@@ -152,6 +152,10 @@ model Organization {
   timezone  String   @default("UTC")
   settings  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Deletion requested (WB-17 UC-17-09): members lose access; owners may cancel until the purge.
+  deletionRequestedAt       DateTime? @map("deletion_requested_at") @db.Timestamptz(6)
+  deletionScheduledFor      DateTime? @map("deletion_scheduled_for") @db.Timestamptz(6)
+  deletionRequestedByUserId String?   @map("deletion_requested_by_user_id") @db.Uuid
 
   members        OrganizationMember[]
   invitations    Invitation[]
@@ -164,6 +168,7 @@ model Organization {
   alertRules     AlertRule[]
   channels       NotificationChannel[]
   aiSettings     AiSettings?
+  exports        TenantExport[]
 
   @@map("organizations")
 }
@@ -1526,4 +1531,35 @@ model MetricAggregate {
   @@unique([connectionId, resourceType, externalId, metric, dimension, day])
   @@index([organizationId, connectionId, day])
   @@map("metric_aggregates")
+}
+
+/// A tenant data export (WB-17 UC-17-09): JSON archive without secrets, downloadable for 24 h.
+model TenantExport {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  requestedByUserId String?   @map("requested_by_user_id") @db.Uuid
+  /// queued, ready, failed, or expired.
+  status            String
+  /// gzip-compressed JSON; cleared when the link expires.
+  archive           Bytes?
+  sizeBytes         Int?      @map("size_bytes")
+  error             String?
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("tenant_exports")
+}
+
+/// What remains of a purged organization: who, when, and how many rows were removed (legal record).
+model DeletedOrganization {
+  id                  String   @id @db.Uuid
+  name                String
+  deletionRequestedAt DateTime @map("deletion_requested_at") @db.Timestamptz(6)
+  purgedAt            DateTime @default(now()) @map("purged_at") @db.Timestamptz(6)
+  summary             Json     @default("{}")
+
+  @@map("deleted_organizations")
 }

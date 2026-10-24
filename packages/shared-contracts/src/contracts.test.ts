@@ -43,8 +43,24 @@ const redisPack = {
 describe('roles and permissions', () => {
   it('defines the five roles and the master-plan permission list', () => {
     expect(ROLES).toEqual(['owner', 'admin', 'operator', 'analyst', 'viewer']);
-    expect(PERMISSIONS).toHaveLength(25);
+    expect(PERMISSIONS).toHaveLength(27);
     expect(PERMISSIONS).toContain('action.approve');
+  });
+
+  it('only owners export or delete the organization (WB-17 UC-17-09)', () => {
+    const ctx = (role: (typeof ROLES)[number]) => ({
+      organizationId: 'o',
+      actor: { kind: 'user' as const, userId: 'u' },
+      roles: [role],
+      productIds: 'all' as const,
+      environmentIds: 'all' as const,
+      requestId: 'r',
+    });
+    for (const p of ['org.export', 'org.delete'] as const) {
+      expect(can(ctx('owner'), p)).toBe(true);
+      for (const role of ['admin', 'operator', 'analyst', 'viewer'] as const)
+        expect(can(ctx(role), p)).toBe(false);
+    }
   });
 });
 

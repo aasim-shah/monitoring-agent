@@ -288,6 +288,7 @@ beforeAll(async () => {
          VALUES ($1, $2, 'google_ga4_property', 'properties/1', 'activeUsers', '2026-10-24', 1, 'complete')`,
         [org, ghConn],
       );
+      await c.query(`INSERT INTO tenant_exports (organization_id, status) VALUES ($1, 'queued')`, [org]);
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

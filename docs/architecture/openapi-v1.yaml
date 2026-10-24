@@ -296,24 +296,43 @@ paths:
       operationId: requestOrganizationDeletion
       tags: [organizations]
       summary: Request organization deletion (30-day grace)
-      description: Request organization deletion (30-day grace).
+      description: >-
+        Owner only, with the organization name typed back. Members lose access at once; agents are
+        revoked and connections disconnected; the purge runs after 30 days. Requires `org.delete`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmName]
+              additionalProperties: false
+              properties:
+                confirmName: { type: string }
       responses:
-        '202': { $ref: '#/components/responses/Accepted' }
+        '202':
+          description: Deletion scheduled
+          content: { application/json: { schema: { $ref: '#/components/schemas/Organization' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M19
   /api/v1/organizations/{orgId}/deletion/cancel:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
       operationId: cancelOrganizationDeletion
       tags: [organizations]
       summary: Cancel pending deletion
-      description: Cancel pending deletion.
+      description: >-
+        Restores member access during the grace period. Agents and connections stay revoked and must be
+        enrolled or reconnected. Requires `org.delete`.
       security: [{ sessionCookie: [] }]
       responses:
         '204': { $ref: '#/components/responses/NoContent' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M19
   /api/v1/organizations/{orgId}/export:
     parameters: [{ $ref: '#/components/parameters/orgId' }]
     post:
@@ -4281,6 +4300,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        deletionScheduledFor:
+          type: [string, 'null']
+          format: date-time
+          description: Set while a deletion is pending — when the organization is purged.
         role:
           type: string
           enum:

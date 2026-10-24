@@ -17,7 +17,8 @@ const VIEW: readonly Permission[] = [
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   owner: PERMISSIONS,
-  admin: PERMISSIONS.filter((p) => p !== 'action.approve'),
+  // Approving actions, exporting all data, and deleting the organization stay with owners.
+  admin: PERMISSIONS.filter((p) => !['action.approve', 'org.export', 'org.delete'].includes(p)),
   operator: [
     ...VIEW,
     'agent.enroll',
