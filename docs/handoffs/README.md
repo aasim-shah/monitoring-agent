@@ -24,6 +24,7 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M11 Logs (live tail, log-derived metrics) | Done | Branch `feat/m11-logs`; deployed; [execution log](M11-execution-log.md) |
 | M12 Alerts, incidents, notifications | Done | Branch `feat/m12-alerts`; deployed; [execution log](M12-execution-log.md) |
 | M13a Website monitoring | Done | Branch `feat/m13a-websites`; deployed; [execution log](M13a-execution-log.md). M13b (Google sources, KPIs) not started |
+| M16 Operational actions and approvals | Done | Branch `feat/m16-actions`; deployed; agent 0.3.0 with opt-in pcp-helper; [execution log](M16-execution-log.md) |
 | M15 Reports and schedules | Done | Branch `feat/m15-reports`; deployed; [execution log](M15-execution-log.md) |
 | M14 AI assistant | Done | Branch `feat/m14-ai`; deployed; [execution log](M14-execution-log.md) |
 | M7, M10–M19 | Not started | M10 partly delivered in M6b |
@@ -114,10 +115,10 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M15.1 | Templates and schedules | Done | [M15-schema](M15-schema.md) |
 | M15.2 | Report generator | Done | [M15-reports-package](M15-reports-package.md), [M15-worker](M15-worker.md) |
 | M15.3 | Delivery | Done | [M15-api](M15-api.md), [M15-web](M15-web.md) |
-| M16.1 | Action engine | Not started | — |
-| M16.2 | Adapters | Not started | — |
-| M16.3 | `pcp-helper` | Not started | — |
-| M16.4 | Approvals UI | Not started | — |
+| M16.1 | Action engine | Done | [M16-schema](M16-schema.md), [M16-engine](M16-engine.md), [M16-api](M16-api.md) |
+| M16.2 | Adapters | Done | [M16-engine](M16-engine.md) |
+| M16.3 | `pcp-helper` | Done | [M16-helper](M16-helper.md) |
+| M16.4 | Approvals UI | Done | [M16-web](M16-web.md) |
 | M17.1 | Fleet install UX | Not started | — |
 | M17.2 | Fleet tooling | Not started | — |
 | M17.3 | Installer runner (assisted SSH, opt-in) | Not started | — |

@@ -165,10 +165,10 @@ Automations & Approvals → Policies (per environment and action type), Pending 
 
 ## 11. Task checklist
 
-- [ ] M16.1 Action engine
-- [ ] M16.2 Adapters
-- [ ] M16.3 `pcp-helper`
-- [ ] M16.4 Approvals UI
+- [x] M16.1 Action engine ([M16-schema](../handoffs/M16-schema.md), [M16-engine](../handoffs/M16-engine.md), [M16-api](../handoffs/M16-api.md))
+- [x] M16.2 Adapters ([M16-engine](../handoffs/M16-engine.md); Cloudflare and GitHub execute once M7 connections exist)
+- [x] M16.3 `pcp-helper` ([M16-helper](../handoffs/M16-helper.md))
+- [x] M16.4 Approvals UI ([M16-web](../handoffs/M16-web.md))
 - [ ] M18.3 Level 1 managed exporters (pack_install)
 
 ## 12. Acceptance criteria
