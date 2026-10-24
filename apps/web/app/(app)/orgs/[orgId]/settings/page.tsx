@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { ApiError, unwrap } from '@pcp/api-client';
 import type { Role } from '@pcp/shared-contracts';
 import { AiSettingsCard } from '@/components/ai/ai-settings-card';
+import { DeleteOrganization, ExportCard } from '@/components/orgs/tenant-data';
 import { SimpleForm } from '@/components/auth/simple-form';
 import { Loading } from '@/components/states/loading';
 import { NotFoundState } from '@/components/states/not-found-state';
@@ -31,6 +32,16 @@ export default function SettingsPage() {
     unwrap(await api.GET('/api/v1/organizations/{orgId}/settings/ai', { params: { path: { orgId } } })),
   );
   const [saved, setSaved] = useState(false);
+  const isOwner = roleCan((org.data?.role ?? 'viewer') as Role, 'org.export');
+  const exports = useApiQuery(
+    ['org-exports', orgId],
+    async () =>
+      unwrap(await api.GET('/api/v1/organizations/{orgId}/export', { params: { path: { orgId } } })).exports,
+    {
+      enabled: isOwner,
+      refetchInterval: (q) => (q.state.data?.some((e) => e.status === 'queued') ? 3000 : false),
+    },
+  );
   if (org.visibleError instanceof ApiError && org.visibleError.status === 404) return <NotFoundState />;
   if (!org.data) return <Loading label="Loading settings" />;
   // Settings require org.settings.manage; others get the same page as a missing one.
@@ -85,6 +96,32 @@ export default function SettingsPage() {
             await queryClient.invalidateQueries({ queryKey: ['ai-settings', orgId] });
           }}
         />
+      ) : null}
+      {isOwner ? (
+        <>
+          <ExportCard
+            exports={exports.data ?? []}
+            downloadHref={(id) => `/api/v1/organizations/${orgId}/export/${id}/download`}
+            onExport={async () => {
+              unwrap(await api.POST('/api/v1/organizations/{orgId}/export', { params: { path: { orgId } } }));
+              await queryClient.invalidateQueries({ queryKey: ['org-exports', orgId] });
+            }}
+          />
+          {org.data.deletionScheduledFor ? null : (
+            <DeleteOrganization
+              name={org.data.name}
+              onDelete={async (confirmName) => {
+                unwrap(
+                  await api.DELETE('/api/v1/organizations/{orgId}', {
+                    params: { path: { orgId } },
+                    body: { confirmName },
+                  }),
+                );
+                await queryClient.invalidateQueries({ queryKey: ['org', orgId] });
+              }}
+            />
+          )}
+        </>
       ) : null}
     </section>
   );
