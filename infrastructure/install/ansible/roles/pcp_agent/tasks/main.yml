@@ -19,7 +19,7 @@
 
     - name: Download install.sh
       ansible.builtin.get_url:
-        url: "{{ pcp_agent_install_script_url }}"
+        url: '{{ pcp_agent_install_script_url }}'
         dest: /root/pcp-install.sh
         mode: '0700'
 

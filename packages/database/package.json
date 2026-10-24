@@ -26,7 +26,7 @@
     "build": "prisma generate --schema prisma/schema.prisma && tsc -p tsconfig.build.json",
     "typecheck": "prisma generate --schema prisma/schema.prisma && tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test": "prisma generate --schema prisma/schema.prisma && vitest run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

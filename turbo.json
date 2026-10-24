@@ -14,6 +14,9 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "@pcp/database#test": {
+      "dependsOn": ["build"]
+    },
     "@pcp/web#typecheck": {
       "dependsOn": ["^build", "@pcp/web#build"]
     },
