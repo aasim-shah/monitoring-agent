@@ -143,11 +143,11 @@ Integrations → Cloudflare / GitHub / Prometheus / Grafana connect wizards (per
 
 ## 11. Task checklist
 
-- [ ] M7.1 Webhook ingestion framework
-- [ ] M7.2 Cloudflare connector
-- [ ] M7.3 GitHub connector
-- [ ] M7.4 Prometheus (Mode A) and Grafana connectors
-- [ ] M7.5 Integrations UI
+- [x] M7.1 Webhook ingestion framework
+- [x] M7.2 Cloudflare connector
+- [x] M7.3 GitHub connector
+- [x] M7.4 Prometheus (Mode A) and Grafana connectors
+- [x] M7.5 Integrations UI
 
 ## 12. Acceptance criteria
 

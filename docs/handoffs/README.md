@@ -27,7 +27,8 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M16 Operational actions and approvals | Done | Branch `feat/m16-actions`; deployed; agent 0.3.0 with opt-in pcp-helper; [execution log](M16-execution-log.md) |
 | M15 Reports and schedules | Done | Branch `feat/m15-reports`; deployed; [execution log](M15-execution-log.md) |
 | M14 AI assistant | Done | Branch `feat/m14-ai`; deployed; [execution log](M14-execution-log.md) |
-| M7, M10–M19 | Not started | M10 partly delivered in M6b |
+| M7 SaaS integrations and webhooks | Done | Branch `feat/m7-integrations`; deployed; Cloudflare, GitHub, Prometheus, Grafana; [execution log](M7-execution-log.md) |
+| M10–M19 (except M13a–M16) | Not started | M10 partly delivered in M6b |
 
 ## Maintenance
 
@@ -75,11 +76,11 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M6.6 | Telemetry query module | Done | [M6.6](M6.6-telemetry-query.md) |
 | M6.7 | Installer and systemd units | Done (M6a scope) | [M6.7](M6.7-installer.md); [deploy runbook](../runbooks/deploy-control-plane.md) |
 | M6.8 | Host overview UI | Done | [M6.8](M6.8-infrastructure-ui.md) |
-| M7.1 | Webhook ingestion framework | Not started | — |
-| M7.2 | Cloudflare connector | Not started | — |
-| M7.3 | GitHub connector | Not started | — |
-| M7.4 | Prometheus (Mode A) and Grafana connectors | Not started | — |
-| M7.5 | Integrations UI | Not started | — |
+| M7.1 | Webhook ingestion framework | Done | [M7-webhooks](M7-webhooks.md) |
+| M7.2 | Cloudflare connector | Done | [M7-connectors](M7-connectors.md) |
+| M7.3 | GitHub connector | Done | [M7-connectors](M7-connectors.md) |
+| M7.4 | Prometheus (Mode A) and Grafana connectors | Done | [M7-connectors](M7-connectors.md) |
+| M7.5 | Integrations UI | Done | [M7-web](M7-web.md) |
 | M8.1 | Private connector worker | Not started | — |
 | M8.2 | Database connectors | Not started | — |
 | M8.3 | Custom REST connector and SSRF guard | Not started | — |
