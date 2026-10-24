@@ -41,6 +41,9 @@ const schema = z
     AGENT_OPAMP_URL: z.string().url().optional(),
     AGENT_PROXY_ADDRESSES: z.string().optional(),
     INTERNAL_TOKEN: z.string().min(24).optional(),
+    /** Assisted SSH install (M17.3): the runner's internal URL and the egress IPs customers allowlist. */
+    INSTALLER_RUNNER_URL: z.string().url().optional(),
+    INSTALLER_EGRESS_IPS: z.string().optional(),
     VM_QUERY_URL: z.string().url().optional(),
     /** Where tenant vmalert rule files are written (a volume vmalert reads), and vmalert's URL. */
     ALERT_RULES_DIR: z.string().min(1).optional(),
@@ -118,6 +121,7 @@ export interface AppConfig {
   agents?: AgentConfig;
   /** Shared secret for private-network service calls; internal routes are off without it. */
   internalToken?: string;
+  installer?: { runnerUrl?: string; egressIps: string[] };
   /** VictoriaMetrics base URL for reads (private network only, BR-04-05). */
   vmQueryUrl?: string;
   alertRulesDir?: string;
@@ -162,6 +166,13 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
         }
       : undefined,
     internalToken: c.INTERNAL_TOKEN,
+    installer: {
+      runnerUrl: c.INSTALLER_RUNNER_URL?.replace(/\/+$/, ''),
+      egressIps: (c.INSTALLER_EGRESS_IPS ?? '')
+        .split(',')
+        .map((ip) => ip.trim())
+        .filter(Boolean),
+    },
     vmQueryUrl: c.VM_QUERY_URL?.replace(/\/+$/, ''),
     alertRulesDir: c.ALERT_RULES_DIR,
     ai: aiConfig(c),

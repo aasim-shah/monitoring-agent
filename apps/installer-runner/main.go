@@ -51,7 +51,7 @@ func main() {
 		if err != nil {
 			return
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("X-Internal-Token", token)
 		req.Header.Set("Content-Type", "application/json")
 		res, err := client.Do(req)
 		if err != nil {

@@ -68,7 +68,9 @@ describe('install sessions (M17.3)', () => {
     const su = (q: string, v: unknown[] = []) => run(db.superuserUrl, q, v);
     await su(`INSERT INTO organizations (id, name) VALUES ($1, 'A'), ($2, 'B')`, [a, b]);
     for (const org of [a, b]) {
-      const [p] = await su(`INSERT INTO products (organization_id, name) VALUES ($1, 'P') RETURNING id`, [org]);
+      const [p] = await su(`INSERT INTO products (organization_id, name) VALUES ($1, 'P') RETURNING id`, [
+        org,
+      ]);
       const [e] = await su(
         `INSERT INTO environments (organization_id, product_id, name) VALUES ($1, $2, 'prod') RETURNING id`,
         [org, p!.id],

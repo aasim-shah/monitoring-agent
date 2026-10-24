@@ -13,7 +13,7 @@ func TestHandlerNeedsTheInternalTokenAndCreatesSessions(t *testing.T) {
 	call := func(method, path, token, body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("X-Internal-Token", token)
 		}
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)

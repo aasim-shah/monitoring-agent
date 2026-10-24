@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { unwrap } from '@pcp/api-client';
 import type { Role } from '@pcp/shared-contracts';
 import { AddServerDialog } from '@/components/agents/add-server-dialog';
+import { AssistedInstallDialog, type AssistedInstallApi } from '@/components/agents/assisted-install';
 import { FleetTable } from '@/components/agents/fleet-table';
 import { Empty } from '@/components/states/empty';
 import { api } from '@/lib/api';
@@ -12,6 +13,37 @@ import { QueryState } from '@/lib/page-guard';
 import { roleCan } from '@/lib/permissions';
 import { useOrganization } from '@/lib/queries';
 import { useApiQuery } from '@/lib/use-api-query';
+
+/** Assisted SSH install calls (M17.3); the browser never sees the token, key, or a stored password. */
+const assistedApi: AssistedInstallApi = {
+  create: async (environmentId, body) =>
+    unwrap(
+      await api.POST('/api/v1/environments/{environmentId}/install-sessions', {
+        params: { path: { environmentId } },
+        body,
+      }),
+    ),
+  connect: async (id, password) => {
+    unwrap(
+      await api.POST('/api/v1/install-sessions/{id}/connect', {
+        params: { path: { id } },
+        body: password ? { password } : {},
+      }),
+    );
+  },
+  confirm: async (id, hostId, fingerprint) => {
+    unwrap(
+      await api.POST('/api/v1/install-sessions/{id}/hosts/{hostId}/confirm-fingerprint', {
+        params: { path: { id, hostId } },
+        body: { fingerprint },
+      }),
+    );
+  },
+  get: async (id) => unwrap(await api.GET('/api/v1/install-sessions/{id}', { params: { path: { id } } })),
+  abort: async (id) => {
+    unwrap(await api.DELETE('/api/v1/install-sessions/{id}', { params: { path: { id } } }));
+  },
+};
 
 export default function AgentsPage() {
   const { orgId, productId } = useParams<{ orgId: string; productId: string }>();
@@ -66,7 +98,15 @@ export default function AgentsPage() {
             Servers running the monitoring agent. Status turns Degraded after 90 s without a heartbeat.
           </p>
         </div>
-        {dialog}
+        <div className="flex flex-wrap gap-2">
+          {canEnroll ? (
+            <AssistedInstallDialog
+              environments={(product.data?.environments ?? []).map((e) => ({ id: e.id, name: e.name }))}
+              api={assistedApi}
+            />
+          ) : null}
+          {dialog}
+        </div>
       </div>
       <QueryState query={agents} label="Loading agents">
         {list.length === 0 ? (

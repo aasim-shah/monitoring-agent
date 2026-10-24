@@ -18,6 +18,7 @@ import { ReportsModule } from './modules/reports/reports.module.js';
 import { WebsitesModule } from './modules/websites/websites.module.js';
 import { KpisModule } from './modules/kpis/kpis.module.js';
 import { UsageModule } from './modules/usage/usage.module.js';
+import { InstallSessionsModule } from './modules/install-sessions/install-sessions.module.js';
 import { AlertingModule } from './modules/alerting/alerting.module.js';
 import { AssetsModule } from './modules/assets/assets.module.js';
 import { AuditingModule } from './modules/auditing/auditing.module.js';
@@ -81,6 +82,7 @@ export class AppModule {
         WebsitesModule,
         KpisModule,
         UsageModule,
+        InstallSessionsModule,
         ReportsModule,
         ActionsModule,
         AssetDiscoveryModule,

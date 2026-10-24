@@ -67,3 +67,17 @@ ALTER TABLE install_session_hosts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE install_session_hosts FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON install_session_hosts
   USING (organization_id = pcp_current_org()) WITH CHECK (organization_id = pcp_current_org());
+
+-- ===== Part 3: tenant resolution for /install-sessions/:id (member of the session's organization) =====
+CREATE FUNCTION pcp_resolve_install_session(p_id uuid, p_user uuid)
+  RETURNS TABLE (organization_id uuid, product_id uuid)
+  LANGUAGE sql STABLE SECURITY DEFINER
+  SET search_path = public, pg_temp
+  AS $$
+    SELECT s.organization_id, s.product_id FROM install_sessions s
+    JOIN organization_members m ON m.organization_id = s.organization_id AND m.user_id = p_user
+    WHERE s.id = p_id
+  $$;
+ALTER FUNCTION pcp_resolve_install_session(uuid, uuid) OWNER TO pcp_rls_definer;
+REVOKE ALL ON FUNCTION pcp_resolve_install_session(uuid, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pcp_resolve_install_session(uuid, uuid) TO pcp_app;

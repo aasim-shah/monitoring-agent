@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-// Handler is the runner's internal API; only the control API calls it, with the internal token.
+// Handler is the runner's internal API; only the control API calls it, with X-Internal-Token.
 func Handler(m *Manager, token string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /sessions", func(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +45,7 @@ func Handler(m *Manager, token string) http.Handler {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+token)) != 1 {
+		if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Internal-Token")), []byte(token)) != 1 {
 			writeError(w, http.StatusUnauthorized, errors.New("unauthorized"))
 			return
 		}

@@ -1671,18 +1671,21 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/install-sessions": {
+    "/api/v1/environments/{environmentId}/install-sessions": {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Environment ID */
+                environmentId: components["parameters"]["environmentId"];
+            };
             cookie?: never;
         };
         get?: never;
         put?: never;
         /**
-         * Start assisted SSH install
-         * @description Start assisted SSH install.
+         * Start an assisted SSH install
+         * @description Creates a session with its own enrollment token (one use per host, 1 hour). In key mode the response carries the one-time public key and the command that adds it to a temporary pcp-install user. The token, the private key, and any password stay in the installer runner's memory (BR-05-01). At most 10 hosts. Requires `agent.enroll`.
          */
         post: operations["createInstallSession"];
         delete?: never;
@@ -1702,17 +1705,40 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Install session status and output (SSE)
-         * @description Install session status and output (SSE).
+         * Install session status and per-host output
+         * @description Status, fingerprints, redacted output, and cleanup result for each host. Poll every 2 s while it runs.
          */
         get: operations["getInstallSession"];
         put?: never;
         post?: never;
         /**
-         * Abort session and clean up
-         * @description Abort session and clean up.
+         * Abort the session
+         * @description The runner destroys the session key and any password; unfinished hosts are marked aborted and the token is revoked.
          */
         delete: operations["abortInstallSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/install-sessions/{id}/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connect to the hosts and read their host-key fingerprints
+         * @description Nothing runs on the hosts yet. In password mode the password goes to the runner's memory only, is used once, and is never stored or logged (UC-05-06).
+         */
+        post: operations["connectInstallSession"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1733,8 +1759,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirm host-key fingerprint
-         * @description Confirm host-key fingerprint.
+         * Confirm a host-key fingerprint and install
+         * @description The fingerprint must equal the one the host presented (BR-05-03); the runner then runs only the install script and the cleanup.
          */
         post: operations["confirmInstallFingerprint"];
         delete?: never;
@@ -4140,6 +4166,40 @@ export interface components {
                 downloadUrl: string;
                 installScriptUrl: string;
             };
+        };
+        InstallSession: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            mode: "key" | "password";
+            /** @enum {string} */
+            status: "awaiting_key" | "connecting" | "awaiting_confirmation" | "installing" | "completed" | "failed" | "aborted" | "expired";
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description Key mode only; shown at creation */
+            publicKey?: string | null;
+            /** @description Adds the key to a temporary pcp-install user; key mode only */
+            setupCommand?: string | null;
+            egressIps: string[];
+            hosts: {
+                /** Format: uuid */
+                id: string;
+                host: string;
+                port: number;
+                username: string;
+                fingerprint: string | null;
+                /** Format: date-time */
+                fingerprintConfirmedAt: string | null;
+                /** @enum {string} */
+                status: "pending" | "connecting" | "awaiting_confirmation" | "installing" | "installed" | "failed" | "aborted";
+                /** @description Redacted install output */
+                output: string;
+                /** @description SHA-256 of the install script that ran */
+                scriptVersion: string | null;
+                /** @enum {string|null} */
+                cleanup: "done" | "failed" | "not_needed" | null;
+                error: string | null;
+            }[];
         };
         AgentEnrollmentList: {
             enrollments: {
@@ -6906,14 +6966,50 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description Environment ID */
+                environmentId: components["parameters"]["environmentId"];
+            };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    mode: "key" | "password";
+                    hosts: {
+                        /** @description Hostname or IP address */
+                        host: string;
+                        /** @default 22 */
+                        port?: number;
+                        /** @description Required in password mode; key mode uses pcp-install */
+                        username?: string;
+                    }[];
+                };
+            };
+        };
         responses: {
-            201: components["responses"]["Created"];
+            /** @description Session created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallSession"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            /** @description The installer runner is not available */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getInstallSession: {
@@ -6928,7 +7024,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            200: components["responses"]["Ok"];
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallSession"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -6945,9 +7049,34 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            202: components["responses"]["Accepted"];
+            204: components["responses"]["NoContent"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    connectInstallSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    password?: string;
+                };
+            };
+        };
+        responses: {
+            202: components["responses"]["Accepted"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     confirmInstallFingerprint: {
@@ -6962,11 +7091,18 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    fingerprint: string;
+                };
+            };
+        };
         responses: {
-            204: components["responses"]["NoContent"];
+            202: components["responses"]["Accepted"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     agentEnroll: {

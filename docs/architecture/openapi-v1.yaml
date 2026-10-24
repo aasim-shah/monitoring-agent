@@ -2036,51 +2036,125 @@ paths:
         '200': { $ref: '#/components/responses/Ok' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /api/v1/install-sessions:
+  /api/v1/environments/{environmentId}/install-sessions:
+    parameters: [{ $ref: '#/components/parameters/environmentId' }]
     post:
       operationId: createInstallSession
       tags: [agents]
-      summary: Start assisted SSH install
-      description: Start assisted SSH install.
+      summary: Start an assisted SSH install
+      description: >-
+        Creates a session with its own enrollment token (one use per host, 1 hour). In key mode the response
+        carries the one-time public key and the command that adds it to a temporary pcp-install user. The
+        token, the private key, and any password stay in the installer runner's memory (BR-05-01). At most 10
+        hosts. Requires `agent.enroll`.
       security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode, hosts]
+              additionalProperties: false
+              properties:
+                mode: { type: string, enum: [key, password] }
+                hosts:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items:
+                    type: object
+                    required: [host]
+                    additionalProperties: false
+                    properties:
+                      host: { type: string, description: Hostname or IP address }
+                      port: { type: integer, minimum: 1, maximum: 65535, default: 22 }
+                      username:
+                        { type: string, description: 'Required in password mode; key mode uses pcp-install' }
       responses:
-        '201': { $ref: '#/components/responses/Created' }
+        '201':
+          description: Session created
+          content: { application/json: { schema: { $ref: '#/components/schemas/InstallSession' } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: The installer runner is not available
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+      x-implemented-in: M17
   /api/v1/install-sessions/{id}:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
       operationId: getInstallSession
       tags: [agents]
-      summary: Install session status and output (SSE)
-      description: Install session status and output (SSE).
+      summary: Install session status and per-host output
+      description: Status, fingerprints, redacted output, and cleanup result for each host. Poll every 2 s while it runs.
       security: [{ sessionCookie: [] }]
       responses:
-        '200': { $ref: '#/components/responses/Ok' }
+        '200':
+          description: Success
+          content: { application/json: { schema: { $ref: '#/components/schemas/InstallSession' } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M17
     delete:
       operationId: abortInstallSession
       tags: [agents]
-      summary: Abort session and clean up
-      description: Abort session and clean up.
-      security: [{ sessionCookie: [] }]
-      responses:
-        '202': { $ref: '#/components/responses/Accepted' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/v1/install-sessions/{id}/hosts/{hostId}/confirm-fingerprint:
-    parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/hostId' }]
-    post:
-      operationId: confirmInstallFingerprint
-      tags: [agents]
-      summary: Confirm host-key fingerprint
-      description: Confirm host-key fingerprint.
+      summary: Abort the session
+      description: The runner destroys the session key and any password; unfinished hosts are marked aborted and the token is revoked.
       security: [{ sessionCookie: [] }]
       responses:
         '204': { $ref: '#/components/responses/NoContent' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+      x-implemented-in: M17
+  /api/v1/install-sessions/{id}/connect:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: connectInstallSession
+      tags: [agents]
+      summary: Connect to the hosts and read their host-key fingerprints
+      description: Nothing runs on the hosts yet. In password mode the password goes to the runner's memory only, is used once, and is never stored or logged (UC-05-06).
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                password: { type: string }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M17
+  /api/v1/install-sessions/{id}/hosts/{hostId}/confirm-fingerprint:
+    parameters: [{ $ref: '#/components/parameters/id' }, { $ref: '#/components/parameters/hostId' }]
+    post:
+      operationId: confirmInstallFingerprint
+      tags: [agents]
+      summary: Confirm a host-key fingerprint and install
+      description: The fingerprint must equal the one the host presented (BR-05-03); the runner then runs only the install script and the cleanup.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fingerprint]
+              additionalProperties: false
+              properties:
+                fingerprint: { type: string }
+      responses:
+        '202': { $ref: '#/components/responses/Accepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+      x-implemented-in: M17
   /agent/v1/enroll:
     servers: [{ url: 'https://agent.example.com', description: Agent control channel (mTLS) }]
     post:
@@ -5112,6 +5186,55 @@ components:
             controlUrl: { type: string }
             downloadUrl: { type: string }
             installScriptUrl: { type: string }
+    InstallSession:
+      type: object
+      required: [id, mode, status, expiresAt, egressIps, hosts]
+      properties:
+        id: { type: string, format: uuid }
+        mode: { type: string, enum: [key, password] }
+        status:
+          type: string
+          enum:
+            [awaiting_key, connecting, awaiting_confirmation, installing, completed, failed, aborted, expired]
+        expiresAt: { type: string, format: date-time }
+        publicKey: { type: [string, 'null'], description: Key mode only; shown at creation }
+        setupCommand:
+          { type: [string, 'null'], description: Adds the key to a temporary pcp-install user; key mode only }
+        egressIps: { type: array, items: { type: string } }
+        hosts:
+          type: array
+          items:
+            type: object
+            required:
+              [
+                id,
+                host,
+                port,
+                username,
+                fingerprint,
+                fingerprintConfirmedAt,
+                status,
+                output,
+                scriptVersion,
+                cleanup,
+                error,
+              ]
+            properties:
+              id: { type: string, format: uuid }
+              host: { type: string }
+              port: { type: integer }
+              username: { type: string }
+              fingerprint: { type: [string, 'null'] }
+              fingerprintConfirmedAt: { type: [string, 'null'], format: date-time }
+              status:
+                {
+                  type: string,
+                  enum: [pending, connecting, awaiting_confirmation, installing, installed, failed, aborted],
+                }
+              output: { type: string, description: Redacted install output, at most 64 KB }
+              scriptVersion: { type: [string, 'null'], description: SHA-256 of the install script that ran }
+              cleanup: { type: [string, 'null'], enum: [done, failed, not_needed, null] }
+              error: { type: [string, 'null'] }
     AgentEnrollmentList:
       type: object
       required: [enrollments]

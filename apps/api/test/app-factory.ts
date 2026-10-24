@@ -9,7 +9,8 @@ import { AppModule } from '../src/app.module.js';
 import { loadConfig, type AppConfig } from '../src/config.js';
 import { MAILER } from '../src/modules/mail/mailer.js';
 import { GOOGLE_HTTP, type GoogleHttp } from '../src/modules/identity/google-login.service.js';
-import { CLOCK, PRISMA, DNS_RESOLVER, TXT_RESOLVER } from '../src/tokens.js';
+import { CLOCK, PRISMA, DNS_RESOLVER, INSTALLER_RUNNER, TXT_RESOLVER } from '../src/tokens.js';
+import type { InstallerRunner } from '../src/modules/install-sessions/runner.client.js';
 import { MemoryMailer } from './memory-mailer.js';
 
 export const MASTER_KEY = randomBytes(32).toString('base64');
@@ -34,6 +35,7 @@ export async function createTestApp(
     dns?: (hostname: string) => Promise<string[]>;
     /** DNS TXT records by name, for website domain verification. */
     txt?: (name: string) => Promise<string[][]>;
+    installerRunner?: InstallerRunner;
   } = {},
 ): Promise<TestApp> {
   const env = {
@@ -55,6 +57,8 @@ export async function createTestApp(
   if (opts.clock) builder = builder.overrideProvider(CLOCK).useValue(opts.clock);
   if (opts.dns) builder = builder.overrideProvider(DNS_RESOLVER).useValue(opts.dns);
   if (opts.txt) builder = builder.overrideProvider(TXT_RESOLVER).useValue(opts.txt);
+  if (opts.installerRunner)
+    builder = builder.overrideProvider(INSTALLER_RUNNER).useValue(opts.installerRunner);
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<NestFastifyApplication>(
     new FastifyAdapter({ trustProxy: true }),

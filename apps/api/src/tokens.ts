@@ -11,3 +11,6 @@ export const DNS_RESOLVER = Symbol('DNS_RESOLVER');
 
 /** DNS TXT lookups (website domain verification); tests replace it. */
 export const TXT_RESOLVER = Symbol('TXT_RESOLVER');
+
+/** The installer runner client (M17.3); tests replace it with a fake. */
+export const INSTALLER_RUNNER = Symbol('INSTALLER_RUNNER');
