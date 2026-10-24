@@ -1,0 +1,24 @@
+# Long-term rollups (master plan M18.4): every 5 minutes vmalert-rollups records 5-minute aggregates of the
+# dashboard series into victoriametrics-longterm (13 months), keeping each series' labels (tenant_id,
+# product_id, agent_id, ...) and name, so the dashboard queries run unchanged on either store.
+groups:
+  - name: rollups-5m
+    interval: 5m
+    rules:
+      # Host charts (gauges: average over the 5 minutes).
+      - record: system_cpu_utilization_ratio
+        expr: avg_over_time(system_cpu_utilization_ratio[5m])
+      - record: system_memory_utilization_ratio
+        expr: avg_over_time(system_memory_utilization_ratio[5m])
+      - record: system_filesystem_utilization_ratio
+        expr: avg_over_time(system_filesystem_utilization_ratio[5m])
+      # Counters keep their last value so rate() still works on the rollups.
+      - record: system_network_io_bytes_total
+        expr: last_over_time(system_network_io_bytes_total[5m])
+      - record: log_lines_total
+        expr: last_over_time(log_lines_total[5m])
+      # Website monitors.
+      - record: website_up
+        expr: avg_over_time(website_up[5m])
+      - record: website_response_seconds
+        expr: avg_over_time(website_response_seconds[5m])

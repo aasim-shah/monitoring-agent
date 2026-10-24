@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planRange, toGrid } from './limits.js';
+import { planRange, toGrid, widenWindows } from './limits.js';
 
 const now = new Date('2026-10-22T12:00:00Z');
 const ago = (s: number) => new Date(now.getTime() - s * 1000);
@@ -57,5 +57,34 @@ describe('toGrid (BR-04-07)', () => {
 
   it('maps NaN to null', () => {
     expect(toGrid([[0, 'NaN']], 0, 0, 60)).toEqual([[0, null]]);
+  });
+});
+
+describe('long-term rollups (M18.4)', () => {
+  const rollupsSince = ago(10 * 86400);
+
+  it('reads rollups for ranges that start before raw retention, at a 5-minute step or coarser', () => {
+    const plan = planRange(ago(90 * 86400), now, 60, now, { since: ago(400 * 86400) });
+    expect(plan.source).toBe('longterm');
+    expect(plan.stepSeconds).toBeGreaterThanOrEqual(300);
+    expect(plan.gaps).toEqual([]);
+  });
+
+  it('Review Focus #3: a 90-day query when rollups began 10 days ago is partial and says from when', () => {
+    const plan = planRange(ago(90 * 86400), now, 3600, now, { since: rollupsSince });
+    expect(plan.source).toBe('longterm');
+    expect(plan.gaps).toEqual([`rollups: 5-minute data starts ${rollupsSince.toISOString()}`]);
+  });
+
+  it('keeps raw data for recent ranges, and raw retention gaps when rollups are off', () => {
+    expect(planRange(ago(3600), now, 60, now, { since: rollupsSince }).source).toBe('raw');
+    expect(planRange(ago(90 * 86400), now, 3600, now).source).toBe('raw');
+  });
+
+  it('widens rate windows so 5-minute rollup samples still yield a rate', () => {
+    expect(widenWindows('sum(rate(x_total[5m])) + rate(y[1m])', 900)).toBe(
+      'sum(rate(x_total[15m])) + rate(y[15m])',
+    );
+    expect(widenWindows('rate(x[1h])', 900)).toBe('rate(x[1h])');
   });
 });

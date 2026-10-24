@@ -8,6 +8,9 @@ export const RANGES = {
   '6h': { seconds: 6 * 3600, step: 300 },
   '24h': { seconds: 86400, step: 900 },
   '7d': { seconds: 7 * 86400, step: 3600 },
+  // Beyond raw retention (15 days) these read the 5-minute rollups when they are on (M18.4).
+  '30d': { seconds: 30 * 86400, step: 3 * 3600 },
+  '90d': { seconds: 90 * 86400, step: 6 * 3600 },
 } as const;
 export type RangeKey = keyof typeof RANGES;
 

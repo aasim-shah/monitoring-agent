@@ -18,7 +18,8 @@ import { roleCan } from '@/lib/permissions';
 import { useOrganization } from '@/lib/queries';
 import { useApiQuery } from '@/lib/use-api-query';
 
-const RANGES = ['15m', '1h', '6h', '24h', '7d'] as const;
+// 30d and 90d read the 5-minute rollups when they are on (M18.4).
+const RANGES = ['15m', '1h', '6h', '24h', '7d', '30d', '90d'] as const;
 type Range = (typeof RANGES)[number];
 
 /** The API's MetricPoint is a [time, value | null] pair; OpenAPI types it as a plain array. */
@@ -41,7 +42,7 @@ export default function HostMetricsPage() {
     { refetchInterval: range === '15m' || range === '1h' ? 30_000 : 120_000 },
   );
   const m = metrics.data;
-  const multiDay = range === '24h' || range === '7d';
+  const multiDay = range === '24h' || range === '7d' || range === '30d' || range === '90d';
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -131,7 +132,8 @@ export default function HostMetricsPage() {
           canManage={roleCan(role, 'pack.manage')}
           canInspect={roleCan(role, 'data.inspect')}
           canConfigureInspection={roleCan(role, 'data.inspect.configure')}
-          range={range}
+          // Pack series are not rolled up; service charts stop at 7 days.
+          range={range === '30d' || range === '90d' ? '7d' : range}
         />
       ) : null}
       {agent.data ? <LogsSection agentId={agentId} canTail={roleCan(role, 'logs.tail')} /> : null}

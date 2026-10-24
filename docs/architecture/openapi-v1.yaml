@@ -1604,7 +1604,7 @@ paths:
             name: range,
             in: query,
             required: false,
-            schema: { type: string, enum: ['15m', '1h', '6h', '24h', '7d'], default: '1h' },
+            schema: { type: string, enum: ['15m', '1h', '6h', '24h', '7d', '30d', '90d'], default: '1h' },
           }
       responses:
         '200':

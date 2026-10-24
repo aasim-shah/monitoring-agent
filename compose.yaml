@@ -118,6 +118,9 @@ services:
       # Assisted SSH install (M17.3): the runner, and the egress IPs customers allowlist for it.
       INSTALLER_RUNNER_URL: http://installer-runner:8090
       INSTALLER_EGRESS_IPS: ${INSTALLER_EGRESS_IPS:-}
+      # Long-term rollups (M18.4): both set to turn routing on (the `rollups` profile must run).
+      VM_LONGTERM_URL: ${VM_LONGTERM_URL:-}
+      ROLLUPS_SINCE: ${ROLLUPS_SINCE:-}
       AGENT_INGEST_URL: ${AGENT_INGEST_URL:-}
       AGENT_OPAMP_URL: ${AGENT_OPAMP_URL:-}
     volumes: ['alert-rules:/var/lib/pcp/alert-rules']
@@ -258,6 +261,48 @@ services:
       retries: 12
     restart: unless-stopped
 
+  # Long-term rollups (M18.4), off unless the `rollups` profile is started: 5-minute aggregates kept
+  # 13 months. The api reads them for ranges older than raw retention when ROLLUPS_SINCE is set.
+  victoriametrics-longterm:
+    profiles: [rollups]
+    image: victoriametrics/victoria-metrics:v1.126.0
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=13
+      - -httpListenAddr=:8428
+    volumes: [vm-longterm-data:/storage]
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8428/health']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy: { resources: { limits: { memory: 128m } } }
+    restart: unless-stopped
+
+  vmalert-rollups:
+    profiles: [rollups]
+    image: victoriametrics/vmalert:v1.126.0
+    command:
+      - -datasource.url=http://victoriametrics:8428
+      - -remoteWrite.url=http://victoriametrics-longterm:8428
+      - -rule=/etc/vmalert/rollups/*.yaml
+      - -evaluationInterval=5m
+      - -httpListenAddr=:8881
+    volumes:
+      - ./infrastructure/telemetry/rollups:/etc/vmalert/rollups:ro
+    networks: [internal]
+    depends_on:
+      victoriametrics: { condition: service_healthy }
+      victoriametrics-longterm: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8881/health']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy: { resources: { limits: { memory: 64m } } }
+    restart: unless-stopped
+
   opamp-server:
     build: { context: ., dockerfile: apps/opamp-server/Dockerfile }
     environment:
@@ -336,3 +381,4 @@ volumes:
   pg-data: {}
   redis-data: {}
   vm-data: {}
+  vm-longterm-data: {}

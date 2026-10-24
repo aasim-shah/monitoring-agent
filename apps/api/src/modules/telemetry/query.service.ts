@@ -3,7 +3,7 @@ import type { MetricQuery, MetricResult, TenantContext } from '@pcp/shared-contr
 import type { AppConfig } from '../../config.js';
 import { ApiException } from '../../common/errors.js';
 import { APP_CONFIG, CLOCK } from '../../tokens.js';
-import { MAX_SERIES, QUERY_TIMEOUT_MS, planRange, toGrid } from './limits.js';
+import { MAX_SERIES, QUERY_TIMEOUT_MS, planRange, toGrid, widenWindows } from './limits.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,12 +42,11 @@ export class TelemetryQueryService {
     });
   }
 
-  private async call<T>(path: string, params: URLSearchParams): Promise<T[]> {
-    if (!this.config.vmQueryUrl)
-      throw new ApiException(503, 'telemetry_unavailable', 'Telemetry storage is not configured');
+  private async call<T>(path: string, params: URLSearchParams, base = this.config.vmQueryUrl): Promise<T[]> {
+    if (!base) throw new ApiException(503, 'telemetry_unavailable', 'Telemetry storage is not configured');
     let res: Response;
     try {
-      res = await fetch(`${this.config.vmQueryUrl}${path}?${params}`, {
+      res = await fetch(`${base}${path}?${params}`, {
         signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
       });
     } catch {
@@ -70,18 +69,20 @@ export class TelemetryQueryService {
   async query(ctx: TenantContext, q: MetricQuery, scope: QueryScope): Promise<MetricResult> {
     let plan;
     try {
-      plan = planRange(new Date(q.start), new Date(q.end), q.stepSeconds, this.now());
+      plan = planRange(new Date(q.start), new Date(q.end), q.stepSeconds, this.now(), this.config.rollups);
     } catch (err) {
       throw new ApiException(400, 'invalid_range', (err as Error).message);
     }
     const params = this.params(ctx, scope);
-    params.set('query', q.promql);
+    const longterm = plan.source === 'longterm';
+    params.set('query', longterm ? widenWindows(q.promql, plan.stepSeconds) : q.promql);
     params.set('start', String(plan.startS));
     params.set('end', String(plan.endS));
     params.set('step', `${plan.stepSeconds}s`);
     const result = await this.call<{ metric: Record<string, string>; values: Array<[number, string]> }>(
       '/api/v1/query_range',
       params,
+      longterm ? this.config.rollups!.url : this.config.vmQueryUrl,
     );
     return {
       series: result.map((r) => ({

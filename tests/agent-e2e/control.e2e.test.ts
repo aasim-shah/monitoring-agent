@@ -503,6 +503,36 @@ describe('service discovery and monitoring packs (M6b exit gate)', () => {
       90_000,
     );
 
+    // M18.2 data inspection: off until the owner turns it on, then stats and the allowlisted key's
+    // length from the real Redis, and no value leaves the host (TC-12-06).
+    await inHost(
+      'redis-cli DEL jobs >/dev/null; redis-cli RPUSH jobs secret-payload-a secret-payload-b secret-payload-c >/dev/null',
+    );
+    const inspectUrl = `/api/v1/agents/${agentId}/inspections`;
+    expect((await api('POST', inspectUrl, { packId: 'redis', target: 'redis' })).json.code).toBe(
+      'inspection_disabled',
+    );
+    expect(
+      (
+        await api('PATCH', `/api/v1/agents/${agentId}/packs/redis/inspection`, {
+          enabled: true,
+          redisKeys: ['jobs'],
+        })
+      ).status,
+    ).toBe(200);
+    const inspection = await api('POST', inspectUrl, { packId: 'redis', target: 'redis' });
+    expect(inspection.status, JSON.stringify(inspection.json)).toBe(202);
+    const inspected = await until('redis inspection', async () => {
+      const r = (await api('GET', `/api/v1/inspections/${inspection.json.id}`)).json;
+      if (r.status === 'failed') throw new Error(`inspection failed: ${r.error}`);
+      return r.status === 'succeeded' ? r : undefined;
+    });
+    expect(inspected.result.dbSize).toBeGreaterThanOrEqual(1);
+    expect(inspected.result.keys).toEqual([
+      expect.objectContaining({ key: 'jobs', type: 'list', length: 3 }),
+    ]);
+    expect(JSON.stringify(inspected)).not.toContain('secret-payload');
+
     // Disabling removes the receiver; the assignment disappears after the agent acknowledges.
     expect((await api('DELETE', `/api/v1/agents/${agentId}/packs/redis`)).status).toBe(202);
     await until('redis pack removed', async () => {
