@@ -28,6 +28,8 @@ func (m *Manager) dial(s *Session, h HostSpec, checkKey func(ssh.PublicKey) erro
 		User:    h.Username,
 		Auth:    auth,
 		Timeout: m.dialTimeout,
+		// The dashboard asks the admin to compare the ed25519 key's fingerprint.
+		HostKeyAlgorithms: []string{ssh.KeyAlgoED25519, ssh.KeyAlgoECDSA256, ssh.KeyAlgoRSASHA256},
 		HostKeyCallback: func(_ string, _ net.Addr, k ssh.PublicKey) error {
 			return checkKey(k)
 		},
