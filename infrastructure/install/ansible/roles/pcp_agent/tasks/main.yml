@@ -1,0 +1,37 @@
+---
+# UC-05-02: wraps the same install.sh as the one-liner. Idempotent: an enrolled host is left as it is.
+- name: Check whether this host is already enrolled
+  ansible.builtin.stat:
+    path: /var/lib/pcp-agent/state.json
+  register: pcp_agent_state
+
+- name: Install and enroll the agent
+  when: not pcp_agent_state.stat.exists
+  block:
+    - name: Check the required variables
+      ansible.builtin.assert:
+        that:
+          - pcp_agent_token | length > 0
+          - pcp_agent_control_url | length > 0
+          - pcp_agent_download_url | length > 0
+        fail_msg: Set pcp_agent_token (from Ansible Vault), pcp_agent_control_url, and pcp_agent_download_url.
+        quiet: true
+
+    - name: Download install.sh
+      ansible.builtin.get_url:
+        url: "{{ pcp_agent_install_script_url }}"
+        dest: /root/pcp-install.sh
+        mode: '0700'
+
+    - name: Run install.sh
+      ansible.builtin.command:
+        argv: "{{ ['bash', '/root/pcp-install.sh', '--token', pcp_agent_token, '--control-url', pcp_agent_control_url, '--download-url', pcp_agent_download_url] + pcp_agent_extra_args }}"
+        creates: /var/lib/pcp-agent/state.json
+      # The enrollment token is a secret.
+      no_log: true
+
+  always:
+    - name: Remove install.sh
+      ansible.builtin.file:
+        path: /root/pcp-install.sh
+        state: absent

@@ -1,0 +1,5 @@
+#cloud-config
+# UC-05-03: new servers enroll on first boot. Replace the three values; the dashboard renders this
+# for you (Agents → Add server → cloud-init). The token must not expire before the servers boot.
+runcmd:
+  - curl -fsSL @@INSTALL_SCRIPT_URL@@ | bash -s -- --token @@TOKEN@@ --control-url @@CONTROL_URL@@ --download-url @@DOWNLOAD_URL@@

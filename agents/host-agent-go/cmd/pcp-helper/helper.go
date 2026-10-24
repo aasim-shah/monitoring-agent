@@ -9,8 +9,8 @@ import (
 	"slices"
 	"time"
 
-	"pcp.local/hostagent/internal/control"
 	proto "pcp.local/agentprotocol"
+	"pcp.local/hostagent/internal/control"
 )
 
 // unitName matches a systemd service unit: no paths, spaces, or shell characters (BR-16-09).

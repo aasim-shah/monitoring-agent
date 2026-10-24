@@ -14,7 +14,12 @@ export interface Run {
 
 // Asynchronous on purpose: a synchronous spawn blocks the Vitest worker for minutes during
 // `compose up --build`, which times out the worker's RPC channel.
-export function run(cmd: string, args: string[], env: Record<string, string> = {}): Promise<Run> {
+export function run(
+  cmd: string,
+  args: string[],
+  env: Record<string, string> = {},
+  input?: string,
+): Promise<Run> {
   // Start from a minimal environment so a developer's shell or .env never leaks into the test.
   const base: Record<string, string> = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' };
   if (process.env.DOCKER_HOST) base.DOCKER_HOST = process.env.DOCKER_HOST;
@@ -25,6 +30,7 @@ export function run(cmd: string, args: string[], env: Record<string, string> = {
     child.stdout.on('data', (d: Buffer) => (stdout += d.toString()));
     child.stderr.on('data', (d: Buffer) => (stderr += d.toString()));
     child.on('error', reject);
+    if (input !== undefined) child.stdin.end(input);
     child.on('close', (code) => resolve({ status: code ?? -1, stdout, stderr }));
   });
 }

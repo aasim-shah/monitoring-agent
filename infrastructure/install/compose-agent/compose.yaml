@@ -1,0 +1,33 @@
+# UC-05-04: the host agent on a Docker host.
+#   PCP_TOKEN=... PCP_CONTROL_URL=... PCP_DOWNLOAD_URL=... docker compose up -d --build
+# The host is read through read-only mounts: / at /hostfs (hostmetrics root_path), the host's
+# process table (pid: host) for service discovery, and its network namespace so packs reach
+# services on 127.0.0.1. The Docker socket is not mounted. No port is published.
+services:
+  pcp-agent:
+    build:
+      context: .
+      args:
+        PCP_DOWNLOAD_URL: ${PCP_DOWNLOAD_URL:?set PCP_DOWNLOAD_URL}
+    image: pcp-agent-compose:latest
+    environment:
+      PCP_TOKEN: ${PCP_TOKEN:-}
+      PCP_CONTROL_URL: ${PCP_CONTROL_URL:?set PCP_CONTROL_URL}
+      PCP_HOST_ROOT: /hostfs
+    pid: host
+    network_mode: host
+    uts: host
+    volumes:
+      - /:/hostfs:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - /etc/os-release:/etc/os-release:ro
+      - pcp-agent:/var/lib/pcp-agent
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    deploy: { resources: { limits: { memory: 256m } } }
+    restart: unless-stopped
+
+volumes:
+  pcp-agent:

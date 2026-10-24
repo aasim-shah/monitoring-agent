@@ -48,9 +48,17 @@ RUN awk 'FILENAME == ARGV[1] { unit = unit $0 "\n"; next } FILENAME == ARGV[2] {
          /^@@UNIT@@$/ { printf "%s", unit; next } /^@@HELPER_UNIT@@$/ { printf "%s", helper; next } { print }' \
       /in/pcp-agent.service /in/pcp-helper.service /in/install.sh > /install.sh && chmod 0644 /install.sh && ! grep -q '@@' /install.sh
 
+# Fleet tooling (M17.2): /downloads/install/pcp_agent-role.tar.gz and compose-agent.tar.gz.
+FROM --platform=$BUILDPLATFORM alpine:3.22 AS fleet
+COPY infrastructure/install /in
+RUN mkdir -p /out && tar -C /in/ansible/roles -czf /out/pcp_agent-role.tar.gz pcp_agent \
+    && tar -C /in -czf /out/compose-agent.tar.gz compose-agent \
+    && cp /in/cloud-init/user-data.yaml.tmpl /out/
+
 # The `downloads` service: /install.sh and /downloads/<tarballs, SHA256SUMS, VERSION>.
 FROM caddy:2.10.2-alpine AS downloads
 COPY --from=package /dist /srv/downloads
 COPY --from=installer /install.sh /srv/install.sh
+COPY --from=fleet /out /srv/downloads/install
 COPY agents/release/Caddyfile /etc/caddy/Caddyfile
 EXPOSE 8080

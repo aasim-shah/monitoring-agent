@@ -106,7 +106,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await run('docker', ['rm', '-f', HOST]);
+  await run('docker', ['rm', '-f', HOST, ...FLEET, COMPOSE_AGENT, ...ASSISTED]);
   if (file) await compose(['down', '-v', '--remove-orphans']);
 });
 
@@ -205,6 +205,60 @@ describe('agent control channel through Caddy mTLS (M5 exit gate)', () => {
 });
 
 const inHost = (script: string) => run('docker', ['exec', HOST, 'bash', '-c', script]);
+const FLEET = ['pcp-fleet-1', 'pcp-fleet-2', 'pcp-fleet-3'];
+const COMPOSE_AGENT = 'pcp-compose-agent';
+const ASSISTED = ['pcp-assisted-1', 'pcp-assisted-2'];
+
+/** A disposable systemd host on the edge network that resolves the dev hostnames to Caddy. */
+async function systemdHost(name: string, hostname: string) {
+  const image = await run('docker', [
+    'build',
+    '-q',
+    '-t',
+    'pcp-systemd-ubuntu:24.04',
+    '-f',
+    'tests/agent-e2e/systemd-ubuntu.Dockerfile',
+    'tests/agent-e2e',
+  ]);
+  expect(image.status, image.stderr).toBe(0);
+  await run('docker', ['rm', '-f', name]);
+  const started = await run('docker', [
+    'run',
+    '-d',
+    '--name',
+    name,
+    '--hostname',
+    hostname,
+    '--privileged',
+    '--cgroupns=host',
+    '-v',
+    '/sys/fs/cgroup:/sys/fs/cgroup:rw',
+    '--network',
+    `${PROJECT}_edge`,
+    '--add-host',
+    `agent.localhost:${CADDY}`,
+    '--add-host',
+    `ingest.localhost:${CADDY}`,
+    'pcp-systemd-ubuntu:24.04',
+  ]);
+  expect(started.status, started.stderr).toBe(0);
+  await until(`systemd in ${name}`, async () =>
+    (
+      await run('docker', [
+        'exec',
+        name,
+        'bash',
+        '-c',
+        'systemctl is-system-running --wait >/dev/null 2>&1; systemctl list-units >/dev/null && echo ok',
+      ])
+    ).stdout.includes('ok')
+      ? true
+      : undefined,
+  );
+  expect(
+    (await run('docker', ['cp', join(work, 'caddy-root.crt'), `${name}:/root/caddy-root.crt`])).status,
+  ).toBe(0);
+}
 
 describe('install.sh on a systemd host (M6a exit gate)', () => {
   it('installs, enrolls, and ships host metrics; upgrades in place; uninstalls cleanly', async () => {
@@ -891,5 +945,286 @@ describe('approved service restart through pcp-helper (M16 exit gate)', () => {
       180_000,
     );
     expect(refused.reason).toBe('ghost.service is not in the helper allowlist (/etc/pcp-agent/helper.yaml)');
+  });
+});
+
+describe('fleet tooling (M17.2 exit gate)', () => {
+  it('TC-05-04: the Ansible role enrolls 3 hosts over SSH, and a second run changes nothing', async () => {
+    await Promise.all(FLEET.map((name, i) => systemdHost(name, `fleet-${i + 1}`)));
+    const keyFile = join(work, 'ansible_ed25519');
+    const keygen = await run('ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', keyFile]);
+    expect(keygen.status, keygen.stderr).toBe(0);
+    for (const name of FLEET) {
+      expect((await run('docker', ['cp', `${keyFile}.pub`, `${name}:/root/ansible.pub`])).status).toBe(0);
+      const ssh = await run('docker', [
+        'exec',
+        name,
+        'bash',
+        '-c',
+        'install -d -m 700 /root/.ssh && cat /root/ansible.pub >> /root/.ssh/authorized_keys && systemctl start ssh',
+      ]);
+      expect(ssh.status, ssh.stderr).toBe(0);
+    }
+    const e = await api('POST', `/api/v1/environments/${environmentId}/agent-enrollments`, { maxUses: 3 });
+    expect(e.status).toBe(201);
+    const install = e.json.install as Json;
+    mkdirSync(join(work, 'ansible'), { recursive: true });
+    writeFileSync(
+      join(work, 'ansible', 'inventory'),
+      `[fleet]\n${FLEET.join('\n')}\n\n[fleet:vars]\nansible_user=root\nansible_ssh_private_key_file=/work/ansible_ed25519\nansible_ssh_common_args=-o StrictHostKeyChecking=no\nansible_python_interpreter=/usr/bin/python3\n`,
+    );
+    writeFileSync(join(work, 'ansible', 'vault.yml'), `vault_pcp_fleet_token: ${install.token}\n`);
+    writeFileSync(
+      join(work, 'ansible', 'site.yml'),
+      [
+        '- hosts: fleet',
+        '  become: true',
+        '  vars_files: [vault.yml]',
+        '  roles:',
+        '    - role: pcp_agent',
+        '      pcp_agent_token: "{{ vault_pcp_fleet_token }}"',
+        '      pcp_agent_control_url: https://agent.localhost',
+        `      pcp_agent_download_url: http://${CADDY}/downloads`,
+        "      pcp_agent_extra_args: ['--ca-file', '/root/caddy-root.crt']",
+        '',
+      ].join('\n'),
+    );
+    chmodSync(keyFile, 0o600);
+    const controller = await run(
+      'docker',
+      ['build', '-q', '-t', 'pcp-ansible-controller', '-'],
+      {},
+      'FROM python:3.12.12-slim\nRUN apt-get update && apt-get install -y --no-install-recommends openssh-client && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir ansible-core==2.17.14\n',
+    );
+    expect(controller.status, controller.stderr).toBe(0);
+    const playbook = () =>
+      run('docker', [
+        'run',
+        '--rm',
+        '--network',
+        `${PROJECT}_edge`,
+        '-v',
+        `${work}:/work`,
+        '-v',
+        `${join(repoRoot, 'infrastructure/install/ansible/roles')}:/work/ansible/roles:ro`,
+        '-w',
+        '/work/ansible',
+        '-e',
+        'ANSIBLE_HOST_KEY_CHECKING=False',
+        'pcp-ansible-controller',
+        'ansible-playbook',
+        '-i',
+        'inventory',
+        'site.yml',
+      ]);
+    const first = await playbook();
+    writeFileSync(join(work, 'ansible-1.log'), first.stdout + first.stderr);
+    expect(first.status, first.stdout.slice(-3000)).toBe(0);
+    expect(first.stdout).not.toContain(install.token);
+    const agents = await until('3 fleet agents', async () => {
+      const list = (await api('GET', `/api/v1/products/${productId}/agents`)).json.agents as Json[];
+      const fleet = list.filter((a) => /^fleet-\d$/.test(a.hostname) && a.lastHeartbeatAt);
+      return fleet.length === 3 ? fleet : undefined;
+    });
+    expect(agents.map((a) => a.hostname).sort()).toEqual(['fleet-1', 'fleet-2', 'fleet-3']);
+    const second = await playbook();
+    writeFileSync(join(work, 'ansible-2.log'), second.stdout + second.stderr);
+    expect(second.status, second.stdout.slice(-3000)).toBe(0);
+    for (const name of FLEET) expect(second.stdout).toMatch(new RegExp(`${name}\\s+: ok=\\d+\\s+changed=0 `));
+  });
+
+  it('UC-05-04: the Compose agent image enrolls from a verified tarball and reads host metrics under /hostfs', async () => {
+    const e = await api('POST', `/api/v1/environments/${environmentId}/agent-enrollments`, {});
+    expect(e.status).toBe(201);
+    const install = e.json.install as Json;
+    // BuildKit can reach the published Caddy port only through the host network.
+    const build = await run('docker', [
+      'build',
+      '-q',
+      '--network',
+      'host',
+      '--build-arg',
+      `PCP_DOWNLOAD_URL=http://127.0.0.1:${HTTP_PORT}/downloads`,
+      '-t',
+      'pcp-agent-compose:e2e',
+      'infrastructure/install/compose-agent',
+    ]);
+    expect(build.status, build.stderr).toBe(0);
+    // A fresh identity: a volume left by an earlier run holds a certificate from another stack's CA.
+    await run('docker', ['rm', '-f', COMPOSE_AGENT]);
+    await run('docker', ['volume', 'rm', '-f', 'pcp-compose-agent-state']);
+    const started = await run('docker', [
+      'run',
+      '-d',
+      '--name',
+      COMPOSE_AGENT,
+      '--hostname',
+      'compose-host',
+      '--network',
+      `${PROJECT}_edge`,
+      '--add-host',
+      `agent.localhost:${CADDY}`,
+      '--add-host',
+      `ingest.localhost:${CADDY}`,
+      '--pid',
+      'host',
+      '--read-only',
+      '--tmpfs',
+      '/tmp',
+      '--cap-drop',
+      'ALL',
+      '--security-opt',
+      'no-new-privileges:true',
+      '-v',
+      '/:/hostfs:ro',
+      '-v',
+      `${join(work, 'caddy-root.crt')}:/etc/pcp-ca.crt:ro`,
+      '-v',
+      'pcp-compose-agent-state:/var/lib/pcp-agent',
+      '-e',
+      `PCP_TOKEN=${install.token}`,
+      '-e',
+      'PCP_CONTROL_URL=https://agent.localhost',
+      '-e',
+      'PCP_CA_FILE=/etc/pcp-ca.crt',
+      '-e',
+      'PCP_HOST_ROOT=/hostfs',
+      'pcp-agent-compose:e2e',
+    ]);
+    expect(started.status, started.stderr).toBe(0);
+    const host = await until(
+      'compose agent host metrics',
+      async () => {
+        const hosts = (await api('GET', `/api/v1/products/${productId}/infrastructure`)).json.hosts as Json[];
+        return hosts.find((h) => h.hostname === 'compose-host' && h.cpuPercent !== null);
+      },
+      180_000,
+    ).catch(async (err) => {
+      writeFileSync(join(work, 'compose-agent.log'), (await run('docker', ['logs', COMPOSE_AGENT])).stderr);
+      throw err;
+    });
+    expect(host.memoryPercent).not.toBeNull();
+    const config = await run('docker', ['exec', COMPOSE_AGENT, 'pcp-agentctl', 'collector-config']);
+    expect(config.stdout).toMatch(/"root_path": *"\/hostfs"/);
+    await run('docker', ['rm', '-f', COMPOSE_AGENT]);
+    await run('docker', ['volume', 'rm', 'pcp-compose-agent-state']);
+  });
+});
+
+describe('assisted SSH install (M17.3 exit gate)', () => {
+  const inBox = (name: string, script: string) => run('docker', ['exec', name, 'bash', '-c', script]);
+  /** The host reaches the app origin (localhost:HTTP_PORT) through Caddy and trusts Caddy's dev root. */
+  async function target(name: string, hostname: string) {
+    await systemdHost(name, hostname);
+    const prep = await inBox(
+      name,
+      `cp /root/caddy-root.crt /usr/local/share/ca-certificates/pcp-dev.crt && update-ca-certificates >/dev/null &&
+       systemd-run --unit pcp-origin socat TCP-LISTEN:${HTTP_PORT},fork,reuseaddr,bind=127.0.0.1 TCP:${CADDY}:80 &&
+       systemctl start ssh`,
+    );
+    expect(prep.status, prep.stderr).toBe(0);
+  }
+  const session = async (id: string) => (await api('GET', `/api/v1/install-sessions/${id}`)).json;
+  const hostIs = (id: string, status: string) =>
+    until(
+      `install host ${status}`,
+      async () => {
+        const s = await session(id);
+        const h = (s.hosts as Json[])[0]!;
+        if (h.status === 'failed' && status !== 'failed')
+          throw new Error(`host failed: ${h.error}\n${h.output}`);
+        return h.status === status && (status !== 'installed' || h.cleanup) ? s : undefined;
+      },
+      300_000,
+    );
+
+  it('TC-05-06/07: installs after the fingerprint is confirmed, then removes the pcp-install user and key', async () => {
+    await target(ASSISTED[0]!, 'assisted-1');
+    const created = await api('POST', `/api/v1/environments/${environmentId}/install-sessions`, {
+      mode: 'key',
+      hosts: [{ host: ASSISTED[0] }],
+    });
+    expect(created.status, JSON.stringify(created.json)).toBe(201);
+    const s = created.json;
+    const setup = await inBox(ASSISTED[0]!, s.setupCommand);
+    expect(setup.status, setup.stderr).toBe(0);
+    expect((await api('POST', `/api/v1/install-sessions/${s.id}/connect`, {})).status).toBe(202);
+    const awaiting = await hostIs(s.id, 'awaiting_confirmation');
+    const fp = (
+      await inBox(ASSISTED[0]!, "ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub | awk '{print $2}'")
+    ).stdout.trim();
+    expect(awaiting.hosts[0].fingerprint).toBe(fp);
+    // Nothing ran before confirmation: no agent on the host yet.
+    expect((await inBox(ASSISTED[0]!, 'test -e /usr/local/bin/pcp-agentctl; echo $?')).stdout.trim()).toBe(
+      '1',
+    );
+    const host = awaiting.hosts[0];
+    expect(
+      (
+        await api('POST', `/api/v1/install-sessions/${s.id}/hosts/${host.id}/confirm-fingerprint`, {
+          fingerprint: fp,
+        })
+      ).status,
+    ).toBe(202);
+    const done = await hostIs(s.id, 'installed');
+    writeFileSync(join(work, 'assisted-1.log'), JSON.stringify(done, null, 2));
+    expect(done.status).toBe('completed');
+    expect(done.hosts[0]).toMatchObject({ cleanup: 'done', error: null });
+    expect(done.hosts[0].scriptVersion).toMatch(/^[0-9a-f]{64}$/);
+    expect(done.hosts[0].output).not.toMatch(/pcp_enr_/);
+    expect((await inBox(ASSISTED[0]!, 'systemctl is-active pcp-agent')).stdout.trim()).toBe('active');
+    await until('assisted agent', async () => {
+      const list = (await api('GET', `/api/v1/products/${productId}/agents`)).json.agents as Json[];
+      return list.find((a) => a.hostname === 'assisted-1' && a.lastHeartbeatAt);
+    });
+    const gone = await inBox(
+      ASSISTED[0]!,
+      'sleep 3; id pcp-install >/dev/null 2>&1; echo $?; test -e /etc/sudoers.d/pcp-install; echo $?; test -e /home/pcp-install; echo $?',
+    );
+    expect(gone.stdout.split('\n').filter(Boolean)).toEqual(['1', '1', '1']);
+  });
+
+  it('TC-05-09: password mode installs and the password is nowhere afterwards', async () => {
+    const PASSWORD = 'Pw-e2e-Secret-7731';
+    await target(ASSISTED[1]!, 'assisted-2');
+    const user = await inBox(
+      ASSISTED[1]!,
+      `useradd -m -s /bin/bash admin && echo 'admin:${PASSWORD}' | chpasswd && usermod -aG sudo admin`,
+    );
+    expect(user.status, user.stderr).toBe(0);
+    const s = (
+      await api('POST', `/api/v1/environments/${environmentId}/install-sessions`, {
+        mode: 'password',
+        hosts: [{ host: ASSISTED[1], username: 'admin' }],
+      })
+    ).json;
+    expect(
+      (await api('POST', `/api/v1/install-sessions/${s.id}/connect`, { password: PASSWORD })).status,
+    ).toBe(202);
+    const awaiting = await hostIs(s.id, 'awaiting_confirmation');
+    const host = awaiting.hosts[0];
+    await api('POST', `/api/v1/install-sessions/${s.id}/hosts/${host.id}/confirm-fingerprint`, {
+      fingerprint: host.fingerprint,
+    });
+    const done = await hostIs(s.id, 'installed');
+    expect(done.hosts[0].cleanup).toBe('not_needed');
+    expect(JSON.stringify(done)).not.toContain(PASSWORD);
+    const dump = await compose([
+      'exec',
+      '-T',
+      'postgres',
+      'psql',
+      '-U',
+      'postgres',
+      '-d',
+      'pcp',
+      '-tAc',
+      "SELECT row_to_json(x)::text FROM (SELECT * FROM install_session_hosts) x UNION ALL SELECT row_to_json(a)::text FROM audit_logs a WHERE action LIKE 'install_session.%'",
+    ]);
+    expect(dump.status, dump.stderr).toBe(0);
+    expect(dump.stdout).toContain('install_session.host_finished');
+    expect(dump.stdout).not.toContain(PASSWORD);
+    const logs = await compose(['logs', 'installer-runner', 'api']);
+    expect(logs.stdout + logs.stderr).not.toContain(PASSWORD);
   });
 });

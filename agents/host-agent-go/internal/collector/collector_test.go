@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os/exec"
 	"strings"
 	"sync/atomic"
@@ -146,5 +147,47 @@ func TestSuperviseRestartsImmediatelyOnRequest(t *testing.T) {
 	}
 	if sleeps.Load() != 0 {
 		t.Error("a requested restart must not back off")
+	}
+}
+
+// UC-05-04: in the Compose profile the host's / is mounted at /hostfs; hostmetrics reads it there.
+func TestHostRootSetsRootPath(t *testing.T) {
+	for root, want := range map[string]any{"": nil, "/hostfs": "/hostfs"} {
+		raw, err := Config(Input{IngestURL: "https://i", CertFile: "c", KeyFile: "k", StorageDir: "/s", HostRoot: root})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var cfg map[string]any
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			t.Fatal(err)
+		}
+		got := cfg["receivers"].(map[string]any)["host_metrics"].(map[string]any)["root_path"]
+		if got != want {
+			t.Errorf("HostRoot %q: root_path = %v", root, got)
+		}
+	}
+}
+
+// Container layers, tmpfs, and pseudo filesystems are not disks: on a Docker host (and under /hostfs)
+// they multiply filesystem series and the collector's memory.
+func TestFilesystemScraperSkipsPseudoAndContainerMounts(t *testing.T) {
+	raw, err := Config(Input{IngestURL: "https://i", CertFile: "c", KeyFile: "k", StorageDir: "/s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	fs := cfg["receivers"].(map[string]any)["host_metrics"].(map[string]any)["scrapers"].(map[string]any)["filesystem"].(map[string]any)
+	types := fs["exclude_fs_types"].(map[string]any)
+	for _, want := range []string{"overlay", "tmpfs", "squashfs", "proc", "sysfs", "cgroup2", "nsfs"} {
+		if !strings.Contains(fmt.Sprint(types["fs_types"]), want) {
+			t.Errorf("fs type %s not excluded: %v", want, types)
+		}
+	}
+	mounts := fs["exclude_mount_points"].(map[string]any)
+	if mounts["match_type"] != "regexp" || !strings.Contains(fmt.Sprint(mounts["mount_points"]), "/var/lib/docker/") {
+		t.Errorf("mount points = %v", mounts)
 	}
 }

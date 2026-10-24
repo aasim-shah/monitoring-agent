@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"pcp.local/hostagent/internal/control"
 	proto "pcp.local/agentprotocol"
+	"pcp.local/hostagent/internal/control"
 )
 
 const helperSocket = "/run/pcp-helper/helper.sock"

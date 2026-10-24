@@ -1,0 +1,9 @@
+---
+# Required: the fleet token (keep it in Ansible Vault) and the URLs shown in the dashboard.
+pcp_agent_token: ''
+pcp_agent_control_url: ''
+pcp_agent_download_url: ''
+# install.sh is served next to /downloads.
+pcp_agent_install_script_url: "{{ pcp_agent_download_url | regex_replace('/downloads/?$', '') }}/install.sh"
+# Extra install.sh flags, for example ['--enable-helper'] or a development CA (['--ca-file', '/root/ca.crt']).
+pcp_agent_extra_args: []

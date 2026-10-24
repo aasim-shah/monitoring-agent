@@ -24,6 +24,8 @@ type Input struct {
 	LogFiles func(packID string) []string
 	// Boosted packs collect every 5 s instead of 30 s (live boost, BR-11-08).
 	Boosted map[string]bool
+	// HostRoot is where the host's / is mounted when the agent runs in a container (UC-05-04).
+	HostRoot string
 }
 
 // Config returns the collector configuration as JSON (a subset of YAML, so the
@@ -44,14 +46,29 @@ func Config(in Input) ([]byte, error) {
 		"host_metrics": map[string]any{
 			"collection_interval": "30s",
 			"scrapers": map[string]any{
-				"cpu":        map[string]any{"metrics": map[string]any{"system.cpu.utilization": enabled}},
-				"memory":     map[string]any{"metrics": map[string]any{"system.memory.utilization": enabled}},
-				"filesystem": map[string]any{"metrics": map[string]any{"system.filesystem.utilization": enabled}},
-				"network":    map[string]any{},
-				"load":       map[string]any{},
-				"disk":       map[string]any{},
+				"cpu":    map[string]any{"metrics": map[string]any{"system.cpu.utilization": enabled}},
+				"memory": map[string]any{"metrics": map[string]any{"system.memory.utilization": enabled}},
+				"filesystem": map[string]any{
+					"metrics": map[string]any{"system.filesystem.utilization": enabled},
+					// Disks only: container layers, tmpfs, and pseudo filesystems multiply series and memory
+					// on Docker hosts and under /hostfs (UC-05-04).
+					"exclude_fs_types": map[string]any{
+						"fs_types":   []string{"overlay", "tmpfs", "devtmpfs", "squashfs", "proc", "sysfs", "cgroup", "cgroup2", "nsfs", "autofs", "mqueue", "debugfs", "tracefs", "securityfs", "pstore", "bpf", "configfs", "fusectl", "binfmt_misc", "hugetlbfs", "devpts", "ramfs", "rpc_pipefs"},
+						"match_type": "strict",
+					},
+					"exclude_mount_points": map[string]any{
+						"mount_points": []string{"^(/hostfs)?/var/lib/docker/.*", "^(/hostfs)?/var/lib/containerd/.*", "^(/hostfs)?/run/.*", "^(/hostfs)?/snap/.*", "^(/hostfs)?/(proc|sys|dev)(/.*)?$"},
+						"match_type":   "regexp",
+					},
+				},
+				"network": map[string]any{},
+				"load":    map[string]any{},
+				"disk":    map[string]any{},
 			},
 		},
+	}
+	if in.HostRoot != "" {
+		receivers["host_metrics"].(map[string]any)["root_path"] = in.HostRoot
 	}
 	packIDs, prefixes, keep, err := addPacksKeep(receivers, in.Packs, in.Boosted)
 	if err != nil {

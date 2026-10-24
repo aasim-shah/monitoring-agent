@@ -1,0 +1,11 @@
+---
+# ansible-playbook -i inventory site.example.yml --ask-vault-pass
+- hosts: all
+  become: true
+  vars_files:
+    - vault.yml # vault_pcp_fleet_token: pcp_enr_...
+  roles:
+    - role: pcp_agent
+      pcp_agent_token: "{{ vault_pcp_fleet_token }}"
+      pcp_agent_control_url: https://agent.example.com
+      pcp_agent_download_url: https://monitor.example.com/downloads

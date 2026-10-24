@@ -446,6 +446,8 @@ func collectorInput(dir string, st *control.State) collector.Input {
 		ServerName: serverName,
 		StorageDir: dir,
 		LogFiles:   logs.FilePaths,
+		// Set by the Compose profile (UC-05-04), where / is mounted read-only at /hostfs.
+		HostRoot: os.Getenv("PCP_HOST_ROOT"),
 	}
 }
 
