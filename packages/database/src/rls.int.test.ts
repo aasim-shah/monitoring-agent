@@ -297,6 +297,18 @@ beforeAll(async () => {
         `INSERT INTO agent_live_boosts (organization_id, agent_id, pack_id, expires_at) VALUES ($1, gen_random_uuid(), 'redis', now())`,
         [org],
       );
+      const session = (
+        await c.query(
+          `INSERT INTO install_sessions (organization_id, product_id, environment_id, mode, status, expires_at, updated_at)
+           VALUES ($1, gen_random_uuid(), gen_random_uuid(), 'key', 'awaiting_key', now(), now()) RETURNING id`,
+          [org],
+        )
+      ).rows[0].id;
+      await c.query(
+        `INSERT INTO install_session_hosts (organization_id, session_id, host, port, username, status, updated_at)
+         VALUES ($1, $2, 'h', 22, 'pcp-install', 'pending', now())`,
+        [org, session],
+      );
     }
     await c.query(
       `INSERT INTO organization_members (id, organization_id, user_id, role) VALUES ($1, $2, $3, 'owner'), ($4, $5, $3, 'viewer')`,

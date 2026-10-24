@@ -147,30 +147,31 @@ model MfaRecoveryCode {
 // ---------- Tenant tables (RLS forced) ----------
 
 model Organization {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String
-  timezone  String   @default("UTC")
-  settings  Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String
+  timezone                  String    @default("UTC")
+  settings                  Json      @default("{}")
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   /// Deletion requested (WB-17 UC-17-09): members lose access; owners may cancel until the purge.
   deletionRequestedAt       DateTime? @map("deletion_requested_at") @db.Timestamptz(6)
   deletionScheduledFor      DateTime? @map("deletion_scheduled_for") @db.Timestamptz(6)
   deletionRequestedByUserId String?   @map("deletion_requested_by_user_id") @db.Uuid
 
-  members        OrganizationMember[]
-  invitations    Invitation[]
-  products       Product[]
-  teams          Team[]
-  auditLogs      AuditLog[]
-  connections    Connection[]
-  jobDefinitions JobDefinition[]
-  jobExecutions  JobExecution[]
-  alertRules     AlertRule[]
-  channels       NotificationChannel[]
-  aiSettings     AiSettings?
-  exports        TenantExport[]
-  usage          TelemetryUsage[]
-  liveBoosts     AgentLiveBoost[]
+  members         OrganizationMember[]
+  invitations     Invitation[]
+  products        Product[]
+  teams           Team[]
+  auditLogs       AuditLog[]
+  connections     Connection[]
+  jobDefinitions  JobDefinition[]
+  jobExecutions   JobExecution[]
+  alertRules      AlertRule[]
+  channels        NotificationChannel[]
+  aiSettings      AiSettings?
+  exports         TenantExport[]
+  usage           TelemetryUsage[]
+  liveBoosts      AgentLiveBoost[]
+  installSessions InstallSession[]
 
   @@map("organizations")
 }
@@ -1598,4 +1599,59 @@ model AgentLiveBoost {
 
   @@index([organizationId, expiresAt])
   @@map("agent_live_boosts")
+}
+
+enum InstallMode {
+  key
+  password
+}
+
+/// An assisted SSH install (M17.3, spec §8.11). Keys, passwords, and the enrollment token live only
+/// in the installer runner's memory; no column here can hold a credential (BR-05-05).
+model InstallSession {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String      @map("organization_id") @db.Uuid
+  productId       String      @map("product_id") @db.Uuid
+  environmentId   String      @map("environment_id") @db.Uuid
+  enrollmentId    String?     @map("enrollment_id") @db.Uuid
+  mode            InstallMode
+  /// awaiting_key | connecting | awaiting_confirmation | installing | completed | failed | aborted | expired
+  status          String
+  createdByUserId String?     @map("created_by_user_id") @db.Uuid
+  expiresAt       DateTime    @map("expires_at") @db.Timestamptz(6)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  hosts        InstallSessionHost[]
+
+  @@unique([organizationId, id])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("install_sessions")
+}
+
+model InstallSessionHost {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId         String    @map("organization_id") @db.Uuid
+  sessionId              String    @map("session_id") @db.Uuid
+  host                   String
+  port                   Int
+  username               String
+  /// SHA256 host-key fingerprint the runner saw; the install runs only after it is confirmed.
+  fingerprint            String?
+  fingerprintConfirmedAt DateTime? @map("fingerprint_confirmed_at") @db.Timestamptz(6)
+  /// pending | connecting | awaiting_confirmation | installing | installed | failed | aborted
+  status                 String
+  /// Install output with the token and any password redacted, at most 64 KB.
+  output                 String    @default("")
+  scriptVersion          String?   @map("script_version")
+  /// done | failed | not_needed (password mode)
+  cleanup                String?
+  error                  String?
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  session InstallSession @relation(fields: [organizationId, sessionId], references: [organizationId, id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("install_session_hosts")
 }
