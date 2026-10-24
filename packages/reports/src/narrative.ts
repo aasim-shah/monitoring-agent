@@ -11,6 +11,8 @@ const SYSTEM = [
   'Cite every claim with its section ID in square brackets, for example [S3].',
   'Write 3 to 6 plain sentences. Say "correlated with", never that one thing caused another.',
   'Mention sections with status "missing" only as missing data.',
+  'Name the largest changes of the day: rows added to databases, website speed and uptime, and Google',
+  'figures, giving the value and its "previous" value as written, never a percentage.',
 ].join(' ');
 
 /** What the model sees: section titles, status, and the snapshot's numbers. Nothing raw (BR-15-02). */

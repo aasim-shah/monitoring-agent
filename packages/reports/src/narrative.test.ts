@@ -28,6 +28,14 @@ describe('narrate (BR-15-02, BR-15-03, UC-15-05)', () => {
     expect(provider.requests).toHaveLength(2);
   });
 
+  it('asks for the day\'s largest changes as value and previous value, never a percentage (M15b)', async () => {
+    const provider = scripted('fake', [{ text: 'All quiet [S2].' }]);
+    await narrate(await snapshot(), provider, { disabled: false });
+    const system = JSON.stringify(provider.requests[0]);
+    expect(system).toContain('rows added to databases');
+    expect(system).toContain('never a percentage');
+  });
+
   it('rejects a citation that is not a section', async () => {
     const provider = scripted('fake', [{ text: 'All quiet [S13].' }]);
     expect((await narrate(await snapshot(), provider, { disabled: false })).problems).toContain(
