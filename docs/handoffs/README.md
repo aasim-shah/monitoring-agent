@@ -32,7 +32,8 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M19 Hardening (production-critical subset) | Done | Branch `feat/m19-hardening`; deployed; backups + restore drill, watchdog, CSP, zod fix, tenant export/deletion, lost-task fix; [execution log](M19-execution-log.md) |
 | M10 Monitoring packs (remainder) | Done | Branch `feat/m10-packs`; deployed; usage and limits, live boost (agent 0.4.0), Level 2 guides for Node.js, Kafka, nginx, edge drop-label transform; [execution log](M10-execution-log.md) |
 | M15b Daily report: 24 h activity and trends | Done | Branch `feat/m15b-report-trends`; deployed with M10; database rows added, website speed, Google KPI trends; [execution log](M15b-execution-log.md) |
-| M17, M18; M19.2/.4/.7 | Not started | M13.4 Google Ads gated on a developer token; pentest, load baselines, self-hosted packaging, and pilot need people or a separate host |
+| M17 Installation methods | Done | Branch `feat/m17-install`; deployed; Ansible, cloud-init, Compose profile, assisted SSH install; [execution log](M17-execution-log.md) |
+| M18; M19.2/.4/.7 | Not started | M13.4 Google Ads gated on a developer token; pentest, load baselines, self-hosted packaging, and pilot need people or a separate host |
 
 ## Maintenance
 
@@ -124,9 +125,9 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M16.2 | Adapters | Done | [M16-engine](M16-engine.md) |
 | M16.3 | `pcp-helper` | Done | [M16-helper](M16-helper.md) |
 | M16.4 | Approvals UI | Done | [M16-web](M16-web.md) |
-| M17.1 | Fleet install UX | Not started | — |
-| M17.2 | Fleet tooling | Not started | — |
-| M17.3 | Installer runner (assisted SSH, opt-in) | Not started | — |
+| M17.1 | Fleet install UX | Done | [M17-execution-log](M17-execution-log.md) |
+| M17.2 | Fleet tooling | Done | [M17-execution-log](M17-execution-log.md) |
+| M17.3 | Installer runner (assisted SSH, opt-in) | Done | [M17-execution-log](M17-execution-log.md) |
 | M18.1 | Retained logs | Not started | — |
 | M18.2 | Data inspection | Not started | — |
 | M18.3 | Level 1 managed exporters | Not started | — |

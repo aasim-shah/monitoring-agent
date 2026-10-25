@@ -185,9 +185,9 @@ Agents → Install (tabs: One-liner, Ansible, cloud-init, Docker, Assisted insta
 ## 12. Task checklist
 
 - [x] M6.7 Installer and systemd units — Ubuntu 24.04 verified ([M6.7](../handoffs/M6.7-installer.md)); full D22 OS matrix in M6b
-- [ ] M17.1 Fleet install UX
-- [ ] M17.2 Fleet tooling (Ansible, cloud-init, Compose profile)
-- [ ] M17.3 Installer runner (assisted SSH)
+- [x] M17.1 Fleet install UX ([M17-execution-log](../handoffs/M17-execution-log.md))
+- [x] M17.2 Fleet tooling (Ansible, cloud-init, Compose profile) ([M17-execution-log](../handoffs/M17-execution-log.md))
+- [x] M17.3 Installer runner (assisted SSH) ([M17-execution-log](../handoffs/M17-execution-log.md))
 
 ## 13. Acceptance criteria
 
