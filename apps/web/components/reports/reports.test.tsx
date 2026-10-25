@@ -234,8 +234,18 @@ const report = (over: Partial<ReportData> = {}): ReportData => ({
 describe('ReportView (UC-15-04/06)', () => {
   it('shows sections in order, missing data as missing, citations as links, and the delivery log', () => {
     render(<ReportView report={report()} canManage onRegenerate={vi.fn()} />);
-    expect(screen.getByRole('heading', { name: /Daily report — 2026-10-25 · v1/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sunday, 25 October' })).toBeInTheDocument();
+    expect(screen.getByText('Daily report · v1')).toBeInTheDocument();
     expect(screen.getByText(/25 h local day/)).toBeInTheDocument();
+    // The plain reading first: status, worth a look, and what is not connected.
+    expect(
+      within(screen.getByRole('region', { name: 'Summary' })).getByText('Needs attention'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '1 incident open' })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Not connected yet' })).getByText('User analytics'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Incidents' })).toHaveTextContent('1 open now');
     expect(screen.getByRole('link', { name: 'S2' })).toHaveAttribute('href', '#S2');
     const infra = screen.getByRole('region', { name: 'Infrastructure performance' });
     expect(within(infra).getByText('No data: No host metrics in this window')).toBeInTheDocument();

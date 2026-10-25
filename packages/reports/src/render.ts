@@ -1,5 +1,6 @@
 import { trend } from './activity.js';
 import type { NarrativeStatus } from './narrative.js';
+import { digest } from './digest.js';
 import { reportEmail } from './email.js';
 import type {
   AnalyticsStats,
@@ -14,6 +15,7 @@ import type {
 } from './snapshot.js';
 
 export type { Section, Snapshot } from './snapshot.js';
+export { digest, plainNarrative, type Digest, type Kpi, type Tone } from './digest.js';
 
 /** The same shape as an incident notification, so reports use the same channels (UC-15-03). */
 export interface ReportMessage {
@@ -183,7 +185,8 @@ function narrativeText(r: RenderableReport): string {
 export function renderReport(r: RenderableReport, link: string): ReportMessage {
   const { snapshot } = r;
   const w = snapshot.window;
-  const subject = `Daily report — ${r.productName} — ${w.localDate}`;
+  const d = digest(snapshot, r.narrative);
+  const subject = `Daily report — ${r.productName} — ${w.localDate} · ${d.status.label}`;
   const header = `${w.localDate} (${w.timezone}, ${w.hours} h) · ${w.start} to ${w.end}${r.late ? ' · Generated late' : ''}`;
   const body = snapshot.sections.map((s) =>
     s.key === 'summary'
@@ -194,23 +197,32 @@ export function renderReport(r: RenderableReport, link: string): ReportMessage {
     subject,
     header,
     '',
+    `${d.status.label}. ${d.summary}`,
+    ...d.kpis.map(
+      (k) =>
+        `${k.label}: ${k.display}${k.change ? ` (${k.change.text}${k.change.against ? ` ${k.change.against}` : ''})` : ''}`,
+    ),
+    ...(d.watch.length ? ['', 'Worth a look', ...d.watch.map((x) => `- ${x.title}: ${x.text}`)] : []),
+    '',
+    'All numbers',
+    '',
     ...body.flatMap((b) => [b.title, ...b.lines, '']),
     `Open the report: ${link}`,
   ].join('\n');
-  const html = reportEmail(r, link, narrativeText(r), sectionLines);
-  const withData = snapshot.sections.filter((s) => s.status === 'ok').length;
+  const html = reportEmail(r, link, d);
   return {
     subject,
     text,
     html,
     slack: {
-      text: `*${subject}*\n${narrativeText(r)}\n${withData} of ${snapshot.sections.length} sections have data. <${link}|Open the report>`,
+      text: `*${subject}*\n${d.summary}${d.watch.length ? `\n${d.watch.map((x) => `• ${x.title}`).join('\n')}` : ''}\n<${link}|Open the report>`,
     },
     json: {
       type: 'report',
       product: r.productName,
       localDate: w.localDate,
       link,
+      status: d.status.tone,
       narrativeStatus: r.narrativeStatus,
       narrative: r.narrative,
       late: r.late,

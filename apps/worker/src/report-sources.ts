@@ -8,6 +8,7 @@ import type {
   IncidentStats,
   ReportSources,
   ReportWindow,
+  Snapshot,
   WebsiteStats,
 } from '@pcp/reports';
 import { databaseActivity } from '@pcp/reports';
@@ -60,6 +61,47 @@ async function vmInstant(
       const v = Number(r.value[1]);
       return { labels: r.metric, value: Number.isFinite(v) ? v : null };
     });
+  } catch {
+    return null;
+  }
+}
+
+/** The same scoping as `vmInstant`, as a range query: one value per `stepSeconds`, null for gaps. */
+async function vmRange(
+  base: string | undefined,
+  organizationId: string,
+  productId: string,
+  promql: string,
+  w: ReportWindow,
+  stepSeconds: number,
+): Promise<Map<string, Map<number, number>> | null> {
+  if (!base) return null;
+  const params = new URLSearchParams({
+    extra_label: `tenant_id=${organizationId}`,
+    'extra_filters[]': `{product_id="${productId}"}`,
+    query: promql,
+    start: String(Math.floor(w.start.getTime() / 1000) + stepSeconds),
+    end: String(Math.floor(w.end.getTime() / 1000)),
+    step: `${stepSeconds}s`,
+    timeout: `${QUERY_TIMEOUT_MS / 1000}s`,
+  });
+  try {
+    const res = await fetch(`${base}/api/v1/query_range?${params}`, {
+      signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
+    });
+    const body = (await res.json()) as {
+      status: string;
+      data?: { result: Array<{ metric: Record<string, string>; values: Array<[number, string]> }> };
+    };
+    if (!res.ok || body.status !== 'success' || !body.data) return null;
+    return new Map(
+      body.data.result.map((r) => [
+        r.metric.monitor_id ?? '',
+        new Map(
+          r.values.map(([t, v]) => [t, Number(v)] as [number, number]).filter(([, v]) => Number.isFinite(v)),
+        ),
+      ]),
+    );
   } catch {
     return null;
   }
@@ -225,14 +267,33 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
           );
         const UP = '100 * avg by (monitor_id) (avg_over_time(website_up[$R]))';
         const AVG = '1000 * avg by (monitor_id) (avg_over_time(website_response_seconds[$R]))';
-        const [uptime, avg, p95, failed, prevUptime, prevAvg] = await Promise.all([
+        const [uptime, avg, p95, failed, prevUptime, prevAvg, hourly] = await Promise.all([
           per(UP, w),
           per(AVG, w),
           per('1000 * max by (monitor_id) (quantile_over_time(0.95, website_response_seconds[$R]))', w),
           per('sum by (monitor_id) (count_le_over_time(website_up[$R], 0))', w),
           per(UP, prev),
           per(AVG, prev),
+          vmRange(
+            deps.vmQueryUrl,
+            ctx.organizationId,
+            productId,
+            '100 * avg by (monitor_id) (avg_over_time(website_up[1h]))',
+            w,
+            3600,
+          ),
         ]);
+        // One block per hour of the local day, oldest first; hours with no checks stay null. The
+        // store may align points to whole hours, so each lands in the hour it is closest to the end of.
+        const hourOf = (t: number) => Math.round((t - w.start.getTime() / 1000) / 3600) - 1;
+        const blocks = (points: Map<number, number> | undefined) => {
+          const out: Array<number | null> = Array.from({ length: w.hours }, () => null);
+          for (const [t, v] of points ?? []) {
+            const i = hourOf(t);
+            if (i >= 0 && i < w.hours) out[i] = v;
+          }
+          return out;
+        };
         return monitors.map((m) => ({
           url: m.url,
           uptimePercent: uptime.get(m.id) ?? null,
@@ -244,6 +305,7 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
           failedChecks: failed.get(m.id) ?? (uptime.has(m.id) ? 0 : null),
           previousUptimePercent: prevUptime.get(m.id) ?? null,
           previousAvgMs: prevAvg.get(m.id) ?? null,
+          ...(hourly ? { hourly: blocks(hourly.get(m.id)) } : {}),
         }));
       });
 
@@ -361,6 +423,25 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
       ];
     };
 
-    return { incidents, hosts, logErrors, databases, websites, deployments, analytics, coverage };
+    /** The latest version of each of the 7 earlier days' reports, for the trend lines. */
+    const history = (w: ReportWindow): Promise<Snapshot[]> =>
+      db(async (tx) => {
+        const day = new Date(`${w.localDate}T00:00:00Z`);
+        const rows = await tx.generatedReport.findMany({
+          where: { productId, localDate: { gte: new Date(day.getTime() - 7 * 86_400_000), lt: day } },
+          orderBy: [{ localDate: 'desc' }, { version: 'desc' }, { createdAt: 'desc' }],
+          select: { localDate: true, snapshot: true },
+          take: 100,
+        });
+        const seen = new Set<string>();
+        return rows.flatMap((r) => {
+          const key = r.localDate.toISOString().slice(0, 10);
+          if (seen.has(key)) return [];
+          seen.add(key);
+          return [r.snapshot as unknown as Snapshot];
+        });
+      });
+
+    return { incidents, hosts, logErrors, databases, websites, deployments, analytics, coverage, history };
   };
 }

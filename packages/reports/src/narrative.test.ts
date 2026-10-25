@@ -32,7 +32,8 @@ describe('narrate (BR-15-02, BR-15-03, UC-15-05)', () => {
     const provider = scripted('fake', [{ text: 'All quiet [S2].' }]);
     await narrate(await snapshot(), provider, { disabled: false });
     const system = JSON.stringify(provider.requests[0]);
-    expect(system).toContain('rows added to databases');
+    expect(system).toContain('database records');
+    expect(system).toContain('2 or 3 short, plain sentences');
     expect(system).toContain('never a percentage');
   });
 

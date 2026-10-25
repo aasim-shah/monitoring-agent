@@ -73,7 +73,11 @@ test('reports: a daily schedule runs, persists, and delivers with missing-data w
 
   // UC-15-04/06: the report view with sections, coverage, and the delivery log.
   await v1.getByRole('link', { name: 'Open' }).click();
-  await expect(page.getByRole('heading', { name: `Daily report — ${localDate} · v1` })).toBeVisible();
+  await expect(page.getByText('Daily report · v1')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Summary' })).toContainText('All good');
+  await expect(page.getByRole('region', { name: 'Not connected yet' })).toContainText('User analytics');
+  // Every number stays one click away.
+  await page.getByText('Show all numbers').click();
   await expect(page.getByText('Verified against the data')).toBeVisible();
   await expect(page.getByRole('region', { name: 'User analytics' })).toContainText(
     'No data: Google Analytics not connected',
@@ -84,6 +88,7 @@ test('reports: a daily schedule runs, persists, and delivers with missing-data w
   await expect(page.getByRole('region', { name: 'Product health' })).toContainText(
     'Open now: 0 (critical: 0)',
   );
+  await page.getByText('Delivery log').click();
   await expect(page.getByRole('row', { name: 'Ops email' })).toContainText('Sent');
 
   // UC-15-09: regenerating adds version 2 and keeps version 1.

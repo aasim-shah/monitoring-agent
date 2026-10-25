@@ -20,14 +20,16 @@ describe('renderReport (UC-15-03)', () => {
       },
       link,
     );
-    expect(m.subject).toBe('Daily report — Shop — 2026-10-25');
+    expect(m.subject).toBe('Daily report — Shop — 2026-10-25 · Needs attention');
     expect(m.text).toContain('Data coverage and missing sources');
     expect(m.text).toContain('Infrastructure performance\nNo data: No host metrics in this window');
     expect(m.text).toContain('User analytics\nNo data: Google Analytics not connected');
     expect(m.text).toContain('Quiet day [S2].');
     expect(m.text).toContain(link);
     expect(m.text).not.toMatch(/Infrastructure performance\n.*0 %/);
-    expect(m.html).toContain('Significant anomalies</h2>');
+    expect(m.text).toContain('Needs attention. Quiet day.');
+    expect(m.html).toContain('Needs attention');
+    expect(m.html).not.toContain('[S2]');
     expect(m.slack.text).toContain(`<${link}|Open the report>`);
     expect(m.json).toMatchObject({
       type: 'report',
@@ -78,7 +80,7 @@ describe('renderReport (UC-15-03)', () => {
     ]);
   });
 
-  it('uses an email-safe layout with readable metrics and honest missing data', async () => {
+  it('uses an email-safe card layout with plain numbers and honest missing data', async () => {
     const snapshot = await buildSnapshot(
       fixtureSources({
         hosts: async () => [{ hostname: 'api-01', cpuAvg: null, cpuMax: 20, memoryAvg: 40, diskMax: 50 }],
@@ -89,8 +91,9 @@ describe('renderReport (UC-15-03)', () => {
               source: 'GA4',
               partial: true,
               values: [
+                { label: 'Active users', value: 120, unit: 'count', previous: 100 },
                 { label: 'Sessions', value: null, unit: 'count' },
-                { label: 'Engagement', value: 0.615, unit: 'ratio' },
+                { label: 'Engagement rate', value: 0.615, unit: 'ratio' },
               ],
             },
           ],
@@ -108,21 +111,22 @@ describe('renderReport (UC-15-03)', () => {
       },
       link,
     );
-    expect(m.html).toContain('max-width:680px');
+    expect(m.html).toContain('max-width:640px');
     expect(m.html).toContain('role="presentation"');
     expect(m.html).toContain('Open full report');
-    expect(m.html).toContain('Sources complete');
-    expect(m.html).toContain('Partial day — provider still processing');
-    expect(m.html).toContain('61.5 %');
+    expect(m.html).toContain('Visitors');
+    expect(m.html).toContain('▲ 20%');
+    expect(m.html).toContain('61.5%');
+    expect(m.html).toContain('partial day');
     expect(m.html).toContain('No data');
     expect(m.html).toContain('Generated late');
-    expect(m.html).toContain('25 October 2026');
+    expect(m.html).toContain('Sunday, 25 October 2026');
     expect(m.html).toContain('25 h');
     expect(m.html).toContain('Shop &amp; Co');
     expect(m.html).toContain('&lt;script&gt;unsafe&lt;/script&gt;');
     expect(m.html).not.toContain('<script>');
-    expect(m.html).toContain('S12');
     expect(m.html).not.toContain('secret-value');
+    expect(m.html).not.toContain('<svg');
   });
 
   it('does not make non-web report links executable in email', async () => {
@@ -135,7 +139,7 @@ describe('renderReport (UC-15-03)', () => {
     expect(m.html).toContain('href="#"');
   });
 
-  it('preserves operational meaning in the themed section cards', async () => {
+  it('puts what needs attention first, with a next step, and keeps every card escaped', async () => {
     const snapshot = await buildSnapshot(
       fixtureSources({
         databases: async () => [{ name: '<orders>', provider: 'postgres', status: 'unavailable', ok: null }],
@@ -147,23 +151,21 @@ describe('renderReport (UC-15-03)', () => {
       }),
       w,
     );
-    const { html } = renderReport(
+    const { html, text, slack } = renderReport(
       { snapshot, narrative: null, narrativeStatus: 'disabled', productName: 'Shop', late: false },
       link,
     );
-    expect(html).toContain('Critical incidents open');
-    expect(html).toContain('Currently open');
-    expect(html).toContain('Application logs');
+    expect(html).toContain('1 incident open');
+    expect(html).toContain('vps-1 disk is 88% full');
+    expect(html).toContain('1 deployment failed');
+    expect(html).toContain('Worth a look');
     expect(html).toContain('Unknown');
-    expect(html).toContain('unavailable');
-    expect(html).not.toContain('>Healthy</span>');
     expect(html).toContain('&lt;orders&gt;');
     expect(html).toContain('&lt;release&gt;');
-    expect(html).toContain('Recorded at (UTC)');
-    expect(html).toContain('Certificate remaining');
-    expect(html).toContain('Suggested action 1');
-    expect(html).toContain('Complete</span>');
-    expect(html).toContain('Missing</span>');
+    expect(html).toContain('Not connected yet');
+    expect(text).toContain('Worth a look\n- 1 incident open');
+    expect(text).toContain('All numbers');
+    expect(slack.text).toContain('• 1 incident open');
   });
 
   it('lists analytics values, says when the day is partial, and never prints a missing value as 0', async () => {

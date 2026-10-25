@@ -140,6 +140,31 @@ beforeAll(async () => {
       value: [0, String(value)],
     });
     let result: unknown[] = [];
+    if (url.pathname.endsWith('/query_range')) {
+      // Hourly uptime: checks in the first and third hour only.
+      const start = Number(url.searchParams.get('start'));
+      res.setHeader('content-type', 'application/json');
+      res.end(
+        JSON.stringify({
+          status: 'success',
+          data: {
+            resultType: 'matrix',
+            result: q.includes('website_up')
+              ? [
+                  {
+                    metric: { monitor_id: websiteMonitor },
+                    values: [
+                      [start, '100'],
+                      [start + 7200, '50'],
+                    ],
+                  },
+                ]
+              : [],
+          },
+        }),
+      );
+      return;
+    }
     if (q.includes('system_cpu') && !q.includes('max_over_time'))
       result = [series({ agent_id: 'a-1' }, 41.25)];
     else if (q.includes('system_cpu')) result = [series({ agent_id: 'a-1' }, 93.5)];
@@ -228,7 +253,7 @@ describe('report-generate and report-deliver (UC-15-02/03)', () => {
     ]);
     for (const d of ds) await h['report-deliver'](ctx(s.org), d.id, job(''));
     expect(mails.map((m) => m.to).sort()).toEqual([['cto@example.com'], ['ops@example.com']]);
-    expect(mails[0]!.subject).toBe('Daily report — Shop — 2026-10-25');
+    expect(mails[0]!.subject).toMatch(/^Daily report — Shop — 2026-10-25 · /);
     expect(mails[0]!.text).toContain('Data coverage and missing sources');
     expect(mails[0]!.text).toContain('Google Analytics not connected');
     expect((await deliveries(s)).map((d) => d.status)).toEqual(['sent', 'sent']);
@@ -514,7 +539,24 @@ describe('24 h activity and trends (M15b)', () => {
       failedChecks: 3,
       previousUptimePercent: 100,
       previousAvgMs: 200,
+      // 25 blocks: the Berlin day the clocks go back.
+      hourly: [100, null, 50, ...Array.from({ length: 22 }, () => null)],
     });
+  });
+
+  it("keeps the earlier days' card values for the 7-day trend lines", async () => {
+    const s = await seed();
+    const h = reportHandlers(deps());
+    await h['report-generate'](ctx(s.org), s.schedule, job('2026-10-23'));
+    await h['report-generate'](ctx(s.org), s.schedule, job('2026-10-24'));
+    await h['report-generate'](ctx(s.org), s.schedule, job('2026-10-25'));
+    const latest = (await reports(s)).find(
+      (r) => (r.snapshot as { window: { localDate: string } }).window.localDate === '2026-10-25',
+    )!;
+    const history = (latest.snapshot as { history: Array<{ day: string; values: Record<string, unknown> }> })
+      .history;
+    expect(history.map((x) => x.day)).toEqual(['2026-10-23', '2026-10-24']);
+    expect(history[1]!.values).toMatchObject({ 'incidents.opened': expect.any(Number) });
   });
 
   it('reports the latest published day and the day before for each Google KPI', async () => {

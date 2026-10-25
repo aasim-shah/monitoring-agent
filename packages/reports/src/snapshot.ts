@@ -1,4 +1,5 @@
 import { DAILY_SECTIONS, type SectionKey } from './templates/daily.js';
+import { metricValues } from './digest.js';
 import { previousWindow, type ReportWindow } from './window.js';
 
 export interface IncidentStats {
@@ -33,6 +34,8 @@ export interface WebsiteStats {
   /** The same figures for the 24 h before (trend). */
   previousUptimePercent?: number | null;
   previousAvgMs?: number | null;
+  /** Uptime per hour of the window, oldest first (the report's uptime strip). */
+  hourly?: Array<number | null>;
 }
 /** The report day's values per Google property, site, or app (M13b); null values stay null. */
 export interface AnalyticsStats {
@@ -83,6 +86,8 @@ export interface ReportSources {
   /** null when no Google connection exists for the product. */
   analytics(w: ReportWindow): Promise<AnalyticsStats | null>;
   coverage(w: ReportWindow): Promise<CoverageItem[]>;
+  /** Earlier reports of the product, for the 7-day trend lines; optional. */
+  history?(w: ReportWindow): Promise<Snapshot[]>;
 }
 
 export interface Section {
@@ -105,6 +110,8 @@ export interface Snapshot {
   anomalies: Anomaly[];
   actions: string[];
   coverage: CoverageItem[];
+  /** Up to 7 earlier days' card values, oldest first (absent on reports before the redesign). */
+  history?: Array<{ day: string; values: Record<string, number | null> }>;
 }
 
 /** Sources that have no connector yet; listed, never zero. */
@@ -180,7 +187,8 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     rawSites,
     coverage,
     deployments,
-    analytics,
+    rawAnalytics,
+    earlier,
   ] = await Promise.all([
     sources.incidents(w),
     sources.incidents(prev),
@@ -193,7 +201,9 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     sources.coverage(w),
     sources.deployments(w),
     sources.analytics(w),
+    sources.history ? sources.history(w).catch(() => []) : Promise.resolve([]),
   ]);
+  const analytics = rawAnalytics && roundAnalytics(rawAnalytics);
   const hosts =
     rawHosts?.map((h) => ({
       hostname: h.hostname,
@@ -214,6 +224,7 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
         ? { previousUptimePercent: r1(s.previousUptimePercent) }
         : {}),
       ...(s.previousAvgMs !== undefined ? { previousAvgMs: ms(s.previousAvgMs) } : {}),
+      ...(s.hourly ? { hourly: s.hourly.map(r1) } : {}),
     })) ?? null;
   const cpu = mean(hosts?.map((h) => h.cpuAvg) ?? []);
   const anomalies = [
@@ -278,5 +289,31 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     anomalies,
     actions,
     coverage: allCoverage,
+    ...(earlier.length
+      ? {
+          history: earlier
+            .filter((e) => e.window.localDate < w.localDate)
+            .sort((a, b) => a.window.localDate.localeCompare(b.window.localDate))
+            .slice(-7)
+            .map((e) => ({ day: e.window.localDate, values: metricValues(e) })),
+        }
+      : {}),
+  };
+}
+
+/** Rates keep three decimals, everything else one: no "22.51666666666667" in a report. */
+function roundAnalytics(a: AnalyticsStats): AnalyticsStats {
+  const round = (unit: string, v: number | null | undefined) =>
+    v == null ? (v ?? null) : unit === 'ratio' ? Math.round(v * 1000) / 1000 : r1(v);
+  return {
+    ...a,
+    resources: a.resources.map((r) => ({
+      ...r,
+      values: r.values.map((v) => ({
+        ...v,
+        value: round(v.unit, v.value),
+        ...(v.previous !== undefined ? { previous: round(v.unit, v.previous) } : {}),
+      })),
+    })),
   };
 }

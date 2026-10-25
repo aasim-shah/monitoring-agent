@@ -9,10 +9,11 @@ const SYSTEM = [
   'You write the executive summary of a daily product operations report.',
   'Use only the numbers in the sections below; never compute, estimate, or round differently.',
   'Cite every claim with its section ID in square brackets, for example [S3].',
-  'Write 3 to 6 plain sentences. Say "correlated with", never that one thing caused another.',
-  'Mention sections with status "missing" only as missing data.',
-  'Name the largest changes of the day: rows added to databases, website speed and uptime, and Google',
-  'figures, giving the value and its "previous" value as written, never a percentage.',
+  'The reader is a busy product owner: write 2 or 3 short, plain sentences, no jargon.',
+  'Start with whether anything needs attention (open incidents, downtime, full disks), then the one or',
+  'two biggest changes of the day (visitors, Google search, database records, website speed), giving the',
+  'value and its "previous" value as written, never a percentage. Do not list every figure.',
+  'Say "correlated with", never that one thing caused another. Do not mention missing sections.',
 ].join(' ');
 
 /** What the model sees: section titles, status, and the snapshot's numbers. Nothing raw (BR-15-02). */
