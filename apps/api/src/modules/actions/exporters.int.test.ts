@@ -93,6 +93,9 @@ describe('Level 1 managed exporters (M18.3, spec §8.9)', () => {
       payload: { status: 'succeeded', result: { exporter: 'redis_exporter', listen: '127.0.0.1:9121' } },
     });
     expect(done.statusCode, done.body).toBe(204);
+    const action = await call(owner.cookie, 'GET', `/api/v1/actions/${res.json().id}`);
+    expect(action.json()).toMatchObject({ status: 'succeeded' });
+    expect(action.json().executions[0].verification).toEqual({ listen: '127.0.0.1:9121', verified: true });
     const cfg = await t.app.inject({ method: 'GET', url: '/agent/v1/config', ...asAgent(agent.fingerprint) });
     expect(cfg.json().packs).toContainEqual(
       expect.objectContaining({ packId: 'redis-exporter', settings: { endpoint: '127.0.0.1:9121' } }),

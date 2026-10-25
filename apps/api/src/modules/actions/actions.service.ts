@@ -697,14 +697,31 @@ export class ActionsService implements OnModuleInit {
     );
     if (!execution) return;
     const result = body.result ?? {};
-    const activeState = typeof result.activeState === 'string' ? result.activeState : null;
-    // Never succeeded without verification: the helper must report the unit active.
-    const verified = body.status === 'succeeded' && activeState === 'active';
+    // Never succeeded without verification. A restart: the unit is active. An exporter install
+    // (M18.3): the helper saw it answer on loopback. A removal: unit, binary, and user are gone.
+    let verified: boolean;
+    let verification: Record<string, unknown>;
+    let failure: string;
+    if (execution.adapter === 'host.install_exporter') {
+      const listen = typeof result.listen === 'string' ? result.listen : null;
+      verified = body.status === 'succeeded' && !!listen?.startsWith('127.0.0.1:');
+      verification = { listen, verified };
+      failure = 'Verification failed: the exporter is not listening on 127.0.0.1';
+    } else if (execution.adapter === 'host.remove_exporter') {
+      verified = body.status === 'succeeded' && result.removed === true;
+      verification = { removed: result.removed === true, verified };
+      failure = 'Verification failed: the exporter was not removed';
+    } else {
+      const activeState = typeof result.activeState === 'string' ? result.activeState : null;
+      verified = body.status === 'succeeded' && activeState === 'active';
+      verification = { activeState, verified };
+      failure = `Verification failed: the unit is ${activeState ?? 'unknown'}`;
+    }
     await this.finish(ctx, execution.id, {
       status: verified ? 'succeeded' : 'failed',
-      error: verified ? null : (body.error ?? `Verification failed: the unit is ${activeState ?? 'unknown'}`),
+      error: verified ? null : (body.error ?? failure),
       result,
-      verification: { activeState, verified },
+      verification,
     });
   }
 
