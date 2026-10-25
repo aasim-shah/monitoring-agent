@@ -9,7 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src test",
     "test": "vitest run",
-    "agent:pki": "turbo run build --filter=@pcp/api... && node scripts/agent-pki.mjs"
+    "agent:pki": "turbo run build --filter=@pcp/api... && node scripts/agent-pki.mjs",
+    "load": "vitest run -c vitest.load.config.ts"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.3",

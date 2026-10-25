@@ -52,7 +52,7 @@ func (c *capture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 const fp = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-func newGateway(t *testing.T, vm http.Handler, mutate func(*Config)) (*Gateway, *time.Time) {
+func newGateway(t testing.TB, vm http.Handler, mutate func(*Config)) (*Gateway, *time.Time) {
 	t.Helper()
 	srv := httptest.NewServer(vm)
 	t.Cleanup(srv.Close)
