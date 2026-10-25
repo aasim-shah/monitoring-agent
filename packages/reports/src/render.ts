@@ -1,5 +1,6 @@
 import { trend } from './activity.js';
 import type { NarrativeStatus } from './narrative.js';
+import { reportEmail } from './email.js';
 import type {
   AnalyticsStats,
   Anomaly,
@@ -30,9 +31,6 @@ export interface RenderableReport {
   productName: string;
   late: boolean;
 }
-
-const escape = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const pct = (v: number | null) => (v === null ? 'no data' : `${v.toFixed(1)} %`);
 const count = (v: number) => Math.round(v).toLocaleString('en-US');
@@ -199,14 +197,7 @@ export function renderReport(r: RenderableReport, link: string): ReportMessage {
     ...body.flatMap((b) => [b.title, ...b.lines, '']),
     `Open the report: ${link}`,
   ].join('\n');
-  const html = [
-    `<h1>${escape(subject)}</h1>`,
-    `<p>${escape(header)}</p>`,
-    ...body.map(
-      (b) => `<h2>${escape(b.title)}</h2><ul>${b.lines.map((l) => `<li>${escape(l)}</li>`).join('')}</ul>`,
-    ),
-    `<p><a href="${escape(link)}">Open the report</a></p>`,
-  ].join('\n');
+  const html = reportEmail(r, link, narrativeText(r), sectionLines);
   const withData = snapshot.sections.filter((s) => s.status === 'ok').length;
   return {
     subject,
