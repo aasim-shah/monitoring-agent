@@ -8,7 +8,7 @@ Measured, not promised: no numeric SLO is published until production baselines e
 |---|---|---|
 | Ingest gateway write path | `scripts/go.sh test -run x -bench BenchmarkWrite -benchtime 5s ./apps/ingest-gateway/`: authenticate, decode, relabel 500 series, enforce limits, re-encode, forward to a no-op store; one request at a time | **2.4 ms per 500-sample request ≈ 206,000 samples/s per core** (1.45 MB, 19.7k allocations per request) |
 | Fleet heartbeats | `pnpm --filter @pcp/api load` (`apps/api/load/heartbeats.load.ts`): 200 enrolled agents, 10 heartbeats each, 50 concurrent, through the real API handlers and PostgreSQL in one process | **663 heartbeats/s**, p50 71 ms, p95 105 ms, p99 167 ms. Agents beat every 30 s, so one API process keeps up with about **19,000 agents** on this machine |
-| Dashboard API reads | `node tests/load/run.ts` (k6 `tests/load/api.js`, 1 → 50 virtual users over 2 minutes, five authenticated reads per iteration, through Caddy) | see below |
+| Dashboard API reads | `node tests/load/run.ts` (k6 `tests/load/api.js`, 1 → 50 virtual users over 2 minutes, five authenticated reads per iteration, through Caddy) | **137 requests/s** at 50 virtual users, 100 % of 16,620 checks passed; p50 183 ms, p95 414 ms, p99 775 ms. Measured while a Docker image build ran on the same machine, so treat it as a lower bound |
 
 ## What these do not measure
 

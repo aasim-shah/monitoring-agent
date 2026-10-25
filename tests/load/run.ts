@@ -3,7 +3,7 @@
 // Starts the stack with the e2e override (Mailpit), creates an owner with MFA and one product,
 // runs the k6 API script, then tears the stack down.
 import { createHmac } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SECRETS, compose as composeRun, envFile, repoRoot, run } from '../smoke/compose.ts';
 
@@ -14,8 +14,23 @@ const BASE = `http://127.0.0.1:${HTTP_PORT}`;
 const ORIGIN = `http://localhost:${HTTP_PORT}`;
 const out = join(repoRoot, 'tests/load/results');
 mkdirSync(out, { recursive: true });
+// Caddy's local config serves agent and ingest names with mTLS, so it needs the agent CA chain.
+const pkiDir = mkdtempSync(join(repoRoot, 'tests/load/.pki-'));
+const pkiRun = await run('pnpm', ['--filter', '@pcp/api', 'agent:pki', '--out', pkiDir]);
+if (pkiRun.status !== 0) throw new Error(`agent:pki failed: ${pkiRun.stderr}`);
+const pki = Object.fromEntries(
+  pkiRun.stdout
+    .split('\n')
+    .filter((l) => /^(AGENT_CA_|TASK_SIGNING_KEY)/.test(l))
+    .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),
+);
 const file = envFile({
   ...SECRETS,
+  ...pki,
+  AGENT_CA_DIR: pkiDir,
+  AGENT_CONTROL_URL: 'https://agent.localhost',
+  AGENT_INGEST_URL: 'https://ingest.localhost',
+  AGENT_OPAMP_URL: 'wss://agent.localhost/agent/v1/opamp',
   CADDY_CONFIG: 'Caddyfile.local',
   APP_ORIGIN: ORIGIN,
   HTTP_PORT: String(HTTP_PORT),
