@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { Fragment, useState } from 'react';
 import { sectionLines, type Section, type Snapshot } from '@pcp/reports/render';
 import { Alert } from '@/components/ui/alert';
@@ -94,10 +96,13 @@ export function ReportView({
   const w = report.snapshot.window;
   const summary = report.snapshot.sections.find((s) => s.key === 'summary');
   return (
-    <div className="space-y-4">
+    <div className="portal-feature-section space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">{`Daily report — ${report.localDate} · v${report.version}`}</h1>
+          <PageHeading
+            title={<>{`Daily report — ${report.localDate} · v${report.version}`}</>}
+            eyebrow="Product detail"
+          />
           <p className="text-sm text-muted-foreground">
             {`${w.hours} h local day in ${report.timezone}, ${formatLocal(report.windowStart, report.timezone)} to ${formatLocal(report.windowEnd, report.timezone)}`}
             {report.scheduleName ? ` · ${report.scheduleName}` : ''}

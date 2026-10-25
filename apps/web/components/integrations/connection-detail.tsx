@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useState } from 'react';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -96,7 +98,10 @@ const resourceLabel: Record<string, string> = {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section aria-label={title} className="space-y-2 rounded-lg border border-border bg-card p-4">
+    <section
+      aria-label={title}
+      className="portal-detail-card space-y-4 rounded-lg border border-border bg-card p-6"
+    >
       <h2 className="text-sm font-semibold">{title}</h2>
       {children}
     </section>
@@ -175,10 +180,10 @@ export function ConnectionDetail({
         : null;
 
   return (
-    <div className="space-y-4">
+    <div className="portal-feature-section space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-xl font-semibold">{c.displayName}</h1>
+          <PageHeading title={<>{c.displayName}</>} eyebrow="Product detail" />
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>{spec?.title ?? c.provider}</span>
             <Badge className={cn(statusTone(c.status))}>{c.status.replace(/_/g, ' ')}</Badge>

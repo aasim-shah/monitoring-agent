@@ -1,5 +1,8 @@
 'use client';
 
+import { PageDialog } from '@/components/shell/page-dialog';
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -10,7 +13,6 @@ import { RoleSelect } from '@/components/members/role-select';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { api, errorMessage } from '@/lib/api';
 import { QueryState } from '@/lib/page-guard';
 import { roleCan } from '@/lib/permissions';
@@ -43,78 +45,95 @@ export default function MembersPage() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-      <section className="space-y-3">
-        <h1 className="text-xl font-semibold">Members & Roles</h1>
-        {error ? <Alert>{error}</Alert> : null}
-        <QueryState query={members} label="Loading members">
-          <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-            {members.data?.members.map((m) => {
-              const manageable = canManage && rolesAtOrBelow(actorRole).includes(m.role as Role);
-              const isSelf = m.userId === me.data?.user.id;
-              return (
-                <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {m.email} {isSelf ? <span className="text-muted-foreground">(you)</span> : null}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {m.productIds === 'all' ? 'All products' : `${m.productIds.length} product(s)`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {manageable ? (
-                      <RoleSelect
-                        id={`role-${m.id}`}
-                        actorRole={actorRole}
-                        value={m.role as Role}
-                        onChange={(role) =>
-                          run(async () =>
-                            unwrap(
-                              await api.PATCH('/api/v1/organizations/{orgId}/members/{memberId}', {
-                                params: { path: { orgId, memberId: m.id } },
-                                body: { role },
-                              }),
-                            ),
-                          )
-                        }
-                      />
-                    ) : (
-                      <Badge>{ROLE_LABELS[m.role as Role]}</Badge>
-                    )}
-                    {manageable ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          run(async () =>
-                            unwrap(
-                              await api.DELETE('/api/v1/organizations/{orgId}/members/{memberId}', {
-                                params: { path: { orgId, memberId: m.id } },
-                              }),
-                            ),
-                          )
-                        }
-                      >
-                        Remove
-                      </Button>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </QueryState>
-      </section>
-      {canManage ? (
-        <Card className="h-fit space-y-4">
-          <div>
-            <CardTitle>Invite a member</CardTitle>
-            <CardDescription>The invitation link expires in 7 days and works once.</CardDescription>
-          </div>
-          <InviteForm orgId={orgId} actorRole={actorRole} products={products.data?.products ?? []} />
-        </Card>
-      ) : null}
+    <div className="portal-route portal-route-members">
+      <PageHeading
+        title={<>Members & Roles</>}
+        description="Give people the access they need. Keep ownership clear."
+        eyebrow="Workspace operations"
+        action={
+          canManage ? (
+            <PageDialog
+              label="Invite member"
+              title="Invite a member"
+              description="The invitation link expires in 7 days and works once."
+            >
+              <InviteForm orgId={orgId} actorRole={actorRole} products={products.data?.products ?? []} />
+            </PageDialog>
+          ) : undefined
+        }
+      />
+      {error ? <Alert>{error}</Alert> : null}
+      <QueryState query={members} label="Loading members">
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Product access</th>
+                <th>Role & actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.data?.members.map((m) => {
+                const manageable = canManage && rolesAtOrBelow(actorRole).includes(m.role as Role);
+                const isSelf = m.userId === me.data?.user.id;
+                return (
+                  <tr key={m.id}>
+                    <td>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {m.email} {isSelf ? <span className="text-muted-foreground">(you)</span> : null}
+                        </p>
+                      </div>
+                    </td>
+                    <td>{m.productIds === 'all' ? 'All products' : `${m.productIds.length} product(s)`}</td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        {manageable ? (
+                          <RoleSelect
+                            id={`role-${m.id}`}
+                            actorRole={actorRole}
+                            value={m.role as Role}
+                            onChange={(role) =>
+                              run(async () =>
+                                unwrap(
+                                  await api.PATCH('/api/v1/organizations/{orgId}/members/{memberId}', {
+                                    params: { path: { orgId, memberId: m.id } },
+                                    body: { role },
+                                  }),
+                                ),
+                              )
+                            }
+                          />
+                        ) : (
+                          <Badge>{ROLE_LABELS[m.role as Role]}</Badge>
+                        )}
+                        {manageable ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              run(async () =>
+                                unwrap(
+                                  await api.DELETE('/api/v1/organizations/{orgId}/members/{memberId}', {
+                                    params: { path: { orgId, memberId: m.id } },
+                                  }),
+                                ),
+                              )
+                            }
+                          >
+                            Remove
+                          </Button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </QueryState>
     </div>
   );
 }

@@ -48,7 +48,7 @@ export function SimpleForm<T extends FieldValues>({
     }
   });
   return (
-    <form onSubmit={submit} noValidate className="space-y-4">
+    <form onSubmit={submit} noValidate className="grid gap-5">
       {error ? <Alert>{errorMessage(error)}</Alert> : null}
       {fields.map((f) => {
         const message = (errors[f.name] as { message?: string } | undefined)?.message;

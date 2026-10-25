@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Card, CardDescription, CardTitle } from '../ui/card';
+import { Card, CardDescription } from '../ui/card';
 
 export function AuthCard({
   title,
@@ -13,9 +13,9 @@ export function AuthCard({
   footer?: ReactNode;
 }) {
   return (
-    <Card className="w-full max-w-sm space-y-6">
+    <Card className="portal-auth-card w-full max-w-[440px] space-y-6">
       <div className="space-y-1">
-        <CardTitle>{title}</CardTitle>
+        <h1 className="text-[28px] font-bold leading-[34px] tracking-tight">{title}</h1>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </div>
       {children}

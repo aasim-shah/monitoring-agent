@@ -14,9 +14,12 @@ describe('middleware', () => {
     );
   });
 
-  it.each(['/login', '/signup', '/verify?token=x', '/reset'])('lets %s through', (path) => {
-    expect(middleware(req(path)).headers.get('x-middleware-next')).toBe('1');
-  });
+  it.each(['/', '/?source=homepage', '/login', '/signup', '/verify?token=x', '/reset'])(
+    'lets %s through',
+    (path) => {
+      expect(middleware(req(path)).headers.get('x-middleware-next')).toBe('1');
+    },
+  );
 
   it('lets signed-in requests through', () => {
     expect(middleware(req('/orgs', 'pcp_session=abc')).headers.get('x-middleware-next')).toBe('1');

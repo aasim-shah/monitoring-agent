@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -26,7 +28,11 @@ export default function IncidentsPage() {
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Incidents</h1>
+        <PageHeading
+          title={<>Incidents</>}
+          description="What needs attention, with evidence and ownership attached."
+          eyebrow="Product operations"
+        />
         <Link className="text-sm text-primary hover:underline" href={`${base}/alert-rules`}>
           Alert rules
         </Link>

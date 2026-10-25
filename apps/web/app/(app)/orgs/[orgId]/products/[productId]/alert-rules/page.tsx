@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -47,7 +49,11 @@ export default function AlertRulesPage() {
           >
             ← Incidents
           </Link>
-          <h1 className="text-xl font-semibold">Alert rules</h1>
+          <PageHeading
+            title={<>Alert rules</>}
+            description="Define actionable conditions without turning every signal into noise."
+            eyebrow="Product operations"
+          />
           <p className="text-sm text-muted-foreground">
             Evaluated every minute on this product&apos;s data. Notifications go to the{' '}
             <Link className="text-primary hover:underline" href={`/orgs/${orgId}/settings/notifications`}>

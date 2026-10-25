@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -60,15 +62,13 @@ export default function AssetsPage() {
   const toReview = (review.data?.edges.length ?? 0) + (review.data?.aliases.length ?? 0);
 
   return (
-    <div className="space-y-4">
+    <div className="portal-route portal-route-assets space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Assets</h1>
-          <p className="text-sm text-muted-foreground">
-            What this product runs on, discovered from agents, databases, and domains, with evidence for every
-            relationship.
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="Product operations"
+          title="Assets"
+          description="An evidence-backed inventory of what your product depends on."
+        />
         {roleCan(role, 'product.manage') ? (
           <Button
             disabled={running}

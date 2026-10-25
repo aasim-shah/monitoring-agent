@@ -9,6 +9,9 @@ overrides:
   next>postcss: 8.5.31
   deepmerge-ts: 8.0.0
   dockerode>uuid: 11.1.1
+  '@lumen/tokens': file:apps/web/vendor/lumen/lumen-tokens-0.1.0.tgz
+  '@lumen/icons': file:apps/web/vendor/lumen/lumen-icons-0.1.0.tgz
+  '@lumen/react': file:apps/web/vendor/lumen/lumen-react-0.1.0.tgz
 
 importers:
 
@@ -217,6 +220,15 @@ importers:
       '@hookform/resolvers':
         specifier: 5.9.2
         version: 5.9.2(@standard-schema/spec@1.1.0)(ajv-errors@3.0.0(ajv@8.20.0))(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(effect@3.21.0)(react-hook-form@7.90.0(@types/react@19.1.17)(react@19.1.10))(zod@4.6.7)
+      '@lumen/icons':
+        specifier: file:vendor/lumen/lumen-icons-0.1.0.tgz
+        version: file:apps/web/vendor/lumen/lumen-icons-0.1.0.tgz(react@19.1.10)
+      '@lumen/react':
+        specifier: file:vendor/lumen/lumen-react-0.1.0.tgz
+        version: file:apps/web/vendor/lumen/lumen-react-0.1.0.tgz(react-dom@19.1.10(react@19.1.10))(react@19.1.10)
+      '@lumen/tokens':
+        specifier: file:vendor/lumen/lumen-tokens-0.1.0.tgz
+        version: file:apps/web/vendor/lumen/lumen-tokens-0.1.0.tgz
       '@pcp/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
@@ -250,6 +262,9 @@ importers:
       clsx:
         specifier: 2.1.1
         version: 2.1.1
+      gsap:
+        specifier: 3.13.0
+        version: 3.13.0
       lucide-react:
         specifier: 0.577.0
         version: 0.577.0(react@19.1.10)
@@ -1805,6 +1820,27 @@ packages:
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
     engines: {node: '>=8'}
+
+  '@lumen/icons@file:apps/web/vendor/lumen/lumen-icons-0.1.0.tgz':
+    resolution: {integrity: sha512-4e+amBJ3R0aiCoRh32561G+psGWjmHtnbXB/l5tp8qygtUEcQ0cm/RP3sPdMqHAYp8XFYgMp0HKb/qmVWAJfnw==, tarball: file:apps/web/vendor/lumen/lumen-icons-0.1.0.tgz}
+    version: 0.1.0
+    peerDependencies:
+      react: '>=18'
+      react-native-svg: '>=13'
+    peerDependenciesMeta:
+      react-native-svg:
+        optional: true
+
+  '@lumen/react@file:apps/web/vendor/lumen/lumen-react-0.1.0.tgz':
+    resolution: {integrity: sha512-sxfTt2wEovQZhlRI9iMLtk1VmjWQ346dXxZxP275g33R3cHFzkhzsPbh7pfSk4L+LVw1FUzmBE6w0Jv/w5W8Ig==, tarball: file:apps/web/vendor/lumen/lumen-react-0.1.0.tgz}
+    version: 0.1.0
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+
+  '@lumen/tokens@file:apps/web/vendor/lumen/lumen-tokens-0.1.0.tgz':
+    resolution: {integrity: sha512-6WDlyGAWfXiK7Hv4chAte4Uob2FBkiVGPqCo7kF6ACDnJ6Y1rC9AmgH0x1OtUtSBJgTXZTDaHtEBbzmZ4DJdlQ==, tarball: file:apps/web/vendor/lumen/lumen-tokens-0.1.0.tgz}
+    version: 0.1.0
 
   '@mongodb-js/saslprep@1.6.1':
     resolution: {integrity: sha512-D4CQtk9IwjCLAvCf1xvHEod3960q8XMUzfmdRU9qjUNlHnesGuTOvJcOTaPm9koZ1caUKA2aTbszZiAkcmSgmg==}
@@ -4178,6 +4214,9 @@ packages:
 
   graphemer@1.4.0:
     resolution: {integrity: sha512-EtKwoO6kxCL9WO5xipiHTZlSzBm7WLT627TqC/uVRd0HKmq8NXyebnNYxDoBi7wt8eTWrUrKXCOVaFq9x1kgag==}
+
+  gsap@3.13.0:
+    resolution: {integrity: sha512-QL7MJ2WMjm1PHWsoFrAQH/J8wUeqZvMtHO58qdekHpCfhvhSL4gSiz6vJf5EeMP0LOn3ZCprL2ki/gjED8ghVw==}
 
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
@@ -6576,6 +6615,21 @@ snapshots:
       - supports-color
 
   '@lukeed/csprng@1.1.0': {}
+
+  '@lumen/icons@file:apps/web/vendor/lumen/lumen-icons-0.1.0.tgz(react@19.1.10)':
+    dependencies:
+      react: 19.1.10
+
+  '@lumen/react@file:apps/web/vendor/lumen/lumen-react-0.1.0.tgz(react-dom@19.1.10(react@19.1.10))(react@19.1.10)':
+    dependencies:
+      '@lumen/icons': file:apps/web/vendor/lumen/lumen-icons-0.1.0.tgz(react@19.1.10)
+      '@lumen/tokens': file:apps/web/vendor/lumen/lumen-tokens-0.1.0.tgz
+      react: 19.1.10
+      react-dom: 19.1.10(react@19.1.10)
+    transitivePeerDependencies:
+      - react-native-svg
+
+  '@lumen/tokens@file:apps/web/vendor/lumen/lumen-tokens-0.1.0.tgz': {}
 
   '@mongodb-js/saslprep@1.6.1':
     dependencies:
@@ -9183,6 +9237,8 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   graphemer@1.4.0: {}
+
+  gsap@3.13.0: {}
 
   has-bigints@1.1.0: {}
 

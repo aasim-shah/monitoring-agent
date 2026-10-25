@@ -1,3 +1,4 @@
+import { PageHeading } from '@/components/shell/page-heading';
 import { Badge } from '@/components/ui/badge';
 import type { ActionRow } from './action-list';
 import { describeAction, STATUS_LABEL, STATUS_TONE } from './format';
@@ -52,9 +53,9 @@ export function ActionDetail({ action }: { action: ActionDetailData }) {
     ]),
   ];
   return (
-    <div className="space-y-4">
+    <div className="portal-feature-section space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">{label}</h1>
+        <PageHeading title={<>{label}</>} eyebrow="Product detail" />
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <Badge className={STATUS_TONE[action.status]}>{STATUS_LABEL[action.status] ?? action.status}</Badge>
           {action.proposedByAi ? <Badge>Proposed by AI</Badge> : null}

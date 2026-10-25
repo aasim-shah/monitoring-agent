@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -85,15 +87,13 @@ export default function WebsitesPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="portal-route portal-route-websites space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Websites & APIs</h1>
-          <p className="text-sm text-muted-foreground">
-            Status, response time, redirects, and certificate expiry for public URLs, checked from the
-            platform. A site is down after 2 failed checks in a row.
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="Product operations"
+          title="Websites & APIs"
+          description="Availability and response times for your public endpoints."
+        />
         {canManage ? <AddMonitorDialog onSubmit={add} /> : null}
       </div>
       {error ? <Alert>{error}</Alert> : null}

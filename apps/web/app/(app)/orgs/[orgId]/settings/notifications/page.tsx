@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -32,14 +34,13 @@ export default function NotificationChannelsPage() {
   const canManage = roleCan(org.data.role as Role, 'org.settings.manage');
   const refresh = () => queryClient.invalidateQueries({ queryKey: key });
   return (
-    <section className="space-y-4">
+    <section className="portal-route portal-route-notifications space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold">Notification channels</h1>
-          <p className="text-sm text-muted-foreground">
-            Incidents notify every active channel at most once per 30 minutes per incident.
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="Workspace"
+          title={<>Notification channels</>}
+          description={<>Incidents notify every active channel at most once per 30 minutes per incident.</>}
+        />
         {canManage ? (
           <AddChannelDialog
             onSubmit={async (body) => {

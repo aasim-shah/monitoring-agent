@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -95,16 +97,13 @@ export default function AutomationsPage() {
     }, 'Sent for approval.');
 
   return (
-    <div className="space-y-6">
+    <div className="portal-route portal-route-automations space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Automations & Approvals</h1>
-          <p className="text-sm text-muted-foreground">
-            Restart an allowlisted service after someone approves it. Every action is checked against its
-            policy, shows its impact first, runs once through a signed short-lived task, is verified, and is
-            audited. The AI assistant can only propose.
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="Product operations"
+          title="Automations & approvals"
+          description="Review permitted actions, their exact targets, and execution evidence."
+        />
         {roleCan(role, 'action.propose') && hosts.length ? (
           <ProposeDialog hosts={hosts} unitsByEnvironment={unitsByEnvironment} onSubmit={propose} />
         ) : null}

@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { unwrap } from '@pcp/api-client';
@@ -83,43 +85,53 @@ export default function IntegrationsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Integrations</h1>
-        <p className="text-sm text-muted-foreground">
-          Connect the services this product runs on with read-only, scoped tokens. Discovered zones,
-          repositories, and targets become assets; deployments and changes reach incidents, the AI assistant,
-          and daily reports.
-        </p>
-      </div>
+    <div className="portal-route portal-route-integrations space-y-6">
+      <PageHeading
+        eyebrow="Product operations"
+        title="Integrations"
+        description="Connect verified sources. Keep permissions and data gaps visible."
+      />
       <QueryState query={catalog} label="Loading integrations">
         <div className="grid gap-3 sm:grid-cols-2">
           {available.map((p) => {
             const spec = INTEGRATIONS[p];
             const entry = catalog.data!.connectors.find((c) => c.type === p)!;
-            const count = (connections.data ?? []).filter((c) => c.provider === p).length;
+            const matched = (connections.data ?? []).filter((c) => c.provider === p);
+            const count = matched.length;
             return (
               <Card key={p} className="flex flex-col justify-between gap-3 p-4">
                 <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    {spec.title}
-                    {count ? <Badge>{count} connected</Badge> : null}
-                  </CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base">{spec.title}</CardTitle>
+                  <div className="portal-provider-status">
+                    <Badge className={count ? 'text-success' : undefined}>
+                      {count ? 'Connected' : 'Not connected'}
+                    </Badge>
+                  </div>
                   <CardDescription>{spec.summary}</CardDescription>
                 </div>
-                {canConfigure ? (
-                  <div>
-                    {spec.oauth ? (
-                      <GoogleConnectDialog onConnect={connectGoogle} />
-                    ) : (
-                      <ConnectDialog
-                        spec={spec}
-                        credentialFields={entry.credentialFields ?? []}
-                        onSubmit={connect}
-                      />
-                    )}
-                  </div>
-                ) : null}
+                <div className="portal-provider-actions">
+                  {matched[0] && (
+                    <Link
+                      className="portal-table-action"
+                      href={`/orgs/${orgId}/products/${productId}/integrations/${matched[0].id}`}
+                    >
+                      Manage connection ↗
+                    </Link>
+                  )}
+                  {canConfigure ? (
+                    <div>
+                      {spec.oauth ? (
+                        <GoogleConnectDialog onConnect={connectGoogle} />
+                      ) : (
+                        <ConnectDialog
+                          spec={spec}
+                          credentialFields={entry.credentialFields ?? []}
+                          onSubmit={connect}
+                        />
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               </Card>
             );
           })}

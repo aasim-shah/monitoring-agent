@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -46,9 +48,14 @@ export default function AssetDetailPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h1 className="flex items-center gap-3 text-xl font-semibold">
-                  {a.name} <Badge>{a.assetType}</Badge> <Badge>{a.lifecycle}</Badge>
-                </h1>
+                <PageHeading
+                  title={
+                    <>
+                      {a.name} <Badge>{a.assetType}</Badge> <Badge>{a.lifecycle}</Badge>
+                    </>
+                  }
+                  eyebrow="Product operations"
+                />
                 <p className="text-sm text-muted-foreground">
                   Source {a.source.replace('_', ' ')} · first seen {relativeTime(a.firstSeenAt)} · last seen{' '}
                   {relativeTime(a.lastSeenAt)}

@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading, PageMetrics } from '@/components/shell/page-heading';
+
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { unwrap } from '@pcp/api-client';
@@ -24,13 +26,29 @@ export default function InfrastructurePage() {
   const hosts = infra.data?.hosts ?? [];
   const base = `/orgs/${orgId}/products/${productId}`;
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Infrastructure</h1>
-        <p className="text-sm text-muted-foreground">
-          Current CPU, memory, and disk for each server. Updates every 30 s.
-        </p>
-      </div>
+    <div className="portal-route portal-route-infrastructure space-y-4">
+      <PageHeading
+        eyebrow="Product operations"
+        title="Infrastructure"
+        description="Host signals alongside the services they support."
+      />
+      {infra.data && (
+        <PageMetrics
+          items={[
+            { label: 'Hosts', value: hosts.length, detail: 'In this product' },
+            {
+              label: 'Reporting',
+              value: hosts.filter((h) => !h.stale && h.lastSampleAt).length,
+              detail: 'With current telemetry',
+            },
+            {
+              label: 'Stale sources',
+              value: hosts.filter((h) => h.stale).length,
+              detail: 'Last values may be outdated',
+            },
+          ]}
+        />
+      )}
       <QueryState query={infra} label="Loading infrastructure">
         {hosts.length === 0 ? (
           <Empty

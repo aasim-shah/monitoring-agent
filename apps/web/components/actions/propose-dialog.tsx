@@ -83,7 +83,7 @@ export function ProposeDialog({
           An approver reviews the impact first. The host restarts the service only if its own helper allowlist
           lists it.
         </DialogDescription>
-        <div className="space-y-4">
+        <div className="portal-feature-section space-y-4">
           {error ? <Alert>{error}</Alert> : null}
           <Field id="propose-host" label="Host">
             <select

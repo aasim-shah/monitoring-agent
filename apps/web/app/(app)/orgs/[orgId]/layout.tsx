@@ -1,11 +1,11 @@
 'use client';
 
+import { PortalNavigation } from '@/components/shell/portal-navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import type { Role } from '@pcp/shared-contracts';
-import { ContextSwitcher } from '@/components/shell/context-switcher';
-import { SideNav } from '@/components/shell/side-nav';
+import { PortalTopbar } from '@/components/shell/portal-topbar';
 import { ErrorState } from '@/components/states/error-state';
 import { Loading } from '@/components/states/loading';
 import { NotFoundState } from '@/components/states/not-found-state';
@@ -36,32 +36,35 @@ export default function OrganizationLayout({ children }: { children: ReactNode }
   if (!org.data) return <Loading label="Loading organization" />;
   const role = (org.data.role ?? 'viewer') as Role;
   return (
-    <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 md:grid-cols-[240px_1fr]">
-      <aside className="space-y-6">
-        <SideNav title={org.data.name} items={buildOrgNav(orgId, role)} />
-        {productId ? <SideNav title="Product" items={buildProductNav(orgId, productId, role)} /> : null}
-      </aside>
-      <main className="space-y-4">
-        <ContextSwitcher orgId={orgId} productId={productId} />
-        {org.data.deletionScheduledFor ? (
-          <DeletionBanner
-            scheduledFor={org.data.deletionScheduledFor}
-            canCancel={roleCan(role, 'org.delete')}
-            onCancel={async () => {
-              unwrap(
-                await api.POST('/api/v1/organizations/{orgId}/deletion/cancel', {
-                  params: { path: { orgId } },
-                }),
-              );
-              await queryClient.invalidateQueries({ queryKey: ['org', orgId] });
-            }}
-          />
-        ) : null}
-        {org.data.telemetryLimitSince ? (
-          <LimitBanner since={org.data.telemetryLimitSince} usageHref={`/orgs/${orgId}/usage`} />
-        ) : null}
-        {children}
-      </main>
+    <div className="portal-layout">
+      <PortalNavigation
+        organization={org.data.name}
+        orgItems={buildOrgNav(orgId, role)}
+        productItems={productId ? buildProductNav(orgId, productId, role) : []}
+      />
+      <div className="portal-workspace">
+        <PortalTopbar organization={org.data.name} orgId={orgId} productId={productId} />
+        <main className="portal-main space-y-6">
+          {org.data.deletionScheduledFor ? (
+            <DeletionBanner
+              scheduledFor={org.data.deletionScheduledFor}
+              canCancel={roleCan(role, 'org.delete')}
+              onCancel={async () => {
+                unwrap(
+                  await api.POST('/api/v1/organizations/{orgId}/deletion/cancel', {
+                    params: { path: { orgId } },
+                  }),
+                );
+                await queryClient.invalidateQueries({ queryKey: ['org', orgId] });
+              }}
+            />
+          ) : null}
+          {org.data.telemetryLimitSince ? (
+            <LimitBanner since={org.data.telemetryLimitSince} usageHref={`/orgs/${orgId}/usage`} />
+          ) : null}
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

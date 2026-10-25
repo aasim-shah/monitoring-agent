@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { unwrap } from '@pcp/api-client';
@@ -23,14 +25,13 @@ export default function UsagePage() {
     { refetchInterval: 60_000 },
   );
   return (
-    <section className="space-y-4">
+    <section className="portal-route portal-route-usage space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Usage</h1>
-          <p className="text-sm text-muted-foreground">
-            Telemetry this organization sends, against its limits.
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="Workspace"
+          title={<>Usage</>}
+          description={<>Telemetry this organization sends, against its limits.</>}
+        />
         <div role="group" aria-label="Range" className="flex gap-1">
           {(['24h', '7d'] as const).map((r) => (
             <Button

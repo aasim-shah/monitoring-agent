@@ -137,7 +137,7 @@ export function ScheduleDialog({
           Each morning at this local time, a report of the previous complete local day goes to the channels
           and recipients you choose.
         </DialogDescription>
-        <div className="space-y-4">
+        <div className="portal-feature-section space-y-4">
           {error ? <Alert>{error}</Alert> : null}
           <Field id="schedule-name" label="Name">
             <Input id="schedule-name" value={name} onChange={(e) => setName(e.target.value)} />
