@@ -75,8 +75,8 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M5.7 | Fleet UI | Done | [M5.7](M5.7-fleet-ui.md) |
 | M6.1 | Agent distribution build | Done (M6a scope) | [M6.1](M6.1-collector-dist.md) |
 | M6.2 | `pcp-agentctl` | In progress | enroll/run/status in [M5.7](M5.7-fleet-ui.md); packaging pending |
-| M6.3 | `pcpcontrol` extension (heartbeat, tasks, discovery) | Not started | — |
-| M6.4 | OpAMP server and supervisor | Not started | — |
+| M6.3 | `pcpcontrol` extension (heartbeat, tasks, discovery) | Superseded | Done in `pcp-agentctl` over the mTLS control channel (heartbeat, signed tasks, discovery, packs); [M6a-execution-log](M6a-execution-log.md), [M6b-execution-log](M6b-execution-log.md) |
+| M6.4 | OpAMP server and supervisor | Superseded | Configuration and upgrades run over the same control channel (policy versions, config/ack) and the installer; `apps/opamp-server` exists but is not deployed. ADR 0005 to be amended |
 | M6.5 | Ingest gateway | Done | [lookup](M6.5-internal-lookup.md), [gateway](M6.5-ingest-gateway.md) |
 | M6.6 | Telemetry query module | Done | [M6.6](M6.6-telemetry-query.md) |
 | M6.7 | Installer and systemd units | Done (M6a scope) | [M6.7](M6.7-installer.md); [deploy runbook](../runbooks/deploy-control-plane.md) |
@@ -86,13 +86,13 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M7.3 | GitHub connector | Done | [M7-connectors](M7-connectors.md) |
 | M7.4 | Prometheus (Mode A) and Grafana connectors | Done | [M7-connectors](M7-connectors.md) |
 | M7.5 | Integrations UI | Done | [M7-web](M7-web.md) |
-| M8.1 | Private connector worker | Not started | — |
-| M8.2 | Database connectors | Not started | — |
-| M8.3 | Custom REST connector and SSRF guard | Not started | — |
-| M9.1 | Observation pipeline | Not started | — |
-| M9.2 | Correlation rules | Not started | — |
-| M9.3 | Graph API and traversal | Not started | — |
-| M9.4 | Topology, inventory, review UI | Not started | — |
+| M8.1 | Private connector worker | Done | [M8-private-worker](M8-private-worker.md) |
+| M8.2 | Database connectors | Done | [M8-database-connectors](M8-database-connectors.md) |
+| M8.3 | Custom REST connector and SSRF guard | Done | [M8-custom-rest](M8-custom-rest.md), [M8-ssrf](M8-ssrf.md) |
+| M9.1 | Observation pipeline | Done | [M9-data-model](M9-data-model.md) |
+| M9.2 | Correlation rules | Done | [M9-sources-rules](M9-sources-rules.md), [M9-discovery-engine](M9-discovery-engine.md) |
+| M9.3 | Graph API and traversal | Done | [M9-graph-api](M9-graph-api.md) |
+| M9.4 | Topology, inventory, review UI | Done | [M9-assets-ui](M9-assets-ui.md) |
 | M10.1 | Pack schema and loader | Done (code catalog) | [M6b-packs-api](M6b-packs-api.md) |
 | M10.2 | Pack compiler | Done | [M6b-agent-packs](M6b-agent-packs.md), [M10-execution-log](M10-execution-log.md) |
 | M10.3 | Pack catalog | Done | [M6b-packs-api](M6b-packs-api.md) |
