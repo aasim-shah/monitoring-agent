@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -549,7 +549,8 @@ describe('service discovery and monitoring packs (M6b exit gate)', () => {
     expect((await inHost('grep -c otlphttp/logs /var/lib/pcp-agent/collector.yaml')).stdout.trim()).not.toBe(
       '0',
     );
-    const marker = `pcp-e2e-retained-${Date.now()}`;
+    // No long digit runs: retained-log redaction masks any 13–19 digits as a possible card number.
+    const marker = `pcp-e2e-retained-${randomUUID().slice(0, 8)}`;
     const shipped = await until(
       'retained redis log line',
       async () => {
@@ -560,7 +561,36 @@ describe('service discovery and monitoring packs (M6b exit gate)', () => {
         return (found.json.lines as Json[] | undefined)?.find((l) => String(l.message).includes(marker));
       },
       180_000,
-    );
+    ).catch(async (err: Error) => {
+      // Say where the line stopped: collector, gateway, or storage.
+      const collector = await inHost(
+        'journalctl -u pcp-agent --no-pager -n 80 | grep -iE "otlphttp|logs|error" | tail -30',
+      );
+      const gw = await compose(['logs', '--tail', '40', 'ingest-gateway', 'victorialogs']);
+      const search = await api('GET', `/api/v1/products/${productId}/logs/search?query=${marker}&range=1h`);
+      let stored = '';
+      for (const account of [0, 1, 2, 3, 4, 5])
+        stored += `account ${account}: ${(
+          await compose([
+            'exec',
+            '-T',
+            'victorialogs',
+            'wget',
+            '-qO-',
+            '--header',
+            `AccountID: ${account}`,
+            'http://127.0.0.1:9428/select/logsql/query?query=*&limit=3',
+          ])
+        ).stdout.slice(0, 600)}\n`;
+      gw.stdout += `\nsearch ${search.status}: ${JSON.stringify(search.json).slice(0, 600)}\n${stored}`;
+      writeFileSync(
+        join(work, 'retained-logs-debug.log'),
+        `${collector.stdout}\n---\n${gw.stdout}${gw.stderr}`,
+      );
+      throw new Error(
+        `${err.message}\ncollector:\n${collector.stdout.slice(-2000)}\ngateway/vlogs:\n${gw.stdout.slice(-2000)}`,
+      );
+    });
     expect(shipped.message).toContain('password=[REDACTED]');
     expect(shipped.message).toContain('[EMAIL]');
     expect(shipped.message).not.toContain('hunter2-e2e');
