@@ -165,7 +165,7 @@ Host detail → Detected services and proposals, Enable pack dialog (credentials
 - [x] M10.6 Usage and limits UI — gateway usage every 60 s, usage page, limit banner, hourly owner notice ([M10-execution-log](../handoffs/M10-execution-log.md))
 - [x] M10.7 Live boost — 5 s for 10 minutes, reverted by the agent, at most 3 per organization ([M10-execution-log](../handoffs/M10-execution-log.md))
 - [x] M10.8 Service dashboards — fixed-PromQL charts per pack on the host page ([M6b-services-ui](../handoffs/M6b-services-ui.md)); Redis and PostgreSQL verified end to end
-- [ ] M18.3 Level 1 managed exporters
+- [x] M18.3 Level 1 managed exporters ([M18](../handoffs/M18-execution-log.md))
 
 ## 12. Acceptance criteria
 

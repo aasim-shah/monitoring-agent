@@ -33,7 +33,9 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M10 Monitoring packs (remainder) | Done | Branch `feat/m10-packs`; deployed; usage and limits, live boost (agent 0.4.0), Level 2 guides for Node.js, Kafka, nginx, edge drop-label transform; [execution log](M10-execution-log.md) |
 | M15b Daily report: 24 h activity and trends | Done | Branch `feat/m15b-report-trends`; deployed with M10; database rows added, website speed, Google KPI trends; [execution log](M15b-execution-log.md) |
 | M17 Installation methods | Done | Branch `feat/m17-install`; deployed; Ansible, cloud-init, Compose profile, assisted SSH install; [execution log](M17-execution-log.md) |
-| M18; M19.2/.4/.7 | Not started | M13.4 Google Ads gated on a developer token; pentest, load baselines, self-hosted packaging, and pilot need people or a separate host |
+| M18 Retained logs, data inspection, Level 1, rollups | Done | Branch `feat/m18-logs-inspection`; deployed (agent 0.5.0); retained logs and rollups ship behind the `logs` and `rollups` profiles, off on the shared VPS; [execution log](M18-execution-log.md) |
+| M19b Self-hosted, load baselines, docs | Done | Branch `feat/m19-selfhosted`; deployed with M18; OIDC, local LLM, AI switch, runbooks, capacity baselines; [execution log](M19b-execution-log.md) |
+| Remaining | Needs people | External pentest (M19.1), pilot with 1–3 customers (M19.7), M0 ADR and threat-model sign-off, M13.4 Google Ads (developer token) |
 
 ## Maintenance
 
@@ -128,15 +130,15 @@ Branches: `feat/m0-m1-foundation` (M0, M1) → `feat/m2-identity-tenancy` (M2, s
 | M17.1 | Fleet install UX | Done | [M17-execution-log](M17-execution-log.md) |
 | M17.2 | Fleet tooling | Done | [M17-execution-log](M17-execution-log.md) |
 | M17.3 | Installer runner (assisted SSH, opt-in) | Done | [M17-execution-log](M17-execution-log.md) |
-| M18.1 | Retained logs | Not started | — |
-| M18.2 | Data inspection | Not started | — |
-| M18.3 | Level 1 managed exporters | Not started | — |
-| M18.4 | Long-term rollups | Not started | — |
+| M18.1 | Retained logs | Done | [M18-execution-log](M18-execution-log.md) |
+| M18.2 | Data inspection | Done | [M18-execution-log](M18-execution-log.md) |
+| M18.3 | Level 1 managed exporters | Done | [M18-execution-log](M18-execution-log.md) |
+| M18.4 | Long-term rollups | Done | [M18-execution-log](M18-execution-log.md) |
 | M19.1 | Security hardening | In progress | CSP and headers, dependency audit, zod fix done; external pentest pending — [M19 log](M19-execution-log.md) |
-| M19.2 | Load tests | Not started | — |
+| M19.2 | Load tests | Done | Baselines in [capacity](../runbooks/capacity.md); [M19b-execution-log](M19b-execution-log.md) |
 | M19.3 | Backup and restore | Done | [runbook](../runbooks/backup-restore.md) |
-| M19.4 | Self-hosted packaging | Not started | — |
+| M19.4 | Self-hosted packaging | Done | OIDC, local LLM, AI switch, [install](../runbooks/self-hosted-install.md)/[upgrade](../runbooks/self-hosted-upgrade.md)/[backup](../runbooks/self-hosted-backup.md) runbooks; a run on a clean VPS is still to be done; [M19b-execution-log](M19b-execution-log.md) |
 | M19.5 | Platform self-monitoring | Done | [runbook](../runbooks/watchdog.md) |
-| M19.6 | Documentation | In progress | Runbooks for backup and watchdog; customer and security docs pending |
-| M19.7 | Pilot | Not started | — |
+| M19.6 | Documentation | Done | [onboarding](../customer/onboarding.md), [connector development](../connector-development/README.md), [security overview](../security/whitepaper.md); [M19b-execution-log](M19b-execution-log.md) |
+| M19.7 | Pilot | Needs people | 1–3 real customers against spec §24.2 |
 | M19.8 | Tenant data export and deletion | Done | [M19 log](M19-execution-log.md) |
