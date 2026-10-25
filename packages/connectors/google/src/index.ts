@@ -337,6 +337,29 @@ export function createGoogleConnector(opts: GoogleOptions): Connector {
           r.dimensionValues[1]!.value || '(other)',
         ),
       );
+    // Visitors per hour of each day (the report's busy hour) and every event's daily count
+    // (custom events). Breakdowns carry a prefix so they never mix with the channel groups.
+    for (const [second, metric, prefix] of [
+      ['hour', 'activeUsers', 'hour'],
+      ['eventName', 'eventCount', 'event'],
+    ] as const) {
+      const r = await call<Report>(token, HOST.data, `/v1beta/${property}:runReport`, {
+        dateRanges,
+        dimensions: [{ name: 'date' }, { name: second }],
+        metrics: [{ name: metric }],
+        limit: 5000,
+        returnPropertyQuota: true,
+      });
+      for (const row of r.rows ?? [])
+        points.push(
+          point(
+            metric,
+            day(row.dimensionValues[0]!.value),
+            row.metricValues[0]?.value,
+            `${prefix}:${row.dimensionValues[1]!.value}`,
+          ),
+        );
+    }
     return points;
   }
 

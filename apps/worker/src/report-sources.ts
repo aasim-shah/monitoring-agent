@@ -12,6 +12,7 @@ import type {
   WebsiteStats,
 } from '@pcp/reports';
 import { databaseActivity } from '@pcp/reports';
+import { domainExpiry } from './domain-expiry.js';
 import { kpisFor, type TenantContext } from '@pcp/shared-contracts';
 import { withTenant } from '@pcp/tenant-security';
 
@@ -74,6 +75,7 @@ async function vmRange(
   promql: string,
   w: ReportWindow,
   stepSeconds: number,
+  keyLabel = 'monitor_id',
 ): Promise<Map<string, Map<number, number>> | null> {
   if (!base) return null;
   const params = new URLSearchParams({
@@ -96,7 +98,7 @@ async function vmRange(
     if (!res.ok || body.status !== 'success' || !body.data) return null;
     return new Map(
       body.data.result.map((r) => [
-        r.metric.monitor_id ?? '',
+        r.metric[keyLabel] ?? '',
         new Map(
           r.values.map(([t, v]) => [t, Number(v)] as [number, number]).filter(([, v]) => Number.isFinite(v)),
         ),
@@ -115,7 +117,13 @@ const byAgent = (rows: Sample[] | null) =>
  * PostgreSQL, host, log, and website numbers from VictoriaMetrics over the local day. Each
  * source is read once per window; a source without data is `null` and explained in coverage.
  */
-export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: string }) {
+export function createReportSources(deps: {
+  prisma: PrismaClient;
+  vmQueryUrl?: string;
+  /** When a host's domain registration expires (ISO); RDAP by default. */
+  domainExpiry?: (host: string, at: Date) => Promise<string | null>;
+}) {
+  const expiry = deps.domainExpiry ?? ((host: string, at: Date) => domainExpiry(host, at));
   return (ctx: TenantContext, productId: string): ReportSources => {
     const memo = new Map<string, Promise<unknown>>();
     const once = <T>(name: string, w: ReportWindow, f: () => Promise<T>): Promise<T> => {
@@ -161,6 +169,21 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
           ),
           vm(`100 * max by (agent_id) (max_over_time(system_filesystem_utilization_ratio[${r}]))`, w),
         ]);
+        // CPU every 5 minutes, only to say when the peak happened.
+        const cpuSeries = await vmRange(
+          deps.vmQueryUrl,
+          ctx.organizationId,
+          productId,
+          '100 * (1 - avg by (agent_id) (avg_over_time(system_cpu_utilization_ratio{state="idle"}[5m])))',
+          w,
+          300,
+          'agent_id',
+        );
+        const peakAt = (id: string) => {
+          let best: [number, number] | null = null;
+          for (const [t, v] of cpuSeries?.get(id) ?? []) if (!best || v > best[1]) best = [t, v];
+          return best ? new Date(best[0] * 1000).toISOString() : null;
+        };
         if (!cpu?.length) return null;
         const names = new Map(
           (
@@ -176,6 +199,7 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
             hostname: names.get(id) ?? id,
             cpuAvg: c.value,
             cpuMax: mx.get(id) ?? null,
+            cpuPeakAt: peakAt(id),
             memoryAvg: mem.get(id) ?? null,
             diskMax: dk.get(id) ?? null,
           };
@@ -294,8 +318,21 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
           }
           return out;
         };
-        return monitors.map((m) => ({
+        const domains = await Promise.all(
+          monitors.map(async (m) => {
+            let host = '';
+            try {
+              host = new URL(m.url).hostname;
+            } catch {
+              return null;
+            }
+            const at = await expiry(host, w.end);
+            return at ? Math.floor((Date.parse(at) - w.end.getTime()) / 86_400_000) : null;
+          }),
+        );
+        return monitors.map((m, i) => ({
           url: m.url,
+          domainDays: domains[i] ?? null,
           uptimePercent: uptime.get(m.id) ?? null,
           tlsDays: m.tlsExpiresAt
             ? Math.floor((m.tlsExpiresAt.getTime() - w.end.getTime()) / 86_400_000)
@@ -363,6 +400,41 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
             orderBy: { day: 'desc' },
           });
           const iso = (d: Date) => d.toISOString().slice(0, 10);
+          // GA4 breakdowns for the report day and the day before: visitors per hour, events by name.
+          const breakdowns = await tx.metricAggregate.findMany({
+            where: {
+              connectionId: { in: connections.map((c) => c.id) },
+              resourceType: 'google_ga4_property',
+              day: { in: [new Date(reportDay.getTime() - 86_400_000), reportDay] },
+              OR: [{ dimension: { startsWith: 'hour:' } }, { dimension: { startsWith: 'event:' } }],
+            },
+            select: { connectionId: true, externalId: true, dimension: true, day: true, value: true },
+          });
+          const ga4Extras = (connectionId: string, externalId: string) => {
+            const mine = breakdowns.filter(
+              (b) => b.connectionId === connectionId && b.externalId === externalId && b.value !== null,
+            );
+            const today = mine.filter((b) => iso(b.day) === w.localDate);
+            const hours = today.filter((b) => b.dimension.startsWith('hour:'));
+            const top = hours.sort((a, b) => b.value! - a.value!)[0];
+            const yesterday = new Map(
+              mine
+                .filter((b) => iso(b.day) !== w.localDate && b.dimension.startsWith('event:'))
+                .map((b) => [b.dimension, b.value!]),
+            );
+            return {
+              busiestHour: top ? { hour: Number(top.dimension.slice(5)), users: top.value! } : null,
+              events: today
+                .filter((b) => b.dimension.startsWith('event:'))
+                .sort((a, b) => b.value! - a.value!)
+                .slice(0, 40)
+                .map((b) => ({
+                  name: b.dimension.slice(6),
+                  count: b.value!,
+                  previous: yesterday.get(b.dimension) ?? null,
+                })),
+            };
+          };
           return {
             reportDay: w.localDate,
             resources: connections.flatMap((c) =>
@@ -392,6 +464,7 @@ export function createReportSources(deps: { prisma: PrismaClient; vmQueryUrl?: s
                     source: GOOGLE_SOURCE[sc.resourceType]!,
                     partial: mine.some((r) => iso(r.day) === w.localDate && r.completeness === 'partial'),
                     values,
+                    ...(sc.resourceType === 'google_ga4_property' ? ga4Extras(c.id, sc.externalId) : {}),
                   };
                 }),
             ),

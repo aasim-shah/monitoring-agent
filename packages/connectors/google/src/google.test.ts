@@ -97,6 +97,17 @@ function standard({ method, url, body }: Call): Answer {
     };
   if (method === 'POST' && p === 'analyticsdata.googleapis.com/v1beta/properties/123:runReport') {
     const req = JSON.parse(body) as { dimensions: Array<{ name: string }> };
+    const pair = (a: string, b: string, v: string) => ({
+      dimensionValues: [{ value: a }, { value: b }],
+      metricValues: [{ value: v }],
+    });
+    if (req.dimensions[1]?.name === 'hour')
+      return { status: 200, body: { rows: [pair('20261024', '22', '61'), pair('20261024', '03', '2')] } };
+    if (req.dimensions[1]?.name === 'eventName')
+      return {
+        status: 200,
+        body: { rows: [pair('20261024', 'sign_up', '34'), pair('20261024', 'page_view', '900')] },
+      };
     if (req.dimensions.length === 2)
       return {
         status: 200,
@@ -301,6 +312,9 @@ describe('Google connector (WB-08 UC-08-04/05/07/08)', () => {
     expect(v('activeUsers', '2026-10-25')).toMatchObject({ value: 40, completeness: 'partial' });
     expect(v('engagementRate', '2026-10-24')?.value).toBe(0.61);
     expect(v('sessions', '2026-10-25', 'Organic Search')?.value).toBe(30);
+    // Visitors per hour (the busy hour) and each event's count (custom events).
+    expect(v('activeUsers', '2026-10-24', 'hour:22')?.value).toBe(61);
+    expect(v('eventCount', '2026-10-24', 'event:sign_up')?.value).toBe(34);
     expect(points.some((p) => /login|auth/i.test(p.metric))).toBe(false);
   });
 

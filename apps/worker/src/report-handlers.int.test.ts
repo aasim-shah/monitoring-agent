@@ -60,7 +60,11 @@ function deps(over: Partial<ReportDeps> = {}): ReportDeps {
     now: () => new Date('2026-10-26T07:01:00Z'),
     provider: verified(),
     appOrigin: 'https://monitor.example.com',
-    sources: createReportSources({ prisma, vmQueryUrl: `http://127.0.0.1:${vmPort}` }),
+    sources: createReportSources({
+      prisma,
+      vmQueryUrl: `http://127.0.0.1:${vmPort}`,
+      domainExpiry: async (host) => (host === 'shop.example.com' ? '2026-11-15T23:00:00Z' : null),
+    }),
     delivery: {
       keyRing: new Map(),
       appOrigin: 'https://monitor.example.com',
@@ -149,17 +153,29 @@ beforeAll(async () => {
           status: 'success',
           data: {
             resultType: 'matrix',
-            result: q.includes('website_up')
-              ? [
+            result: q.includes('system_cpu')
+              ? // CPU every 5 minutes: the peak is 10 minutes after the first point.
+                [
                   {
-                    metric: { monitor_id: websiteMonitor },
+                    metric: { agent_id: 'a-1' },
                     values: [
-                      [start, '100'],
-                      [start + 7200, '50'],
+                      [start, '10'],
+                      [start + 600, '93.5'],
+                      [start + 900, '40'],
                     ],
                   },
                 ]
-              : [],
+              : q.includes('website_up')
+                ? [
+                    {
+                      metric: { monitor_id: websiteMonitor },
+                      values: [
+                        [start, '100'],
+                        [start + 7200, '50'],
+                      ],
+                    },
+                  ]
+                : [],
           },
         }),
       );
@@ -238,7 +254,19 @@ describe('report-generate and report-deliver (UC-15-02/03)', () => {
     expect(snapshot.sections).toHaveLength(12);
     expect(snapshot.sections.find((x) => x.key === 'infrastructure')).toMatchObject({
       status: 'ok',
-      data: { hosts: [{ hostname: 'a-1', cpuAvg: 41.3, cpuMax: 93.5, memoryAvg: 55, diskMax: 71.2 }] },
+      data: {
+        hosts: [
+          {
+            hostname: 'a-1',
+            cpuAvg: 41.3,
+            cpuMax: 93.5,
+            // The window starts 2026-10-24T22:00Z; the range query's first point is 5 min later.
+            cpuPeakAt: '2026-10-24T22:15:00.000Z',
+            memoryAvg: 55,
+            diskMax: 71.2,
+          },
+        ],
+      },
     });
     expect(snapshot.sections.find((x) => x.key === 'health')!.data).toMatchObject({
       opened: 1,
@@ -422,6 +450,17 @@ describe('report-generate and report-deliver (UC-15-02/03)', () => {
       );
     await v('2026-10-25', 'activeUsers', 120, 'partial');
     await v('2026-10-24', 'activeUsers', 999);
+    const b = (d: string, metric: string, dimension: string, value: number) =>
+      sql(
+        `INSERT INTO metric_aggregates (organization_id, connection_id, resource_type, external_id, metric, dimension, day, value, completeness)
+         VALUES ($1, $2, 'google_ga4_property', 'properties/1', $3, $4, $5, $6, 'complete')`,
+        [s.org, conn, metric, dimension, d, value],
+      );
+    await b('2026-10-25', 'activeUsers', 'hour:22', 61);
+    await b('2026-10-25', 'activeUsers', 'hour:09', 12);
+    await b('2026-10-25', 'eventCount', 'event:sign_up', 34);
+    await b('2026-10-24', 'eventCount', 'event:sign_up', 30);
+    await b('2026-10-25', 'eventCount', 'event:page_view', 900);
     const h = reportHandlers(deps());
     await h['report-generate'](ctx(s.org), s.schedule, job('2026-10-25'));
     const [report] = await reports(s);
@@ -440,6 +479,14 @@ describe('report-generate and report-deliver (UC-15-02/03)', () => {
     expect(res).toMatchObject({ name: 'Shop web', source: 'GA4', partial: true });
     expect(res!.values.find((x) => x.label === 'Active users')!.value).toBe(120);
     expect(res!.values.find((x) => x.label === 'Sessions')!.value).toBeNull();
+    // Breakdowns never mix into the day's totals; they feed the busiest hour and custom events.
+    expect(res).toMatchObject({
+      busiestHour: { hour: 22, users: 61 },
+      events: [
+        { name: 'page_view', count: 900, previous: null },
+        { name: 'sign_up', count: 34, previous: 30 },
+      ],
+    });
   });
 });
 
@@ -534,6 +581,8 @@ describe('24 h activity and trends (M15b)', () => {
       url: 'https://shop.example.com/',
       uptimePercent: 99.5,
       tlsDays: null,
+      // RDAP: the domain expires 21 days after the window's end.
+      domainDays: 21,
       avgMs: 231,
       p95Ms: 410,
       failedChecks: 3,

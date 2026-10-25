@@ -198,6 +198,7 @@ export function renderReport(r: RenderableReport, link: string): ReportMessage {
     header,
     '',
     `${d.status.label}. ${d.summary}`,
+    ...(d.story.length ? ['', 'Yesterday', ...d.story.map((l) => `- ${l.text}`), ''] : []),
     ...d.kpis.map(
       (k) =>
         `${k.label}: ${k.display}${k.change ? ` (${k.change.text}${k.change.against ? ` ${k.change.against}` : ''})` : ''}`,

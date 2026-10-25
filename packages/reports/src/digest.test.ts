@@ -170,3 +170,101 @@ describe('report digest: the plain, card-based reading of a snapshot', () => {
     );
   });
 });
+
+describe('report story: yesterday in plain sentences', () => {
+  const busyDay = () =>
+    buildSnapshot(
+      fixtureSources({
+        incidents: async () => ({ opened: 0, resolved: 0, openNow: 0, openCritical: 0 }),
+        hosts: async () => [
+          {
+            hostname: 'web-1',
+            cpuAvg: 12.4,
+            cpuMax: 89.2,
+            cpuPeakAt: '2026-10-24T17:05:00.000Z',
+            memoryAvg: 40,
+            diskMax: 50,
+          },
+        ],
+        websites: async () => [
+          { url: 'https://runmypharmacy.com/', uptimePercent: 100, tlsDays: 61, domainDays: 20 },
+        ],
+        databases: async () => [
+          {
+            name: 'app-db',
+            provider: 'postgres',
+            status: 'healthy',
+            ok: true,
+            activity: {
+              baseline: 'ok',
+              approximate: false,
+              rowsAdded: 151,
+              sizeBytes: 1000,
+              sizeChangeBytes: 0,
+              top: [
+                { name: 'public.orders', added: 120, total: 5000 },
+                { name: 'public.users', added: 14, total: 900 },
+                { name: 'public.reviews', added: 15, total: 300 },
+                { name: 'public.contact_submissions', added: 2, total: 40 },
+              ],
+            },
+          },
+        ],
+        analytics: async () => ({
+          reportDay: '2026-10-24',
+          resources: [
+            {
+              name: 'runmypharmacy',
+              source: 'GA4',
+              partial: false,
+              values: [
+                { label: 'Active users', unit: 'count', value: 1800, previous: 1500 },
+                { label: 'New users', unit: 'count', value: 6, previous: 8 },
+              ],
+              busiestHour: { hour: 22, users: 1240 },
+              events: [
+                { name: 'sign_up', count: 34, previous: 30 },
+                { name: 'purchase', count: 12, previous: null },
+              ],
+            },
+          ],
+        }),
+      }),
+      w,
+    );
+
+  it('adds database sign-ups and Google first-time visitors into new users', async () => {
+    const story = digest(await busyDay(), null).story.map((x) => x.text);
+    expect(story).toContain(
+      '20 new users: 14 sign-ups in your database and 6 first-time visitors on Google Analytics.',
+    );
+    expect(story).toContain('2 contact forms submitted.');
+    expect(story).toContain('135 other new records: 120 orders, 15 reviews.');
+  });
+
+  it('says when the busiest hour was and when the server peaked, in the report timezone', async () => {
+    const story = digest(await busyDay(), null).story.map((x) => x.text);
+    expect(story).toContain(
+      'Your server performed well. Busiest hour was 10 pm with 1,240 visitors; CPU peaked at 89% at 10:05 pm.',
+    );
+  });
+
+  it('warns about a domain that expires soon, alongside the certificate', async () => {
+    const d = digest(await busyDay(), null);
+    expect(d.story.find((x) => x.kind === 'domain')).toEqual({
+      kind: 'domain',
+      tone: 'watch',
+      text: 'runmypharmacy.com: domain expires in 20 days, SSL certificate in 61 days.',
+    });
+    expect(d.watch.map((x) => x.title)).toContain('Domain runmypharmacy.com expires in 20 days');
+  });
+
+  it('lists custom events and leaves out lines with no data', async () => {
+    const story = digest(await busyDay(), null).story;
+    expect(story.find((x) => x.kind === 'events')?.text).toBe(
+      'Custom events: sign_up 34 (▲ 13%), purchase 12.',
+    );
+    expect(story.some((x) => x.kind === 'ads' || x.kind === 'apps')).toBe(false);
+    expect(digest(await quietDay(), null).story.some((x) => x.kind === 'users')).toBe(true);
+  });
+});

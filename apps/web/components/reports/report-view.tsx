@@ -394,6 +394,28 @@ export function ReportView({
         ) : null}
       </section>
 
+      {d.story.length ? (
+        <section aria-label="Yesterday" className="rounded-[20px] border border-border bg-card px-6 py-5">
+          <Eyebrow>Yesterday</Eyebrow>
+          <ul className="mt-2 divide-y divide-border">
+            {d.story.map((l) => (
+              <li key={l.kind + l.text} className="flex items-start gap-3 py-2.5 text-[15px] leading-6">
+                <span
+                  aria-hidden
+                  className={cn('mt-2.5 size-2 shrink-0 rounded-full', {
+                    'bg-success': l.tone === 'good',
+                    'bg-warning': l.tone === 'watch',
+                    'bg-destructive': l.tone === 'attention',
+                    'bg-foreground/25': l.tone === 'neutral',
+                  })}
+                />
+                {l.text}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {d.kpis.length ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {d.kpis.map((k) => (

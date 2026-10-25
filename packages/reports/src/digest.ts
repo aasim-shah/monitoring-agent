@@ -65,9 +65,16 @@ export interface WatchItem {
   text: string;
   tone: 'watch' | 'attention';
 }
+export interface StoryLine {
+  kind: 'users' | 'contacts' | 'records' | 'server' | 'domain' | 'events' | 'apps' | 'ads' | 'incidents';
+  tone: Tone;
+  text: string;
+}
 export interface Digest {
   status: { tone: Exclude<Tone, 'neutral'>; label: string };
   summary: string;
+  /** Yesterday in plain sentences; a line appears only when its source has data. */
+  story: StoryLine[];
   kpis: Kpi[];
   hosts: HostCard[];
   websites: WebsiteCard[];
@@ -412,7 +419,10 @@ function databaseCards(dbs: DatabaseStats[], watch: WatchItem[]): Card[] {
                 .slice(0, 3)
                 .map(
                   (t) =>
-                    [t.name, t.isNew ? `new, ${count(t.total)}` : `+${count(t.added!)}`] as [string, string],
+                    [
+                      t.name.split('.').pop()!,
+                      t.isNew ? `new, ${count(t.total)}` : `+${count(t.added!)}`,
+                    ] as [string, string],
                 ),
             ]
           : [['Status', d.status] as [string, string]]),
@@ -454,6 +464,195 @@ function fallbackSummary(s: Snapshot, d: Omit<Digest, 'summary'>): string {
       : 'Nothing needs your attention.',
   );
   return parts.join(' ');
+}
+
+/** Tables whose new rows are people signing up, and tables that hold form submissions. */
+const USER_TABLE = /(^|_)(users?|customers?|accounts?|members?|signups?|subscribers?)$/i;
+const CONTACT_TABLE = /(contact|lead|enquir|inquir|message|submission|form)/i;
+const tableName = (name: string) => name.split('.').pop()!.replace(/_/g, ' ');
+const plural = (n: number, one: string, many = `${one}s`) => `${count(n)} ${n === 1 ? one : many}`;
+
+function hourLabel(hour: number): string {
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h} ${hour < 12 ? 'am' : 'pm'}`;
+}
+function timeLabel(iso: string, timezone: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: timezone,
+  })
+    .format(new Date(iso))
+    .replace(/\s?([AP])M$/, (_, x: string) => ` ${x.toLowerCase()}m`);
+}
+/** Events GA4 records on its own; what is left are the product's custom events. */
+const AUTOMATIC_EVENTS = new Set([
+  'page_view',
+  'session_start',
+  'first_visit',
+  'user_engagement',
+  'scroll',
+  'click',
+  'first_open',
+  'screen_view',
+  'app_remove',
+  'os_update',
+  'app_update',
+  'app_clear_data',
+  'notification_receive',
+  'notification_open',
+  'notification_dismiss',
+  'view_search_results',
+  'file_download',
+  'video_start',
+  'video_progress',
+  'video_complete',
+  'form_start',
+]);
+
+function storyLines(s: Snapshot, watch: WatchItem[]): StoryLine[] {
+  const lines: StoryLine[] = [];
+  const dbs = data<{ databases: DatabaseStats[] }>(s, 'databases')?.databases ?? [];
+  const tables = dbs.flatMap((d) => (d.activity?.baseline === 'ok' ? d.activity.top : []));
+  const added = (re: RegExp) =>
+    tables.filter((t) => re.test(tableName(t.name).replace(/ /g, '_')) && t.added);
+  const users = added(USER_TABLE);
+  const contacts = added(CONTACT_TABLE).filter((t) => !users.includes(t));
+  const sum = (ts: typeof tables) => ts.reduce((a, t) => a + (t.added ?? 0), 0);
+  const signups = sum(users);
+  const analytics = data<AnalyticsStats>(s, 'analytics');
+  const ga = (analytics?.resources ?? []).filter((r) => r.source === 'GA4');
+  const firstVisits = ga.reduce((a, r) => a + (r.values.find((v) => v.label === 'New users')?.value ?? 0), 0);
+  const hasGaNew = ga.some((r) => r.values.some((v) => v.label === 'New users' && v.value != null));
+  const hasDb = dbs.some((d) => d.activity?.baseline === 'ok');
+
+  if (signups || firstVisits || hasDb || hasGaNew) {
+    const db = `${plural(signups, 'sign-up')} in your database`;
+    const google = `${plural(firstVisits, 'first-time visitor')} on Google Analytics`;
+    lines.push({
+      kind: 'users',
+      tone: signups + firstVisits ? 'good' : 'neutral',
+      text:
+        signups && firstVisits
+          ? `${plural(signups + firstVisits, 'new user')}: ${db} and ${google}.`
+          : signups
+            ? `${plural(signups, 'new sign-up')} in your database.`
+            : firstVisits
+              ? `${plural(firstVisits, 'first-time visitor')} on Google Analytics.`
+              : 'No new users.',
+    });
+  }
+  const forms = sum(contacts);
+  if (forms)
+    lines.push({
+      kind: 'contacts',
+      tone: 'good',
+      text: `${count(forms)} contact ${forms === 1 ? 'form' : 'forms'} submitted.`,
+    });
+  const total = dbs.reduce(
+    (a, d) => a + (d.activity?.baseline === 'ok' ? (d.activity.rowsAdded ?? 0) : 0),
+    0,
+  );
+  const other = total - signups - forms;
+  if (other > 0) {
+    const named = tables
+      .filter((t) => t.added && !users.includes(t) && !contacts.includes(t))
+      .slice(0, 3)
+      .map((t) => `${count(t.added!)} ${tableName(t.name)}`);
+    lines.push({
+      kind: 'records',
+      tone: 'neutral',
+      text: `${plural(other, 'other new record')}${named.length ? `: ${named.join(', ')}` : ''}.`,
+    });
+  }
+
+  const inc = data<IncidentStats>(s, 'health');
+  if (inc && (inc.opened || inc.openNow))
+    lines.push({
+      kind: 'incidents',
+      tone: inc.openNow ? 'attention' : 'watch',
+      text: `${plural(inc.opened, 'incident')} opened${inc.openNow ? `, ${count(inc.openNow)} still open` : ', all resolved'}.`,
+    });
+
+  const hosts = data<{ hosts: HostStats[] }>(s, 'infrastructure')?.hosts ?? [];
+  const peakHost = hosts.filter((h) => h.cpuMax != null).sort((a, b) => b.cpuMax! - a.cpuMax!)[0];
+  const busiest = ga
+    .map((r) => r.busiestHour)
+    .filter((b): b is { hour: number; users: number } => !!b)
+    .sort((a, b) => b.users - a.users)[0];
+  const sites = data<{ websites: WebsiteStats[] }>(s, 'availability')?.websites ?? [];
+  if (peakHost || busiest) {
+    const down = sites.some((w) => w.uptimePercent != null && w.uptimePercent < 99);
+    const hot = (peakHost?.cpuMax ?? 0) >= 90;
+    const parts = [
+      busiest ? `Busiest hour was ${hourLabel(busiest.hour)} with ${plural(busiest.users, 'visitor')}` : '',
+      peakHost
+        ? `CPU peaked at ${whole(peakHost.cpuMax!)}${hosts.length > 1 ? ` on ${peakHost.hostname}` : ''}${peakHost.cpuPeakAt ? ` at ${timeLabel(peakHost.cpuPeakAt, s.window.timezone)}` : ''}`
+        : '',
+    ].filter(Boolean);
+    lines.push({
+      kind: 'server',
+      tone: down || hot ? 'watch' : 'good',
+      text: `${down || hot ? 'Your server was under pressure.' : 'Your server performed well.'} ${parts.join('; ')}.`,
+    });
+    if (hot && peakHost)
+      watch.push({
+        tone: 'watch',
+        title: `CPU on ${peakHost.hostname} reached ${whole(peakHost.cpuMax!)}`,
+        text: `${peakHost.cpuPeakAt ? `At ${timeLabel(peakHost.cpuPeakAt, s.window.timezone)}. ` : ''}If this repeats, look at what ran then or give the server more CPU.`,
+      });
+  }
+
+  for (const w of sites) {
+    if (w.domainDays == null && w.tlsDays == null) continue;
+    const name = host(w.url);
+    const soonest = Math.min(w.domainDays ?? Infinity, w.tlsDays ?? Infinity);
+    const parts = [
+      w.domainDays != null ? `domain expires in ${plural(w.domainDays, 'day')}` : '',
+      w.tlsDays != null ? `SSL certificate in ${plural(w.tlsDays, 'day')}` : '',
+    ].filter(Boolean);
+    lines.push({
+      kind: 'domain',
+      tone: soonest <= 7 ? 'attention' : soonest <= 30 ? 'watch' : 'good',
+      text: `${name}: ${parts.join(', ')}.`,
+    });
+    if (w.domainDays != null && w.domainDays <= 30)
+      watch.push({
+        tone: w.domainDays <= 7 ? 'attention' : 'watch',
+        title: `Domain ${name} expires in ${plural(w.domainDays, 'day')}`,
+        text: 'Renew it with your registrar so the site and its email keep working.',
+      });
+  }
+
+  const events = ga
+    .flatMap((r) => r.events ?? [])
+    .filter((e) => !AUTOMATIC_EVENTS.has(e.name) && e.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  if (events.length)
+    lines.push({
+      kind: 'events',
+      tone: 'neutral',
+      text: `Custom events: ${events
+        .map((e) => {
+          const c = change(e.count, e.previous);
+          return `${e.name} ${count(e.count)}${c && /[▲▼]/.test(c.text) ? ` (${c.text})` : ''}`;
+        })
+        .join(', ')}.`,
+    });
+
+  for (const app of (analytics?.resources ?? []).filter((r) => r.source === 'Play vitals')) {
+    const users = app.values.find((v) => v.label === 'Daily users (Play vitals)')?.value;
+    const crash = app.values.find((v) => v.label === 'User-perceived crash rate')?.value;
+    if (users == null && crash == null) continue;
+    lines.push({
+      kind: 'apps',
+      tone: crash != null && crash >= 0.0109 ? 'watch' : 'neutral',
+      text: `${app.name}: ${[users != null ? plural(users, 'daily user') : '', crash != null ? `crash rate ${formatValue(crash, 'ratio')}` : ''].filter(Boolean).join(', ')}.`,
+    });
+  }
+  return lines;
 }
 
 export function digest(s: Snapshot, narrative: string | null): Digest {
@@ -579,6 +778,7 @@ export function digest(s: Snapshot, narrative: string | null): Digest {
       series: series(s, 'logs.errors', logs.errors),
     });
 
+  const story = storyLines(s, watch);
   const notConnected = [...new Set(s.coverage.filter((c) => c.status === 'missing').map((c) => c.source))];
   const order = { attention: 0, watch: 1 } as const;
   watch.sort((a, b) => order[a.tone] - order[b.tone]);
@@ -588,6 +788,7 @@ export function digest(s: Snapshot, narrative: string | null): Digest {
       : watch.length
         ? ({ tone: 'watch', label: 'Worth a look' } as const)
         : ({ tone: 'good', label: 'All good' } as const),
+    story,
     kpis,
     hosts,
     websites,

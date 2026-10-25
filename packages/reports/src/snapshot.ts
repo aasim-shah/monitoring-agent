@@ -12,6 +12,8 @@ export interface HostStats {
   hostname: string;
   cpuAvg: number | null;
   cpuMax: number | null;
+  /** When CPU was highest (ISO, 5-minute resolution). */
+  cpuPeakAt?: string | null;
   memoryAvg: number | null;
   diskMax: number | null;
 }
@@ -27,6 +29,8 @@ export interface WebsiteStats {
   url: string;
   uptimePercent: number | null;
   tlsDays: number | null;
+  /** Days until the domain's registration expires (RDAP); null when the registry does not say. */
+  domainDays?: number | null;
   /** Response time over the window and failed checks (M15b). */
   avgMs?: number | null;
   p95Ms?: number | null;
@@ -55,6 +59,10 @@ export interface AnalyticsStats {
       previous?: number | null;
       previousDay?: string | null;
     }>;
+    /** The local hour (0–23) with the most visitors on the report day (GA4). */
+    busiestHour?: { hour: number; users: number } | null;
+    /** Custom events on the report day, most frequent first (GA4 automatic events left out). */
+    events?: Array<{ name: string; count: number; previous: number | null }>;
   }>;
   /** Scoped Firebase apps (names; their crash data needs BigQuery exports). */
   firebaseApps?: string[];
@@ -209,6 +217,7 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
       hostname: h.hostname,
       cpuAvg: r1(h.cpuAvg),
       cpuMax: r1(h.cpuMax),
+      ...(h.cpuPeakAt ? { cpuPeakAt: h.cpuPeakAt } : {}),
       memoryAvg: r1(h.memoryAvg),
       diskMax: r1(h.diskMax),
     })) ?? null;
@@ -217,6 +226,7 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
       url: bareUrl(s.url),
       uptimePercent: r1(s.uptimePercent),
       tlsDays: s.tlsDays === null ? null : Math.floor(s.tlsDays),
+      ...(s.domainDays != null ? { domainDays: Math.floor(s.domainDays) } : {}),
       ...(s.avgMs !== undefined ? { avgMs: ms(s.avgMs) } : {}),
       ...(s.p95Ms !== undefined ? { p95Ms: ms(s.p95Ms) } : {}),
       ...(s.failedChecks !== undefined ? { failedChecks: s.failedChecks } : {}),
