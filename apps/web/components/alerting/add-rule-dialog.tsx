@@ -84,7 +84,7 @@ export function AddRuleDialog({
       <DialogContent aria-describedby="add-rule-description">
         <DialogTitle>Add alert rule</DialogTitle>
         <DialogDescription id="add-rule-description">{template?.description}</DialogDescription>
-        <div className="space-y-4">
+        <div className="portal-feature-section space-y-4">
           {error ? <Alert>{error}</Alert> : null}
           <Field id="rule-template" label="Template">
             <select

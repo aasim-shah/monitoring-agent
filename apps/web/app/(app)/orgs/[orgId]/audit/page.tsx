@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -39,7 +41,11 @@ export default function AuditPage() {
   if (!audit.data) return <Loading label="Loading audit log" />;
   return (
     <section className="space-y-3">
-      <h1 className="text-xl font-semibold">Audit Log</h1>
+      <PageHeading
+        title={<>Audit Log</>}
+        description="A traceable record of changes across your workspace."
+        eyebrow="Workspace"
+      />
       <AuditTable
         entries={audit.data.pages.flatMap((p) => p.entries)}
         hasMore={audit.hasNextPage}

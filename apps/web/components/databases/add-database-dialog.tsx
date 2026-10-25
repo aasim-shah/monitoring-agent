@@ -233,7 +233,7 @@ export function AddDatabaseDialog({
           </label>
         </div>
         {mode === 'managed' ? (
-          <div className="space-y-4">
+          <div className="portal-feature-section space-y-4">
             {error ? <Alert>{error}</Alert> : null}
             <Field id="db-name" label="Name">
               <Input

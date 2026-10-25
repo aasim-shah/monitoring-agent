@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -53,10 +55,15 @@ export default function HostMetricsPage() {
           >
             ← Infrastructure
           </Link>
-          <h1 className="flex items-center gap-3 text-xl font-semibold">
-            {agent.data?.hostname ?? 'Server'}
-            {agent.data ? <AgentStatusBadge status={agent.data.status} stale={agent.data.stale} /> : null}
-          </h1>
+          <PageHeading
+            title={
+              <>
+                {agent.data?.hostname ?? 'Server'}
+                {agent.data ? <AgentStatusBadge status={agent.data.status} stale={agent.data.stale} /> : null}
+              </>
+            }
+            eyebrow="Product operations"
+          />
           {agent.data ? (
             <p className="text-sm text-muted-foreground">
               {agent.data.environmentName} · {agent.data.os} · {agent.data.arch} ·{' '}

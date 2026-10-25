@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import Link from 'next/link';
 import { useState } from 'react';
 import { Alert } from '@/components/ui/alert';
@@ -129,11 +131,11 @@ export function IncidentDetail({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="portal-feature-section space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <SeverityBadge severity={incident.severity} />
         <StatusBadge status={incident.status} />
-        <h1 className="text-xl font-semibold">{incident.title}</h1>
+        <PageHeading title={<>{incident.title}</>} eyebrow="Product detail" />
         {askAiHref ? (
           <Link
             className="ml-auto rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"

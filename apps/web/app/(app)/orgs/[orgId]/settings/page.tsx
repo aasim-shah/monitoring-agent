@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -49,7 +51,11 @@ export default function SettingsPage() {
   const settings = (org.data.settings ?? {}) as { dataRetentionDays?: number };
   return (
     <section className="max-w-lg space-y-3">
-      <h1 className="text-xl font-semibold">Settings</h1>
+      <PageHeading
+        title={<>Settings</>}
+        description="Workspace identity, AI preferences, and data controls."
+        eyebrow="Workspace"
+      />
       {saved ? <Alert tone="success">Settings saved.</Alert> : null}
       <Card>
         <SimpleForm

@@ -23,7 +23,7 @@ export class ApiError extends Error {
     return new ApiError(
       status,
       'error',
-      typeof body === 'string' && body ? body : `Request failed (${status})`,
+      'The server returned an unexpected response. Please try again later.',
     );
   }
 }

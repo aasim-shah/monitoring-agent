@@ -25,7 +25,10 @@ export function GoogleAccess({
   const rows = serviceStatuses(grantedScopes);
   const missing = GOOGLE_SCOPES.some((s) => !grantedScopes.includes(s));
   return (
-    <section aria-label="Google access" className="space-y-2 rounded-lg border border-border bg-card p-4">
+    <section
+      aria-label="Google access"
+      className="portal-detail-card space-y-4 rounded-lg border border-border bg-card p-6"
+    >
       <h2 className="text-sm font-semibold">Google access</h2>
       <p className="text-sm">
         {accountEmail ? `Connected as ${accountEmail}` : 'Not connected to a Google account yet'}

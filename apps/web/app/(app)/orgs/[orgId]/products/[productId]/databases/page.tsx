@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -112,15 +114,13 @@ export default function DatabasesPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="portal-route portal-route-databases space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Databases</h1>
-          <p className="text-sm text-muted-foreground">
-            PostgreSQL, MySQL, and MongoDB health with a read-only user: managed databases (Atlas, Supabase,
-            RDS) directly over TLS, private ones through a worker. No free-form queries.
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="Product operations"
+          title="Databases"
+          description="Authorized health signals, with connection scope kept explicit."
+        />
         {roleCan(role, 'connection.configure') ? (
           <AddDatabaseDialog
             workers={workers.filter((w) => w.status !== 'revoked')}

@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -71,9 +73,14 @@ export default function AgentDetailPage() {
               >
                 ← Agents
               </Link>
-              <h1 className="flex items-center gap-3 text-xl font-semibold">
-                {a.hostname} <AgentStatusBadge status={a.status} stale={a.stale} />
-              </h1>
+              <PageHeading
+                title={
+                  <>
+                    {a.hostname} <AgentStatusBadge status={a.status} stale={a.stale} />
+                  </>
+                }
+                eyebrow="Product operations"
+              />
               <p className="text-sm text-muted-foreground">
                 {a.environmentName} · {a.os} · {a.arch} · agent {a.agentVersion} · last seen{' '}
                 {relativeTime(a.lastHeartbeatAt)} ·{' '}

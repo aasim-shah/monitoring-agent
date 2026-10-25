@@ -100,7 +100,21 @@ export function Chat({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="portal-chat space-y-4">
+      {!messages.length && !turns.length && (
+        <div className="portal-chat-welcome">
+          <span className="portal-eyebrow">Product context</span>
+          <h2>What would you like to understand?</h2>
+          <p>Ask about a signal, a recent change, or the services your product depends on.</p>
+          <div className="portal-question-suggestions">
+            {['What needs attention?', 'What changed recently?', 'Why was the API slower?'].map((prompt) => (
+              <button type="button" key={prompt} onClick={() => setQuestion(prompt)}>
+                {prompt} ↗
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <ol className="space-y-4">
         {messages.map((m) => (
           <li

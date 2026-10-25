@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@pcp/api-client';
-import { handleApiError } from './api';
+import { errorMessage, handleApiError } from './api';
 
 const router = () => ({ replace: vi.fn() });
 
@@ -22,5 +22,18 @@ describe('handleApiError', () => {
     const err = new ApiError(404, 'not_found', 'Not found');
     expect(handleApiError(err, r, '/orgs/x')).toBe(err);
     expect(r.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe('errorMessage', () => {
+  it('does not display HTML from a missing API route', () => {
+    expect(errorMessage(new ApiError(404, 'error', '<!DOCTYPE html><html>Not found</html>'))).toBe(
+      'Cannot reach the application API. Please try again later.',
+    );
+  });
+  it('preserves structured API validation messages', () => {
+    expect(errorMessage(new ApiError(400, 'validation_error', 'Enter a valid email'))).toBe(
+      'Enter a valid email',
+    );
   });
 });

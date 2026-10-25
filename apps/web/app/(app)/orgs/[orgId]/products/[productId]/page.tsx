@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { z } from 'zod';
@@ -40,7 +42,7 @@ export default function ProductPage() {
       {p ? (
         <div className="space-y-6">
           <div>
-            <h1 className="text-xl font-semibold">{p.name}</h1>
+            <PageHeading title={<>{p.name}</>} eyebrow="Product operations" />
             {p.description ? <p className="text-sm text-muted-foreground">{p.description}</p> : null}
           </div>
           <div className="grid gap-4 md:grid-cols-2">

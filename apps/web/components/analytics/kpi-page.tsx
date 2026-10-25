@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { PageHeading } from '@/components/shell/page-heading';
 import { useState } from 'react';
 import { unwrap } from '@pcp/api-client';
 import {
@@ -86,13 +87,11 @@ export function KpiSources({
   const integrations = `/orgs/${orgId}/products/${productId}/integrations`;
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{title}</h1>
-          <p className="text-sm text-muted-foreground">{intro}</p>
-        </div>
-        <RangePicker value={range} onChange={setRange} />
-      </div>
+      <PageHeading
+        title={title}
+        description={intro}
+        action={<RangePicker value={range} onChange={setRange} />}
+      />
       <QueryState query={kpis} label={`Loading ${title}`}>
         {kpis.data ? (
           <>

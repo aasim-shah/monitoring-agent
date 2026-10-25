@@ -32,7 +32,11 @@ describe('FleetTable', () => {
       '/orgs/o/products/p/agents/a1',
     );
     expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('30 s ago')).toBeInTheDocument();
+    expect(screen.getByTitle('30 s ago')).toHaveAttribute('datetime', '2026-10-22T11:59:30Z');
+    expect(screen.getByRole('link', { name: 'Inspect agent ↗' })).toHaveAttribute(
+      'href',
+      '/orgs/o/products/p/agents/a1',
+    );
   });
 
   it('warns about duplicate machine IDs (cloned images)', () => {

@@ -89,7 +89,7 @@ function PolicyDialog({
         <DialogDescription id="policy-description">
           Only these units can be restarted, and only on hosts whose own helper allowlist also lists them.
         </DialogDescription>
-        <div className="space-y-4">
+        <div className="portal-feature-section space-y-4">
           {error ? <Alert>{error}</Alert> : null}
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />

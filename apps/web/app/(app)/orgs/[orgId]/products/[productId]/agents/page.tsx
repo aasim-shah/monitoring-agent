@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { unwrap } from '@pcp/api-client';
@@ -7,6 +9,7 @@ import type { Role } from '@pcp/shared-contracts';
 import { AddServerDialog } from '@/components/agents/add-server-dialog';
 import { AssistedInstallDialog, type AssistedInstallApi } from '@/components/agents/assisted-install';
 import { FleetTable } from '@/components/agents/fleet-table';
+import { Alert } from '@/components/ui/alert';
 import { Empty } from '@/components/states/empty';
 import { api } from '@/lib/api';
 import { QueryState } from '@/lib/page-guard';
@@ -90,14 +93,13 @@ export default function AgentsPage() {
   ) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="portal-route portal-route-agents space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Agents</h1>
-          <p className="text-sm text-muted-foreground">
-            Servers running the monitoring agent. Status turns Degraded after 90 s without a heartbeat.
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="Product operations"
+          title="Agents"
+          description="Enroll servers and review their trusted connection state."
+        />
         <div className="flex flex-wrap gap-2">
           {canEnroll ? (
             <AssistedInstallDialog
@@ -118,6 +120,12 @@ export default function AgentsPage() {
           <FleetTable agents={list} basePath={`/orgs/${orgId}/products/${productId}/agents`} />
         )}
       </QueryState>
+      <Alert tone="info">
+        <div>
+          <strong className="block mb-1">Enrollment is scoped</strong>Installation tokens are short-lived and
+          scoped to the selected environment. Keep install commands private.
+        </div>
+      </Alert>
     </div>
   );
 }

@@ -35,7 +35,12 @@ export function handleApiError(error: unknown, router: RouterLike, pathname: str
 }
 
 export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
+  if (error instanceof ApiError) {
+    if (error.code === 'error' || /<(?:!doctype|html|head|body)\b/i.test(error.message)) {
+      return 'Cannot reach the application API. Please try again later.';
+    }
+    return error.message;
+  }
   if (error instanceof TypeError) return 'Cannot reach the server. Check your connection and try again.';
   return 'Something went wrong.';
 }

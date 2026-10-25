@@ -9,6 +9,7 @@ const SESSION_COOKIE = 'pcp_session';
  */
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
+  if (pathname === '/') return NextResponse.next();
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
   if (req.cookies.get(SESSION_COOKIE)) return NextResponse.next();
   const login = new URL('/login', req.url);

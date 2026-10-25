@@ -18,7 +18,7 @@ const n = (v: number) => Math.round(v).toLocaleString('en-US');
 export function UsageView({ data }: { data: UsageData }) {
   const epoch = (iso: string) => Date.parse(iso) / 1000;
   return (
-    <div className="space-y-4">
+    <div className="portal-feature-section space-y-4">
       <ul aria-label="Usage totals" className="grid gap-2 sm:grid-cols-3">
         <li aria-label="Active series" className="rounded-md border border-border bg-card p-3">
           <p className="text-xs text-muted-foreground">Active series (this hour)</p>

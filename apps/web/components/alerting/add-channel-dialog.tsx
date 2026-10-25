@@ -108,7 +108,7 @@ export function AddChannelDialog({
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="portal-feature-section space-y-4">
             {error ? <Alert>{error}</Alert> : null}
             <Field id="channel-kind" label="Type">
               <select

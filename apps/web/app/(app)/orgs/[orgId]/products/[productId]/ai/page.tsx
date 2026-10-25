@@ -1,5 +1,7 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
@@ -78,19 +80,19 @@ export default function AiAssistantPage() {
 
   const s = settings.data;
   return (
-    <section className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">AI Assistant</h1>
-        <p className="text-sm text-muted-foreground">
-          Ask about this product. Answers cite their evidence and list what could not be checked.
-        </p>
-      </div>
+    <section className="portal-route portal-route-ai space-y-4">
+      <PageHeading
+        eyebrow="Product operations"
+        title="AI assistant"
+        description="Ask questions over verified sources. Keep gaps and uncertainty in view."
+      />
       {s && s.disabled ? (
         <Alert tone="info">The AI assistant is turned off for this organization.</Alert>
       ) : null}
       {s && !s.available ? <Alert tone="info">No AI provider is configured on this platform.</Alert> : null}
-      <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
-        <aside className="space-y-2">
+      <div className="portal-ai-workspace">
+        <aside className="portal-conversations space-y-4">
+          <h2>Conversations</h2>
           <Button size="sm" variant="outline" className="w-full" onClick={() => select(null)}>
             New conversation
           </Button>

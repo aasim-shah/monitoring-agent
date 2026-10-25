@@ -39,7 +39,10 @@
       "fastify": "5.12.7",
       "next>postcss": "8.5.31",
       "deepmerge-ts": "8.0.0",
-      "dockerode>uuid": "11.1.1"
+      "dockerode>uuid": "11.1.1",
+      "@lumen/tokens": "file:apps/web/vendor/lumen/lumen-tokens-0.1.0.tgz",
+      "@lumen/icons": "file:apps/web/vendor/lumen/lumen-icons-0.1.0.tgz",
+      "@lumen/react": "file:apps/web/vendor/lumen/lumen-react-0.1.0.tgz"
     }
   }
 }

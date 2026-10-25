@@ -43,7 +43,7 @@ export function WorkerPanel({
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-card p-4">
+    <div className="portal-detail-card space-y-4 rounded-lg border border-border bg-card p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold">Private workers</h2>

@@ -1,11 +1,15 @@
 'use client';
 
+import { PageHeading } from '@/components/shell/page-heading';
+
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { unwrap } from '@pcp/api-client';
 import type { Role } from '@pcp/shared-contracts';
-import { ReportList } from '@/components/reports/report-list';
+import Link from 'next/link';
+import { ReportHistory } from '@/components/reports/report-toolbar';
+import { formatLocal, formatUtcTime, NARRATIVE_LABEL } from '@/components/reports/format';
 import { ScheduleDialog, type ChannelOption, type NewSchedule } from '@/components/reports/schedule-dialog';
 import { ScheduleList } from '@/components/reports/schedule-list';
 import { Alert } from '@/components/ui/alert';
@@ -69,16 +73,18 @@ export default function ReportsPage() {
     await refresh();
   };
 
+  const latest = reports.data?.reports[0];
+  const next = [...(schedules.data?.schedules ?? [])]
+    .filter((s) => s.enabled)
+    .sort((a, b) => Date.parse(a.nextRunAt) - Date.parse(b.nextRunAt))[0];
   return (
-    <div className="space-y-6">
+    <div className="portal-route portal-route-reports space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Reports & Schedules</h1>
-          <p className="text-sm text-muted-foreground">
-            A daily report of the previous local day: incidents, hosts, logs, databases, and websites, with a
-            summary checked against the numbers. Missing sources are listed, never shown as zero.
-          </p>
-        </div>
+        <PageHeading
+          eyebrow="Product operations"
+          title="Reports & schedules"
+          description="A clear daily picture, delivered on your schedule. Health, changes, and evidence in one place."
+        />
         {canManage ? (
           <ScheduleDialog
             channels={channels.data ?? []}
@@ -89,6 +95,39 @@ export default function ReportsPage() {
         ) : null}
       </div>
       {message ? <Alert tone={message.tone === 'info' ? 'info' : undefined}>{message.text}</Alert> : null}
+      <div className="portal-report-overview">
+        <article className="portal-feature-card">
+          <p className="portal-eyebrow">Latest report</p>
+          <h2>{latest ? latest.localDate : 'Your first report starts here'}</h2>
+          <p className="text-sm text-muted-foreground">
+            {latest
+              ? NARRATIVE_LABEL[latest.narrativeStatus]
+              : 'Create a schedule or run an existing one to receive a product summary.'}
+          </p>
+          {latest && (
+            <div className="portal-feature-footer">
+              <span>
+                Version {latest.version} · {latest.scheduleName ?? 'Deleted schedule'}
+              </span>
+              <Link href={`/orgs/${orgId}/products/${productId}/reports/${latest.id}`}>Read report ↗</Link>
+            </div>
+          )}
+        </article>
+        <article className="portal-feature-card">
+          <p className="portal-eyebrow">Next delivery</p>
+          <h2>{next ? next.localTime : 'No delivery scheduled'}</h2>
+          <p className="text-sm text-muted-foreground">
+            {next ? next.timezone : 'Paused schedules do not create new reports.'}
+          </p>
+          {next && (
+            <div className="portal-feature-footer">
+              <span>
+                {formatLocal(next.nextRunAt, next.timezone)} · {formatUtcTime(next.nextRunAt)} UTC
+              </span>
+            </div>
+          )}
+        </article>
+      </div>
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Schedules</h2>
         <QueryState query={schedules} label="Loading schedules">
@@ -133,7 +172,7 @@ export default function ReportsPage() {
       <section className="space-y-2">
         <h2 className="text-base font-semibold">Report history</h2>
         <QueryState query={reports} label="Loading reports">
-          <ReportList
+          <ReportHistory
             reports={(reports.data?.reports ?? []).map((r) => ({
               id: r.id,
               localDate: r.localDate,
