@@ -9,29 +9,25 @@ import {
 } from '@aws-sdk/client-amplify';
 import {
   CloudWatchClient,
-  GetMetricDataCommand,
+  GetMetricStatisticsCommand,
   ListMetricsCommand,
-  type MetricDataQuery,
+  type Statistic,
 } from '@aws-sdk/client-cloudwatch';
-import { CostExplorerClient, GetCostAndUsageCommand } from '@aws-sdk/client-cost-explorer';
 import { ConnectorError, type Connector, type ExecutionContext, type MetricPoint } from '@pcp/connector-sdk';
 import type { Observation } from '@pcp/shared-contracts';
 
-export const AWS_RESOURCE_TYPES = [
-  'aws_s3_bucket',
-  'aws_lambda_function',
-  'aws_amplify_branch',
-  'aws_cost_account',
-] as const;
-const SERVICES = ['s3', 'lambda', 'amplify', 'costs'] as const;
+export const AWS_RESOURCE_TYPES = ['aws_s3_bucket', 'aws_lambda_function', 'aws_amplify_branch'] as const;
+/**
+ * Only AWS APIs that cost nothing: listing calls, and CloudWatch GetMetricStatistics inside the free
+ * tier. Cost Explorer ($0.01 a request) and GetMetricData (outside the free tier) are never called.
+ */
+const SERVICES = ['s3', 'lambda', 'amplify'] as const;
 type Service = (typeof SERVICES)[number];
 interface Config {
   roleArn: string;
   externalId: string;
   regions: string[];
   services: Service[];
-  costTagKey?: string;
-  costTagValue?: string;
 }
 /** Used both as a customer policy and an STS session ceiling. No object contents, secrets, or writes. */
 export const AWS_READ_POLICY = {
@@ -46,9 +42,8 @@ export const AWS_READ_POLICY = {
         'amplify:ListApps',
         'amplify:ListBranches',
         'amplify:ListJobs',
-        'cloudwatch:GetMetricData',
+        'cloudwatch:GetMetricStatistics',
         'cloudwatch:ListMetrics',
-        'ce:GetCostAndUsage',
       ],
       Resource: '*',
     },
@@ -76,19 +71,11 @@ const configErrors = (c: Record<string, unknown>) => {
     errors.push('services');
   if (typeof c.externalId !== 'string' || c.externalId.length < 16 || c.externalId.length > 128)
     errors.push('externalId');
-  if (
-    Boolean(c.costTagKey) !== Boolean(c.costTagValue) ||
-    [c.costTagKey, c.costTagValue].some((v) => v !== undefined && (typeof v !== 'string' || v.length > 128))
-  )
-    errors.push('costTagKey/costTagValue');
   return errors;
 };
 function configuration(ctx: ExecutionContext): Config {
   if (configErrors(ctx.config).length)
-    throw new ConnectorError(
-      'invalid_config',
-      'Invalid AWS role, external ID, regions, services, or cost tag',
-    );
+    throw new ConnectorError('invalid_config', 'Invalid AWS role, external ID, regions, or services');
   return ctx.config as unknown as Config;
 }
 function failure(err: unknown): ConnectorError {
@@ -310,18 +297,6 @@ export function createAwsConnector(options: { now?: () => Date } = {}): Connecto
             });
           });
       });
-      if (s.cfg.services.includes('costs'))
-        observations.push(
-          observation(
-            ctx,
-            'aws_cost_account',
-            `aws-cost:${s.account}`,
-            s.cfg.costTagKey
-              ? `AWS costs ${s.account} · ${s.cfg.costTagKey}=${s.cfg.costTagValue}`
-              : `AWS account costs ${s.account} (shared, not product-attributed)`,
-            'global',
-          ),
-        );
       // DiscoveryPage has no gap field: preserve named gaps as a non-scopable inventory observation.
       if (gaps.length)
         observations.push({
@@ -333,40 +308,48 @@ export function createAwsConnector(options: { now?: () => Date } = {}): Connecto
       s.close();
     }
   }
+  /** One daily statistic per CloudWatch metric; days without a datapoint stay absent, never zero. */
+  interface Query {
+    id: string;
+    namespace: string;
+    metric: string;
+    dimensions: Array<{ Name: string; Value: string }>;
+    stat: Statistic;
+  }
   async function metrics(
     s: Session,
     region: string,
-    queries: MetricDataQuery[],
+    queries: Query[],
     scope: { resourceType: string; externalId: string },
     start: string,
     end: string,
   ): Promise<MetricPoint[]> {
     const api = s.client(new CloudWatchClient(s.settings(region)));
-    const results = await pages(async (token) => {
+    const points: MetricPoint[] = [];
+    for (const q of queries) {
+      // A resource is published whole or not at all: the deadline skips it under one gap.
+      if (s.signal.aborted) throw new ConnectorError('provider_unavailable', TIME_LIMIT_GAP);
       const r = await api.send(
-        new GetMetricDataCommand({
-          MetricDataQueries: queries,
+        new GetMetricStatisticsCommand({
+          Namespace: q.namespace,
+          MetricName: q.metric,
+          Dimensions: q.dimensions,
           StartTime: new Date(`${start}T00:00:00Z`),
           EndTime: new Date(`${end}T00:00:00Z`),
-          ScanBy: 'TimestampAscending',
-          NextToken: token,
+          Period: 86400,
+          Statistics: [q.stat],
         }),
         { abortSignal: s.signal },
       );
-      return { items: r.MetricDataResults ?? [], next: r.NextToken };
-    });
-    const points: MetricPoint[] = [];
-    for (const r of results) {
-      if (r.StatusCode !== 'Complete' || r.Messages?.length)
-        throw new ConnectorError('provider_unavailable', 'CloudWatch returned incomplete metric data');
-      for (let i = 0; i < (r.Timestamps?.length ?? 0); i++) {
-        const value = r.Values?.[i];
+      for (const d of r.Datapoints ?? []) {
+        if (!d.Timestamp) continue;
+        const value = d[q.stat];
         points.push({
           ...scope,
-          metric: r.Id!,
-          day: date(r.Timestamps![i]!),
+          metric: q.id,
+          day: date(d.Timestamp),
           value: value !== undefined && Number.isFinite(value) ? value : null,
-          completeness: date(r.Timestamps![i]!) >= date(now()) ? 'partial' : 'complete',
+          completeness: date(d.Timestamp) >= date(now()) ? 'partial' : 'complete',
         });
       }
     }
@@ -387,8 +370,6 @@ export function createAwsConnector(options: { now?: () => Date } = {}): Connecto
         externalId: { type: 'string', readOnly: true },
         regions: { type: 'array', items: { type: 'string' }, maxItems: 10 },
         services: { type: 'array', items: { enum: SERVICES } },
-        costTagKey: { type: 'string' },
-        costTagValue: { type: 'string' },
       },
     }),
     validateConfig: (c) => ({
@@ -426,16 +407,8 @@ export function createAwsConnector(options: { now?: () => Date } = {}): Connecto
         namespace: string,
         metric: string,
         dimensions: Array<{ Name: string; Value: string }>,
-        stat: string,
-      ): MetricDataQuery => ({
-        Id: id,
-        MetricStat: {
-          Metric: { Namespace: namespace, MetricName: metric, Dimensions: dimensions },
-          Period: 86400,
-          Stat: stat,
-        },
-        ReturnData: true,
-      });
+        stat: Statistic,
+      ): Query => ({ id, namespace, metric, dimensions, stat });
       try {
         await each(input.scopes, (scope) =>
           guarded(s, scope.externalId, gaps, async () => {
@@ -591,81 +564,6 @@ export function createAwsConnector(options: { now?: () => Date } = {}): Connecto
                       mine.some((j) => !['SUCCEED', 'FAILED', 'CANCELLED'].includes(j.status ?? ''))
                         ? 'partial'
                         : 'complete',
-                  });
-              }
-            } else if (scope.resourceType === 'aws_cost_account' && s.cfg.services.includes('costs')) {
-              if (id !== `aws-cost:${s.account}`)
-                throw new ConnectorError('invalid_config', 'Cost scope belongs to another account');
-              const api = s.client(new CostExplorerClient(s.settings('us-east-1')));
-              const accountFilter = { Dimensions: { Key: 'LINKED_ACCOUNT' as const, Values: [s.account] } };
-              const results = await pages(async (token) => {
-                const result = await api.send(
-                  new GetCostAndUsageCommand({
-                    TimePeriod: { Start: start, End: end },
-                    Granularity: 'DAILY',
-                    Metrics: ['UnblendedCost'],
-                    Filter: s.cfg.costTagKey
-                      ? {
-                          And: [
-                            accountFilter,
-                            { Tags: { Key: s.cfg.costTagKey, Values: [s.cfg.costTagValue!] } },
-                          ],
-                        }
-                      : accountFilter,
-                    GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
-                    NextPageToken: token,
-                  }),
-                  { abortSignal: s.signal },
-                );
-                return { items: result.ResultsByTime ?? [], next: result.NextPageToken };
-              });
-              const totals = new Map<
-                string,
-                { total: number; partial: boolean; groups: Map<string, number> }
-              >();
-              for (const row of results) {
-                const day = row.TimePeriod?.Start;
-                if (!day) continue;
-                const entry = totals.get(day) ?? {
-                  total: 0,
-                  partial: false,
-                  groups: new Map<string, number>(),
-                };
-                entry.partial ||= row.Estimated === true || day >= shift(today, -1);
-                for (const g of row.Groups ?? []) {
-                  const cost = g.Metrics?.UnblendedCost;
-                  if (
-                    cost?.Unit !== 'USD' ||
-                    cost.Amount === undefined ||
-                    !Number.isFinite(Number(cost.Amount))
-                  )
-                    throw new ConnectorError(
-                      'invalid_response',
-                      'AWS cost currency/value unsupported; expected USD',
-                    );
-                  const value = Number(cost.Amount);
-                  entry.total += value;
-                  const service = g.Keys?.[0] ?? 'Other';
-                  entry.groups.set(service, (entry.groups.get(service) ?? 0) + value);
-                }
-                totals.set(day, entry);
-              }
-              for (const [day, e] of totals) {
-                points.push({
-                  ...scope,
-                  metric: 'cost_usd',
-                  day,
-                  value: e.total,
-                  completeness: e.partial ? 'partial' : 'complete',
-                });
-                for (const [dimension, value] of e.groups)
-                  points.push({
-                    ...scope,
-                    metric: 'cost_usd',
-                    dimension,
-                    day,
-                    value,
-                    completeness: e.partial ? 'partial' : 'complete',
                   });
               }
             } else

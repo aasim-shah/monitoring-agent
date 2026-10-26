@@ -241,7 +241,6 @@ export function ConnectionDetail({
           </p>
           <p className="text-xs text-muted-foreground">
             Only read operations are allowed. Select resources below to include their metrics in this product.
-            Account costs are shared unless a cost allocation tag was configured.
           </p>
         </Section>
       ) : null}

@@ -1,6 +1,6 @@
 # AWS read-only integration
 
-The first release supports S3 general-purpose bucket daily storage and object counts, Lambda daily invocations/errors/throttles/peak duration/peak concurrency, Amplify branch build outcomes, and Cost Explorer daily unblended USD costs with service breakdowns. The same account's cost breakdown includes other AWS services, but their operational metrics are not yet collected.
+The first release supports S3 general-purpose bucket daily storage and object counts, Lambda daily invocations/errors/throttles/peak duration/peak concurrency, and Amplify branch build outcomes. It calls **free AWS APIs only**: listing calls (S3, Lambda, Amplify, STS) and CloudWatch `GetMetricStatistics`, which is inside the CloudWatch free tier of 1 million API requests a month. It never calls Cost Explorer ($0.01 a request) or `GetMetricData` (outside the free tier), so connecting an account adds no AWS charges in normal use.
 
 ## Platform setup
 
@@ -8,8 +8,8 @@ Run the API and worker with an AWS workload role whose policy permits `sts:Assum
 
 ## Customer setup
 
-1. Create a dedicated IAM role with the read policy below. Restrict resources further where the AWS action supports resource-level permissions. Omit service permissions for services you do not connect; billing is optional.
-2. In a product's Integrations screen, choose AWS. Enter the role ARN, comma-separated regions, and desired services (`s3`, `lambda`, `amplify`, `costs`). Optionally enter an activated cost allocation tag key/value pair.
+1. Create a dedicated IAM role with the read policy below. Restrict resources further where the AWS action supports resource-level permissions. Omit service permissions for services you do not connect.
+2. In a product's Integrations screen, choose AWS. Enter the role ARN, comma-separated regions, and desired services (`s3`, `lambda`, `amplify`).
 3. Save. The API generates a unique external ID for this connection, ignoring caller-supplied values. Initial validation may fail until you complete the trust policy. Copy the external ID shown on the connection detail page.
 4. Add a trust statement like the following, replacing the principal and external ID. Select **Validate now**, then discover resources and save the resources belonging to the product.
 5. Open the product's AWS screen for daily charts and Reports & Schedules for AWS analysis in subsequent reports.
@@ -37,8 +37,7 @@ Customer role permissions (also applied as an inline STS session ceiling):
       "s3:ListAllMyBuckets", "s3:GetBucketLocation",
       "lambda:ListFunctions",
       "amplify:ListApps", "amplify:ListBranches", "amplify:ListJobs",
-      "cloudwatch:GetMetricData", "cloudwatch:ListMetrics",
-      "ce:GetCostAndUsage"
+      "cloudwatch:GetMetricStatistics", "cloudwatch:ListMetrics"
     ],
     "Resource": "*"
   }]
@@ -50,14 +49,14 @@ The connector assumes a 15-minute session for each execution and destroys client
 ## Interpretation and limits
 
 - All AWS points use UTC dates. Daily report AWS sections explicitly identify their own UTC date even when the enclosing report uses another timezone. They are not rebucketed into an arbitrary local day.
-- Costs are unblended USD, provisional according to AWS and for the latest two days. The API always filters to the assumed account's linked-account ID, including when the role is in a management account. Without an allocation tag, the selected billing resource is labeled **shared account costs**, never product-attributed. Scoping it to multiple products repeats the same account view; do not add those reports together. Cost allocation tags must already be activated by the customer. Forecasts, monthly summary cards, regional cost breakdowns, and savings estimates are not part of this release.
+- Costs are not collected: every AWS billing API is charged per request. A free month-to-date figure (CloudWatch `AWS/Billing EstimatedCharges` through `GetMetricStatistics`) is possible later, but it needs "Receive CloudWatch billing alerts" turned on in the account's billing preferences.
 - S3 storage and object counts are gauges: the range card uses the latest available daily observation. Storage sums published storage-type metrics; an incomplete set of daily samples is omitted. No-data days stay missing. Request/error metrics require a separately configured S3 metrics setup and are not collected in this release.
 - Lambda charts show daily counts and daily maximum duration/concurrency; range cards use the maximum for peaks. Absent AWS samples remain missing, including zero-traffic days when AWS publishes nothing.
 - Amplify builds are grouped by start date. Days with in-progress builds remain partial. Discovery stores only app/branch identifiers and names, never full app configuration.
-- Sync runs hourly. The existing worker requests 28 days initially and revisits the latest 3 days on subsequent runs (the connector accepts up to 90 days). Cost data and build outcomes can be revised later. Reports retain their snapshots; regenerate to capture later revisions.
+- Sync runs hourly. The existing worker requests 28 days initially and revisits the latest 3 days on subsequent runs (the connector accepts up to 90 days). Build outcomes can be revised later. Reports retain their snapshots; regenerate to capture later revisions.
 - Discovery pagination and requests are bounded; permission failures appear as named inventory coverage observations. Sync gaps are saved on the sync run and appear in AWS charts and report coverage. Other permitted services continue when one fails. Previously collected values can remain visible with stale/partial coverage after a failed read.
-- CloudWatch reads and Cost Explorer API requests can incur AWS charges. Limit services, regions, and product scopes. This release does not install collectors or enable billable AWS metric streams.
+- Free-tier budget: each sync makes one `GetMetricStatistics` request per metric per resource (5 per Lambda function, 2 to 3 per bucket), about 3,600 a month per Lambda function with hourly syncs. The free tier is shared with any other CloudWatch API use in the account. This release does not install collectors or enable billable AWS metric streams.
 
 ## Validation
 
-SDK-mocked tests cover the session ceiling, cross-account scope rejection, pagination, incomplete CloudWatch results, S3 ownership and storage classes, billing attribution, and per-service failures. Report tests cover evidence-backed comparisons, provisional data, UTC labeling, and all delivery renderers. API integration tests cover generated external IDs and scoped persisted AWS KPIs. A live account smoke test is still required before rollout.
+SDK-mocked tests cover the session ceiling, cross-account scope rejection, pagination, free-API-only reads (no Cost Explorer, no GetMetricData), missing days left missing, S3 ownership and storage classes, and per-resource failures. Report tests cover evidence-backed comparisons, provisional data, UTC labeling, and all delivery renderers. API integration tests cover generated external IDs and scoped persisted AWS KPIs. A live account smoke test is still required before rollout.

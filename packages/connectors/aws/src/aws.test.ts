@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
-import { CloudWatchClient } from '@aws-sdk/client-cloudwatch';
+import { CloudWatchClient, GetMetricStatisticsCommand } from '@aws-sdk/client-cloudwatch';
 import { S3Client } from '@aws-sdk/client-s3';
 import { LambdaClient } from '@aws-sdk/client-lambda';
 import { AmplifyClient } from '@aws-sdk/client-amplify';
-import { CostExplorerClient } from '@aws-sdk/client-cost-explorer';
 import type { ExecutionContext } from '@pcp/connector-sdk';
 import { createAwsConnector, AWS_READ_POLICY } from './index.js';
 const mockSend = (prototype: object) =>
@@ -21,7 +20,7 @@ const ctx = (config: Record<string, unknown> = {}): ExecutionContext => ({
     roleArn: 'arn:aws:iam::123456789012:role/ReadOnly',
     externalId: 'server-generated-external-id',
     regions: ['us-east-1'],
-    services: ['s3', 'lambda', 'amplify', 'costs'],
+    services: ['s3', 'lambda', 'amplify'],
     ...config,
   },
 });
@@ -55,6 +54,8 @@ describe('AWS read-only boundaries', () => {
     expect(JSON.stringify(AWS_READ_POLICY)).not.toMatch(
       /GetObject|GetFunction|Secret|Put|Update|Delete|Invoke/,
     );
+    // Free APIs only: no Cost Explorer, no GetMetricData (outside the CloudWatch free tier).
+    expect(JSON.stringify(AWS_READ_POLICY)).not.toMatch(/ce:|GetMetricData/);
   });
   it('says plainly when the platform itself has no AWS credentials to assume the role', async () => {
     vi.mocked(STSClient.prototype.send).mockRejectedValue(
@@ -86,12 +87,15 @@ describe('AWS read-only boundaries', () => {
     expect(result.points).toEqual([]);
     expect(result.gaps[0]).toContain('outside');
   });
-  it('does not silently accept incomplete CloudWatch values or substitute zero', async () => {
-    mockSend(CloudWatchClient.prototype).mockResolvedValue({
-      MetricDataResults: [{ Id: 'errors', StatusCode: 'PartialData', Timestamps: [now()], Values: [9] }],
+  it('reads Lambda with the free GetMetricStatistics call and never substitutes zero for a missing day', async () => {
+    const send = mockSend(CloudWatchClient.prototype).mockImplementation(async (command) => {
+      const input = command.input as { MetricName: string; Statistics: string[] };
+      return input.MetricName === 'Errors'
+        ? { Datapoints: [{ Timestamp: new Date('2026-10-25T00:00:00Z'), Sum: 9 }] }
+        : { Datapoints: [] };
     });
     const r = await connector().sync!(ctx(), {
-      days: 1,
+      days: 2,
       scopes: [
         {
           resourceType: 'aws_lambda_function',
@@ -99,8 +103,24 @@ describe('AWS read-only boundaries', () => {
         },
       ],
     });
+    expect(send.mock.calls.every(([c]) => c instanceof GetMetricStatisticsCommand)).toBe(true);
+    expect(send.mock.calls[0]![0].input).toMatchObject({
+      Namespace: 'AWS/Lambda',
+      Dimensions: [{ Name: 'FunctionName', Value: 'api' }],
+      Period: 86400,
+    });
+    expect(r.points).toEqual([
+      expect.objectContaining({ metric: 'errors', day: '2026-10-25', value: 9, completeness: 'complete' }),
+    ]);
+  });
+  it('does not offer costs: the costs service is rejected and Cost Explorer is never reached', async () => {
+    expect(connector().validateConfig!({ ...ctx().config, services: ['costs'] }).ok).toBe(false);
+    const r = await connector().sync!(ctx(), {
+      days: 2,
+      scopes: [{ resourceType: 'aws_cost_account', externalId: 'aws-cost:123456789012' }],
+    });
     expect(r.points).toEqual([]);
-    expect(r.gaps[0]).toContain('incomplete');
+    expect(r.gaps[0]).toContain('disabled or unsupported');
   });
 });
 describe('AWS discovery and daily sync', () => {
@@ -128,38 +148,6 @@ describe('AWS discovery and daily sync', () => {
     expect(coverage?.attributes.gaps).toEqual([expect.stringContaining('S3 discovery:')]);
     expect(JSON.stringify(coverage)).not.toContain('sensitive provider message');
   });
-  it('restricts costs to the assumed account and optional allocation tag, keeping service breakdowns and provisional flags', async () => {
-    const send = mockSend(CostExplorerClient.prototype).mockResolvedValue({
-      ResultsByTime: [
-        {
-          TimePeriod: { Start: '2026-10-25', End: '2026-10-26' },
-          Estimated: true,
-          Groups: [
-            { Keys: ['AWS Lambda'], Metrics: { UnblendedCost: { Amount: '1.234', Unit: 'USD' } } },
-            { Keys: ['Amazon S3'], Metrics: { UnblendedCost: { Amount: '2', Unit: 'USD' } } },
-          ],
-        },
-      ],
-    });
-    const r = await connector().sync!(
-      ctx({ services: ['costs'], costTagKey: 'Product', costTagValue: 'shop' }),
-      { days: 2, scopes: [{ resourceType: 'aws_cost_account', externalId: 'aws-cost:123456789012' }] },
-    );
-    expect(send.mock.calls[0]![0].input).toMatchObject({
-      Filter: {
-        And: [
-          { Dimensions: { Key: 'LINKED_ACCOUNT', Values: ['123456789012'] } },
-          { Tags: { Key: 'Product', Values: ['shop'] } },
-        ],
-      },
-    });
-    expect(r.points.find((p) => !p.dimension)).toMatchObject({
-      day: '2026-10-25',
-      value: 3.234,
-      completeness: 'partial',
-    });
-    expect(r.points.find((p) => p.dimension === 'Amazon S3')?.value).toBe(2);
-  });
   it('combines S3 storage classes only when every class has data and validates bucket ownership', async () => {
     const s3 = mockSend(S3Client.prototype).mockResolvedValue({ LocationConstraint: undefined });
     const cw = mockSend(CloudWatchClient.prototype)
@@ -168,19 +156,15 @@ describe('AWS discovery and daily sync', () => {
           Dimensions: [{ Name: 'StorageType', Value }],
         })),
       })
-      .mockResolvedValueOnce({
-        MetricDataResults: [
-          { Id: 'storage_0', StatusCode: 'Complete', Timestamps: [new Date('2026-10-25')], Values: [100] },
-          { Id: 'storage_1', StatusCode: 'Complete', Timestamps: [new Date('2026-10-25')], Values: [20] },
-          { Id: 'objects', StatusCode: 'Complete', Timestamps: [new Date('2026-10-25')], Values: [7] },
-        ],
-      });
+      .mockResolvedValueOnce({ Datapoints: [{ Timestamp: new Date('2026-10-25'), Average: 100 }] })
+      .mockResolvedValueOnce({ Datapoints: [{ Timestamp: new Date('2026-10-25'), Average: 20 }] })
+      .mockResolvedValueOnce({ Datapoints: [{ Timestamp: new Date('2026-10-25'), Average: 7 }] });
     const r = await connector().sync!(ctx(), {
       days: 2,
       scopes: [{ resourceType: 'aws_s3_bucket', externalId: 'arn:aws:s3:::bucket' }],
     });
     expect(s3.mock.calls[0]![0].input).toMatchObject({ ExpectedBucketOwner: '123456789012' });
-    expect(cw).toHaveBeenCalledTimes(2);
+    expect(cw).toHaveBeenCalledTimes(4);
     expect(r.points.find((p) => p.metric === 'storage_bytes')?.value).toBe(120);
     expect(r.points.filter((p) => p.day === '2026-10-26')).toEqual([]);
   });
@@ -224,11 +208,7 @@ describe('AWS discovery and daily sync', () => {
   it('skips remaining scopes under one gap once the deadline passes', async () => {
     mockSend(CloudWatchClient.prototype).mockImplementation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 30));
-      return {
-        MetricDataResults: [
-          { Id: 'errors', StatusCode: 'Complete', Timestamps: [new Date('2026-10-25')], Values: [1] },
-        ],
-      };
+      return { Datapoints: [{ Timestamp: new Date('2026-10-25'), Sum: 1 }] };
     });
     const r = await connector().sync!(
       { ...ctx({ services: ['lambda'] }), deadline: new Date(Date.now() + 10).toISOString() },
@@ -241,21 +221,20 @@ describe('AWS discovery and daily sync', () => {
       },
     );
     expect(r.gaps).toEqual([expect.stringContaining('time limit reached')]);
-    expect(r.points).toHaveLength(5);
+    // A function cut off mid-read publishes nothing rather than half its metrics.
+    expect(r.points).toEqual([]);
   });
-  it('continues other scoped services after a billing denial', async () => {
-    mockSend(CostExplorerClient.prototype).mockRejectedValue(
-      Object.assign(new Error(), { name: 'AccessDeniedException' }),
+  it('continues other scoped resources after one is denied', async () => {
+    mockSend(S3Client.prototype).mockRejectedValue(Object.assign(new Error(), { name: 'AccessDenied' }));
+    mockSend(CloudWatchClient.prototype).mockImplementation(async (command) =>
+      (command.input as { MetricName: string }).MetricName === 'Errors'
+        ? { Datapoints: [{ Timestamp: new Date('2026-10-25'), Sum: 2 }] }
+        : { Datapoints: [] },
     );
-    mockSend(CloudWatchClient.prototype).mockResolvedValue({
-      MetricDataResults: [
-        { Id: 'errors', StatusCode: 'Complete', Timestamps: [new Date('2026-10-25')], Values: [2] },
-      ],
-    });
     const r = await connector().sync!(ctx(), {
       days: 2,
       scopes: [
-        { resourceType: 'aws_cost_account', externalId: 'aws-cost:123456789012' },
+        { resourceType: 'aws_s3_bucket', externalId: 'arn:aws:s3:::denied' },
         {
           resourceType: 'aws_lambda_function',
           externalId: 'arn:aws:lambda:us-east-1:123456789012:function:api',

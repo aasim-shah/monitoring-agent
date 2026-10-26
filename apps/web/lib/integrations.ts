@@ -31,23 +31,22 @@ export const INTEGRATIONS: Record<IntegrationSpec['provider'], IntegrationSpec> 
   aws: {
     provider: 'aws',
     title: 'AWS',
-    summary: 'Read-only S3 storage, Lambda performance, Amplify builds, and AWS costs.',
+    summary: 'Read-only S3 storage, Lambda performance, and Amplify builds, using free AWS APIs only.',
     permissions: [
       'sts:AssumeRole (trust the platform principal with this connection’s external ID)',
-      'cloudwatch:GetMetricData, cloudwatch:ListMetrics',
+      'cloudwatch:GetMetricStatistics, cloudwatch:ListMetrics',
     ],
     optionalPermissions: [
       's3:ListAllMyBuckets, s3:GetBucketLocation',
       'lambda:ListFunctions',
       'amplify:ListApps, amplify:ListBranches, amplify:ListJobs',
-      'ce:GetCostAndUsage (optional billing access)',
     ],
     tokenHelp:
       'Enter a customer IAM role ARN. After saving, copy the generated external ID from the connection into its IAM trust policy, then select Validate now. No customer access keys are needed. Ask your platform administrator for the trusted AWS principal.',
     collects:
-      'Bucket sizes/object counts, Lambda invocations/errors/throttles/duration/concurrency, Amplify build results, daily USD spend by service. No object contents or function code.',
+      'Bucket sizes/object counts, Lambda invocations/errors/throttles/duration/concurrency, Amplify build results. No object contents, function code, or billing data.',
     frequency:
-      'Hourly sync; daily UTC aggregates. Billing and S3 storage can arrive late. AWS read API charges may apply.',
+      'Hourly sync; daily UTC aggregates. S3 storage can arrive late. Free AWS APIs only: listing calls and CloudWatch GetMetricStatistics within the free tier; no Cost Explorer.',
     changes: 'None. An explicit read-only session policy limits each assumed role session.',
     configFields: [
       {
@@ -68,18 +67,12 @@ export const INTEGRATIONS: Record<IntegrationSpec['provider'], IntegrationSpec> 
         label: 'Services (comma-separated)',
         required: true,
         list: true,
-        placeholder: 's3, lambda, amplify, costs',
-        hint: 'Choose from s3, lambda, amplify, costs. Omit costs to disable billing reads.',
+        placeholder: 's3, lambda, amplify',
+        hint: 'Choose from s3, lambda, amplify.',
       },
-      {
-        name: 'costTagKey',
-        label: 'Cost allocation tag key (optional)',
-        hint: 'Use an activated cost allocation tag to attribute costs. Without a tag, costs cover the account and must not be treated as product spend.',
-      },
-      { name: 'costTagValue', label: 'Cost allocation tag value (optional)' },
     ],
     displayName: () => 'AWS',
-    scopeTypes: ['aws_s3_bucket', 'aws_lambda_function', 'aws_amplify_branch', 'aws_cost_account'],
+    scopeTypes: ['aws_s3_bucket', 'aws_lambda_function', 'aws_amplify_branch'],
   },
   cloudflare: {
     provider: 'cloudflare',

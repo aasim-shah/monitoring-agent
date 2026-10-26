@@ -300,7 +300,7 @@ describe('AWS connection setup', () => {
       config: {
         roleArn: 'arn:aws:iam::123456789012:role/ReadOnly',
         regions: ['us-east-1'],
-        services: ['s3', 'lambda', 'amplify', 'costs'],
+        services: ['s3', 'lambda', 'amplify'],
         externalId: 'attacker-selected-external-id',
       },
     };

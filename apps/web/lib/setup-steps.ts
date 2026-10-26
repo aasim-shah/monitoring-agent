@@ -63,7 +63,7 @@ export function buildSetupSteps(input: SetupInput): SetupStep[] {
       id: 'aws',
       title: 'Connect AWS',
       description: 'Connect a read-only role, then choose the resources belonging to this product.',
-      collects: 'S3 storage, Lambda performance, Amplify builds, and optional AWS costs.',
+      collects: 'S3 storage, Lambda performance, and Amplify builds.',
       status: 'todo',
       href: `/orgs/${input.orgId}/products/${input.productId}/integrations`,
       actionLabel: 'Connect AWS',
