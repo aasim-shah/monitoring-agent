@@ -4141,6 +4141,10 @@ export interface components {
                 externalId: string;
                 name: string;
                 breakdown?: {
+                    costByService?: {
+                        service: string;
+                        value: number;
+                    }[];
                     sessionsByChannel?: {
                         channel: string;
                         value: number;
@@ -4150,7 +4154,7 @@ export interface components {
                     key: string;
                     label: string;
                     /** @enum {string} */
-                    unit: "count" | "percent" | "ratio" | "position";
+                    unit: "count" | "percent" | "ratio" | "position" | "bytes" | "ms" | "USD";
                     definition: string;
                     caveats: string[];
                     lowerIsBetter?: boolean;

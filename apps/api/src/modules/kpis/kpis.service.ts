@@ -16,6 +16,10 @@ export type KpiRange = keyof typeof KPI_RANGES;
 
 /** Resource kinds with daily KPI values (M13b); Firebase apps are listed for the Mobile page. */
 const KPI_RESOURCES = [
+  'aws_s3_bucket',
+  'aws_lambda_function',
+  'aws_amplify_branch',
+  'aws_cost_account',
   'google_ga4_property',
   'google_search_console_site',
   'google_play_app',
@@ -55,7 +59,7 @@ export class KpisService {
     return withTenant(this.prisma, ctx, async (tx) => {
       const connections = await tx.connection.findMany({
         where: {
-          provider: 'google',
+          provider: { in: ['google', 'aws'] },
           status: { notIn: ['disconnected', 'revoked'] },
           scopes: { some: { productId } },
         },
@@ -63,7 +67,7 @@ export class KpisService {
         orderBy: { createdAt: 'asc' },
       });
       const anyGoogle =
-        connections.length > 0 ||
+        connections.some((c) => c.provider === 'google') ||
         (await tx.connection.count({
           where: { provider: 'google', status: { notIn: ['disconnected', 'revoked'] } },
         })) > 0;
@@ -118,8 +122,21 @@ export class KpisService {
         for (const m of mine)
           if (m.metric === 'sessions' && m.dimension && m.value !== null)
             channels.set(m.dimension, (channels.get(m.dimension) ?? 0) + m.value);
+        const costs = new Map<string, number>();
+        for (const m of mine)
+          if (m.metric === 'cost_usd' && m.dimension && m.value !== null)
+            costs.set(m.dimension, (costs.get(m.dimension) ?? 0) + m.value);
         return {
           ...r,
+          ...(r.resourceType === 'aws_cost_account'
+            ? {
+                breakdown: {
+                  costByService: [...costs]
+                    .map(([service, value]) => ({ service, value }))
+                    .sort((a, b) => b.value - a.value),
+                },
+              }
+            : {}),
           kpis,
           ...(r.resourceType === 'google_ga4_property'
             ? {
@@ -142,7 +159,16 @@ export class KpisService {
         : [];
       const gaps = new Set<string>();
       const connectionViews = connections.map((c) => {
-        const services = serviceStatus(c.grantedScopes);
+        const services = c.provider === 'google' ? serviceStatus(c.grantedScopes) : {};
+        if (c.provider === 'aws') {
+          const run = runs.find(
+            (r) => r.connectionId === c.id && (r.status === 'succeeded' || r.status === 'failed'),
+          );
+          if (run?.errorMessage) gaps.add(`${c.displayName}: ${run.errorMessage}`);
+          for (const r of views.filter((r) => r.connectionId === c.id))
+            if (r.kpis.some((k) => k.points.some((p) => p.value === null)))
+              gaps.add(`${r.name}: some UTC days have no data`);
+        }
         for (const [s, status] of Object.entries(services) as Array<[GoogleService, ServiceStatus]>)
           if (status !== 'available') gaps.add(`${SERVICE_LABEL[s]}: ${STATUS_TEXT[status]}`);
         const mine = runs.filter((r) => r.connectionId === c.id);
@@ -150,16 +176,22 @@ export class KpisService {
         const latest = mine.find((r) => r.status === 'succeeded' || r.status === 'failed');
         const lastSuccessfulSync = success?.finishedAt ?? null;
         const failedLast = latest?.status === 'failed';
+        // AWS saves per-resource gaps on a succeeded run; Google's service gaps are already listed above.
+        const partialSync = c.provider === 'aws' ? (success?.errorMessage ?? null) : null;
         const freshness: Freshness = {
           lastSuccessfulSync,
           lastAttempt: latest?.finishedAt ?? latest?.startedAt ?? null,
           expectedIntervalSeconds: 3600,
           status: !lastSuccessfulSync
             ? 'unavailable'
-            : failedLast || today.getTime() - lastSuccessfulSync.getTime() > STALE_AFTER_MS
+            : failedLast ||
+                Boolean(partialSync) ||
+                today.getTime() - lastSuccessfulSync.getTime() > STALE_AFTER_MS
               ? 'stale'
               : 'current',
-          reason: failedLast ? (latest?.errorMessage ?? latest?.errorCode ?? 'sync failed') : c.statusReason,
+          reason:
+            partialSync ??
+            (failedLast ? (latest?.errorMessage ?? latest?.errorCode ?? 'sync failed') : c.statusReason),
         };
         return {
           id: c.id,

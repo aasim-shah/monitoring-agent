@@ -92,11 +92,23 @@ async function storeMetrics(
       completeness: p.completeness,
     }));
   if (!rows.length) return 0;
-  await withTenant(
-    prisma,
-    ctx,
-    (tx) =>
-      tx.$executeRaw`
+  await withTenant(prisma, ctx, async (tx) => {
+    // A revised billing day may drop a service (for example after a credit).
+    // Replace its breakdown atomically so stale groups cannot outlive the new total.
+    const costDays = rows.filter(
+      (r) => r.resource_type === 'aws_cost_account' && r.metric === 'cost_usd' && r.dimension === '',
+    );
+    if (costDays.length)
+      await tx.metricAggregate.deleteMany({
+        where: {
+          connectionId,
+          resourceType: 'aws_cost_account',
+          metric: 'cost_usd',
+          dimension: { not: '' },
+          OR: costDays.map((r) => ({ externalId: r.external_id, day: new Date(`${r.day}T00:00:00Z`) })),
+        },
+      });
+    return tx.$executeRaw`
       INSERT INTO metric_aggregates
         (organization_id, connection_id, resource_type, external_id, metric, dimension, day, value, completeness, fetched_at)
       SELECT ${ctx.organizationId}::uuid, ${connectionId}::uuid, r.resource_type, r.external_id, r.metric,
@@ -104,8 +116,8 @@ async function storeMetrics(
       FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb)
         AS r(resource_type text, external_id text, metric text, dimension text, day text, value float8, completeness text)
       ON CONFLICT (connection_id, resource_type, external_id, metric, dimension, day)
-      DO UPDATE SET value = EXCLUDED.value, completeness = EXCLUDED.completeness, fetched_at = EXCLUDED.fetched_at`,
-  );
+      DO UPDATE SET value = EXCLUDED.value, completeness = EXCLUDED.completeness, fetched_at = EXCLUDED.fetched_at`;
+  });
   return rows.length;
 }
 
@@ -163,14 +175,16 @@ export function startProcessors(deps: ProcessorDeps): Processors {
 
     try {
       let items: number | null = null;
+      let syncGaps: string[] = [];
       if (kind === 'connection-validate') await deps.runtime.validate(ctx, connectionId);
       else if (kind === 'connection-sync') {
         const seen = await withTenant(deps.prisma, ctx, (tx) =>
           tx.metricAggregate.count({ where: { connectionId } }),
         );
-        const { points } = await deps.runtime.sync(ctx, connectionId, {
+        const { points, gaps } = await deps.runtime.sync(ctx, connectionId, {
           days: seen ? SYNC_DAYS : FIRST_SYNC_DAYS,
         });
+        syncGaps = gaps;
         items = await storeMetrics(deps.prisma, ctx, connectionId, points, now());
       } else {
         const { observations } = await deps.runtime.discover(ctx, connectionId);
@@ -178,7 +192,15 @@ export function startProcessors(deps: ProcessorDeps): Processors {
         await storeInventory(deps.prisma, ctx, connectionId, observations, now());
       }
       await withTenant(deps.prisma, ctx, (tx) =>
-        tx.syncRun.update({ where: { id: run.id }, data: { status: 'succeeded', finishedAt: now(), items } }),
+        tx.syncRun.update({
+          where: { id: run.id },
+          data: {
+            status: 'succeeded',
+            finishedAt: now(),
+            items,
+            errorMessage: syncGaps.length ? syncGaps.join('; ').slice(0, 4000) : null,
+          },
+        }),
       );
       return { items };
     } catch (err) {

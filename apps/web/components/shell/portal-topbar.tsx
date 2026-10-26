@@ -6,6 +6,7 @@ import { PortalTheme } from './portal-theme';
 const titles: Record<string, string> = {
   agents: 'Agents',
   assets: 'Assets',
+  aws: 'AWS',
   infrastructure: 'Infrastructure',
   websites: 'Websites & APIs',
   mobile: 'Mobile Apps & SDKs',

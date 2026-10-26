@@ -492,6 +492,13 @@ export function ReportView({
           </Panel>
         ))}
       </Group>
+      <Group title="AWS">
+        {d.aws.map((c) => (
+          <Panel key={c.name} title={c.name} subtitle={c.subtitle} status={c}>
+            <Rows rows={c.rows} />
+          </Panel>
+        ))}
+      </Group>
 
       {d.notConnected.length || d.quiet.length ? (
         <section aria-label="Not connected yet" className="rounded-[20px] border border-border bg-card p-6">

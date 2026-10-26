@@ -10,6 +10,7 @@ describe('buildSetupSteps', () => {
       'servers',
       'google',
       'databases',
+      'aws',
       'code-and-cloud',
       'websites',
       'team',
@@ -33,7 +34,7 @@ describe('buildSetupSteps', () => {
 
   it('marks unbuilt steps as coming soon, without a link', () => {
     for (const step of buildSetupSteps(base).filter(
-      (s) => !['environments', 'servers', 'team'].includes(s.id),
+      (s) => !['environments', 'servers', 'aws', 'team'].includes(s.id),
     )) {
       expect(step.status, step.id).toBe('soon');
       expect(step.href, step.id).toBeUndefined();

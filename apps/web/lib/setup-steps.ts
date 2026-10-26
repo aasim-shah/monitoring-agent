@@ -60,6 +60,15 @@ export function buildSetupSteps(input: SetupInput): SetupStep[] {
       status: 'soon',
     },
     {
+      id: 'aws',
+      title: 'Connect AWS',
+      description: 'Connect a read-only role, then choose the resources belonging to this product.',
+      collects: 'S3 storage, Lambda performance, Amplify builds, and optional AWS costs.',
+      status: 'todo',
+      href: `/orgs/${input.orgId}/products/${input.productId}/integrations`,
+      actionLabel: 'Connect AWS',
+    },
+    {
       id: 'code-and-cloud',
       title: 'Connect GitHub and Cloudflare',
       description: 'Authorize read-only access to link deployments and DNS to what is running.',

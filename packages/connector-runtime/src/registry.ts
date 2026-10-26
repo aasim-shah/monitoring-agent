@@ -1,3 +1,4 @@
+import { createAwsConnector } from '@pcp/connectors-aws';
 import { ConnectorRegistry, type Connector, type DestinationOptions } from '@pcp/connector-sdk';
 import { createCloudflareConnector } from '@pcp/connectors-cloudflare';
 import { customHttpConnector } from '@pcp/connectors-custom-http';
@@ -43,6 +44,7 @@ export async function buildRegistry(env: Record<string, string | undefined>): Pr
   const registry = new ConnectorRegistry();
   /** Production connectors. Providers join this list as their milestones land (M7, M8, M13). */
   const production: Connector[] = [
+    createAwsConnector(),
     postgresConnector,
     mysqlConnector,
     mongodbConnector,

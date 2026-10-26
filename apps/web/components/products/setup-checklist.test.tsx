@@ -14,7 +14,7 @@ describe('SetupChecklist', () => {
       />,
     );
     expect(screen.getByRole('heading', { name: /set up monitoring/i })).toBeTruthy();
-    expect(screen.getByText('1 of 7 done')).toBeTruthy();
+    expect(screen.getByText('1 of 8 done')).toBeTruthy();
     expect(screen.getAllByText('Coming soon')).toHaveLength(4);
     expect(screen.getByRole('link', { name: 'Add server' }).getAttribute('href')).toBe(
       '/orgs/o/products/p/agents',

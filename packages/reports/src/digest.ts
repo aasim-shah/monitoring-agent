@@ -1,5 +1,6 @@
 import type {
   AnalyticsStats,
+  AwsStats,
   DatabaseStats,
   DeploymentStats,
   HostStats,
@@ -66,7 +67,17 @@ export interface WatchItem {
   tone: 'watch' | 'attention';
 }
 export interface StoryLine {
-  kind: 'users' | 'contacts' | 'records' | 'server' | 'domain' | 'events' | 'apps' | 'ads' | 'incidents';
+  kind:
+    | 'users'
+    | 'contacts'
+    | 'records'
+    | 'server'
+    | 'domain'
+    | 'events'
+    | 'apps'
+    | 'ads'
+    | 'incidents'
+    | 'aws';
   tone: Tone;
   text: string;
 }
@@ -81,6 +92,8 @@ export interface Digest {
   analytics: AnalyticsCard[];
   databases: Card[];
   activity: Card[];
+  /** One card per scoped AWS resource; values are UTC days. */
+  aws: Card[];
   watch: WatchItem[];
   quiet: string[];
   notConnected: string[];
@@ -655,6 +668,63 @@ function storyLines(s: Snapshot, watch: WatchItem[]): StoryLine[] {
   return lines;
 }
 
+const usd = (v: number) =>
+  `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function awsValue(v: { value: number | null; unit: string }): string {
+  if (v.value === null) return 'No data';
+  if (v.unit === 'USD') return usd(v.value);
+  if (v.unit === 'bytes') return bytes(v.value);
+  if (v.unit === 'ms') return `${count(v.value)} ms`;
+  return count(v.value);
+}
+const AWS_PROBLEMS = ['errors', 'throttles', 'builds_failed'];
+
+/** AWS cards, their story line, and what is worth a look (failures, a cost jump on a settled day). */
+function awsParts(s: Snapshot, watch: WatchItem[]): { cards: Card[]; story: StoryLine[] } {
+  const a = data<AwsStats>(s, 'aws');
+  if (!a) return { cards: [], story: [] };
+  const story: StoryLine[] = [];
+  const cards = a.resources.map((r) => {
+    const problems = r.values.filter((v) => AWS_PROBLEMS.includes(v.metric) && (v.value ?? 0) > 0);
+    for (const v of problems)
+      watch.push({
+        tone: 'watch',
+        title: `${r.name}: ${v.label.toLowerCase()} ${count(v.value!)}`,
+        text: `On ${shortDate(a.day)} (UTC). Open AWS to see which runs failed.`,
+      });
+    const jump = s.anomalies.find((x) => x.metric === `${r.name}: Unblended cost` && x.changePercent > 0);
+    if (jump)
+      watch.push({
+        tone: 'watch',
+        title: `AWS cost up on ${r.name}`,
+        text: `${usd(jump.current)}, up from ${usd(jump.previous)}. Check the service breakdown; billing can still be revised.`,
+      });
+    const cost = r.values.find((v) => v.metric === 'cost_usd')?.value;
+    if (cost != null) {
+      const top = [...r.costByService].sort((x, y) => y.value - x.value)[0];
+      story.push({
+        kind: 'aws',
+        tone: jump ? 'watch' : 'neutral',
+        text: `AWS cost ${usd(cost)} on ${shortDate(a.day)} (UTC)${top && top.value > 0 ? `, mostly ${top.service} ${usd(top.value)}` : ''}${r.partial ? ', still provisional' : ''}.`,
+      });
+    }
+    return {
+      name: r.name,
+      subtitle: `AWS · ${shortDate(a.day)} UTC${r.partial ? ' · partial' : ''}`,
+      tone: problems.length || jump ? 'watch' : r.partial ? 'neutral' : 'good',
+      label: problems.length ? 'Failures' : jump ? 'Cost up' : r.partial ? 'Partial' : 'Healthy',
+      rows: [
+        ...r.values.map((v) => [v.label, awsValue(v)] as [string, string]),
+        ...[...r.costByService]
+          .sort((x, y) => y.value - x.value)
+          .slice(0, 5)
+          .map((c) => [c.service, usd(c.value)] as [string, string]),
+      ],
+    } satisfies Card;
+  });
+  return { cards, story };
+}
+
 export function digest(s: Snapshot, narrative: string | null): Digest {
   const watch: WatchItem[] = [];
   const incidents = data<IncidentStats>(s, 'health');
@@ -778,7 +848,8 @@ export function digest(s: Snapshot, narrative: string | null): Digest {
       series: series(s, 'logs.errors', logs.errors),
     });
 
-  const story = storyLines(s, watch);
+  const awsView = awsParts(s, watch);
+  const story = [...storyLines(s, watch), ...awsView.story];
   const notConnected = [...new Set(s.coverage.filter((c) => c.status === 'missing').map((c) => c.source))];
   const order = { attention: 0, watch: 1 } as const;
   watch.sort((a, b) => order[a.tone] - order[b.tone]);
@@ -795,6 +866,7 @@ export function digest(s: Snapshot, narrative: string | null): Digest {
     analytics: analyticsList,
     databases,
     activity,
+    aws: awsView.cards,
     watch,
     quiet,
     notConnected,

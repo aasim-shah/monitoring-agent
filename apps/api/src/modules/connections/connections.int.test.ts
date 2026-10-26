@@ -289,3 +289,34 @@ describe('mock connector safety', () => {
     expect(Object.keys(pkg.dependencies)).not.toContain('@pcp/connectors-mock');
   });
 });
+
+describe('AWS connection setup', () => {
+  it('generates a distinct external ID server-side and never accepts a caller-supplied value', async () => {
+    const owner = await ownerWithOrg(t);
+    const body = {
+      provider: 'aws',
+      displayName: 'AWS',
+      executionLocation: 'cloud',
+      config: {
+        roleArn: 'arn:aws:iam::123456789012:role/ReadOnly',
+        regions: ['us-east-1'],
+        services: ['s3', 'lambda', 'amplify', 'costs'],
+        externalId: 'attacker-selected-external-id',
+      },
+    };
+    const create = () =>
+      t.app.inject({
+        method: 'POST',
+        url: `/api/v1/organizations/${owner.orgId}/connections`,
+        headers: headers(owner.cookie),
+        payload: body,
+      });
+    const a = await create();
+    const b = await create();
+    expect(a.statusCode).toBe(201);
+    expect(b.statusCode).toBe(201);
+    expect(a.json().config.externalId).toMatch(/^[a-f0-9-]{36}$/);
+    expect(a.json().config.externalId).not.toBe(body.config.externalId);
+    expect(a.json().config.externalId).not.toBe(b.json().config.externalId);
+  });
+});

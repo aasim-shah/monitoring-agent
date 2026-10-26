@@ -5243,6 +5243,14 @@ components:
               breakdown:
                 type: object
                 properties:
+                  costByService:
+                    type: array
+                    items:
+                      type: object
+                      required: [service, value]
+                      properties:
+                        service: { type: string }
+                        value: { type: number }
                   sessionsByChannel:
                     type: array
                     items:
@@ -5259,7 +5267,7 @@ components:
                   properties:
                     key: { type: string }
                     label: { type: string }
-                    unit: { type: string, enum: [count, percent, ratio, position] }
+                    unit: { type: string, enum: [count, percent, ratio, position, bytes, ms, USD] }
                     definition: { type: string }
                     caveats: { type: array, items: { type: string } }
                     lowerIsBetter: { type: boolean }

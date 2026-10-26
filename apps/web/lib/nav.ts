@@ -64,6 +64,11 @@ export function buildProductNav(orgId: string, productId: string, role: Role): N
       permission: 'connection.view',
     },
     {
+      label: 'AWS',
+      href: `/orgs/${orgId}/products/${productId}/aws`,
+      permission: 'telemetry.query',
+    },
+    {
       label: 'Analytics & Ads',
       href: `/orgs/${orgId}/products/${productId}/analytics`,
       permission: 'telemetry.query',

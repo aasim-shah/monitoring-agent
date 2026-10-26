@@ -70,6 +70,22 @@ export interface AnalyticsStats {
 
 import type { DatabaseActivity } from './activity.js';
 
+/** AWS uses explicit UTC daily buckets, not the report's local-day boundaries. */
+export interface AwsStats {
+  day: string;
+  timezone: 'UTC';
+  resources: Array<{
+    name: string;
+    externalId: string;
+    resourceType: string;
+    partial: boolean;
+    fetchedAt: string | null;
+    values: Array<{ metric: string; label: string; value: number | null; unit: string }>;
+    costByService: Array<{ service: string; value: number }>;
+  }>;
+  gaps: string[];
+}
+
 export interface DeploymentStats {
   deployed: number;
   failed: number;
@@ -93,6 +109,8 @@ export interface ReportSources {
   deployments(w: ReportWindow): Promise<DeploymentStats | null>;
   /** null when no Google connection exists for the product. */
   analytics(w: ReportWindow): Promise<AnalyticsStats | null>;
+  /** null when no AWS connection is scoped to the product. */
+  aws?(w: ReportWindow): Promise<AwsStats | null>;
   coverage(w: ReportWindow): Promise<CoverageItem[]>;
   /** Earlier reports of the product, for the 7-day trend lines; optional. */
   history?(w: ReportWindow): Promise<Snapshot[]>;
@@ -197,6 +215,8 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     deployments,
     rawAnalytics,
     earlier,
+    aws,
+    prevAws,
   ] = await Promise.all([
     sources.incidents(w),
     sources.incidents(prev),
@@ -210,6 +230,8 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     sources.deployments(w),
     sources.analytics(w),
     sources.history ? sources.history(w).catch(() => []) : Promise.resolve([]),
+    sources.aws?.(w) ?? null,
+    sources.aws?.(prev) ?? null,
   ]);
   const analytics = rawAnalytics && roundAnalytics(rawAnalytics);
   const hosts =
@@ -243,14 +265,50 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
     anomaly('Incidents opened', prevIncidents.opened, incidents.opened, 10),
   ].filter((a): a is Anomaly => a !== null);
   const actions = suggestedActions(incidents, hosts, databases, websites);
+  for (const resource of aws?.resources ?? []) {
+    const before = prevAws?.resources.find(
+      (r) => r.externalId === resource.externalId && r.resourceType === resource.resourceType,
+    );
+    for (const v of resource.values) {
+      if (!['cost_usd', 'errors', 'throttles', 'builds_failed', 'storage_bytes'].includes(v.metric)) continue;
+      const old = before?.values.find((p) => p.metric === v.metric)?.value ?? null;
+      const a = anomaly(
+        `${resource.name}: ${v.label}`,
+        old,
+        v.value,
+        v.metric === 'storage_bytes' ? 1048576 : 1,
+      );
+      // Provisional AWS days are revised later: no anomaly claims on them.
+      if (a && !resource.partial && !before?.partial) anomalies.push(a);
+      if (v.value !== null && v.value > 0 && ['errors', 'throttles', 'builds_failed'].includes(v.metric))
+        actions.push(`Investigate ${resource.name}: ${v.label} ${v.value} during UTC ${aws!.day}.`);
+      if (a && v.metric === 'cost_usd' && a.changePercent > 0)
+        actions.push(
+          `Review the service cost breakdown for ${resource.name}; billing values may be revised.`,
+        );
+    }
+  }
   const allCoverage: CoverageItem[] = [
+    ...(aws
+      ? [
+          {
+            source: 'AWS (UTC daily buckets)',
+            status:
+              aws.gaps.length ||
+              aws.resources.some((r) => r.partial || r.values.some((v) => v.value === null))
+                ? ('partial' as const)
+                : ('ok' as const),
+            ...(aws.gaps.length ? { reason: aws.gaps.join('; ') } : {}),
+          },
+        ]
+      : []),
     ...coverage,
     ...Object.entries(NOT_CONNECTED)
       .filter(([key]) => !(key === 'deployments' && deployments) && !(key === 'analytics' && analytics))
       .map(([, n]) => ({ source: n!.source, status: 'missing' as const, reason: n!.reason })),
   ];
 
-  const data: Record<SectionKey, { data: unknown } | { missing: string }> = {
+  const data: Record<Exclude<SectionKey, 'aws'>, { data: unknown } | { missing: string }> = {
     summary: {
       data: {
         localDate: w.localDate,
@@ -290,12 +348,33 @@ export async function buildSnapshot(sources: ReportSources, w: ReportWindow): Pr
       end: w.end.toISOString(),
       hours: w.hours,
     },
-    sections: DAILY_SECTIONS.map((s) => {
-      const d = data[s.key];
-      return 'missing' in d
-        ? { id: s.id, key: s.key, title: s.title, status: 'missing' as const, data: null, reason: d.missing }
-        : { id: s.id, key: s.key, title: s.title, status: 'ok' as const, data: d.data };
-    }),
+    sections: [
+      ...DAILY_SECTIONS.map((s) => {
+        const d = data[s.key];
+        return 'missing' in d
+          ? {
+              id: s.id,
+              key: s.key,
+              title: s.title,
+              status: 'missing' as const,
+              data: null,
+              reason: d.missing,
+            }
+          : { id: s.id, key: s.key, title: s.title, status: 'ok' as const, data: d.data };
+      }),
+      // AWS is an extra section, only for products with a scoped AWS connection.
+      ...(aws
+        ? [
+            {
+              id: 'S13',
+              key: 'aws' as const,
+              title: 'AWS performance and costs (UTC)',
+              status: 'ok' as const,
+              data: aws,
+            },
+          ]
+        : []),
+    ],
     anomalies,
     actions,
     coverage: allCoverage,

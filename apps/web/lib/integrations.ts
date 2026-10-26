@@ -1,6 +1,6 @@
 /** What each SaaS integration asks for and does, shown before anyone pastes a token (WB-06 UC-06-02). */
 export interface IntegrationSpec {
-  provider: 'cloudflare' | 'github' | 'prometheus' | 'grafana' | 'google';
+  provider: 'cloudflare' | 'github' | 'prometheus' | 'grafana' | 'google' | 'aws';
   /** Connected through the provider's sign-in, not a pasted token (Google, M13b). */
   oauth?: boolean;
   title: string;
@@ -28,6 +28,59 @@ export interface IntegrationSpec {
 }
 
 export const INTEGRATIONS: Record<IntegrationSpec['provider'], IntegrationSpec> = {
+  aws: {
+    provider: 'aws',
+    title: 'AWS',
+    summary: 'Read-only S3 storage, Lambda performance, Amplify builds, and AWS costs.',
+    permissions: [
+      'sts:AssumeRole (trust the platform principal with this connection’s external ID)',
+      'cloudwatch:GetMetricData, cloudwatch:ListMetrics',
+    ],
+    optionalPermissions: [
+      's3:ListAllMyBuckets, s3:GetBucketLocation',
+      'lambda:ListFunctions',
+      'amplify:ListApps, amplify:ListBranches, amplify:ListJobs',
+      'ce:GetCostAndUsage (optional billing access)',
+    ],
+    tokenHelp:
+      'Enter a customer IAM role ARN. After saving, copy the generated external ID from the connection into its IAM trust policy, then select Validate now. No customer access keys are needed. Ask your platform administrator for the trusted AWS principal.',
+    collects:
+      'Bucket sizes/object counts, Lambda invocations/errors/throttles/duration/concurrency, Amplify build results, daily USD spend by service. No object contents or function code.',
+    frequency:
+      'Hourly sync; daily UTC aggregates. Billing and S3 storage can arrive late. AWS read API charges may apply.',
+    changes: 'None. An explicit read-only session policy limits each assumed role session.',
+    configFields: [
+      {
+        name: 'roleArn',
+        label: 'Read-only role ARN',
+        required: true,
+        placeholder: 'arn:aws:iam::123456789012:role/ProductControlPlaneReadOnly',
+      },
+      {
+        name: 'regions',
+        label: 'Regions (comma-separated)',
+        required: true,
+        list: true,
+        placeholder: 'us-east-1, eu-west-1',
+      },
+      {
+        name: 'services',
+        label: 'Services (comma-separated)',
+        required: true,
+        list: true,
+        placeholder: 's3, lambda, amplify, costs',
+        hint: 'Choose from s3, lambda, amplify, costs. Omit costs to disable billing reads.',
+      },
+      {
+        name: 'costTagKey',
+        label: 'Cost allocation tag key (optional)',
+        hint: 'Use an activated cost allocation tag to attribute costs. Without a tag, costs cover the account and must not be treated as product spend.',
+      },
+      { name: 'costTagValue', label: 'Cost allocation tag value (optional)' },
+    ],
+    displayName: () => 'AWS',
+    scopeTypes: ['aws_s3_bucket', 'aws_lambda_function', 'aws_amplify_branch', 'aws_cost_account'],
+  },
   cloudflare: {
     provider: 'cloudflare',
     title: 'Cloudflare',

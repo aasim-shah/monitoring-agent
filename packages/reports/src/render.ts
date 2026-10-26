@@ -5,6 +5,7 @@ import { reportEmail } from './email.js';
 import type {
   AnalyticsStats,
   Anomaly,
+  AwsStats,
   CoverageItem,
   DatabaseStats,
   HostStats,
@@ -144,6 +145,17 @@ export function sectionLines(s: Section): string[] {
         ...(d.firebaseApps?.length
           ? [`Firebase apps: ${d.firebaseApps.join(', ')} (crash data needs the Crashlytics BigQuery export)`]
           : []),
+      ];
+    }
+    case 'aws': {
+      const d = s.data as AwsStats;
+      return [
+        `AWS period: ${d.day} 00:00–24:00 UTC. Costs are provisional; account totals are not automatically product-attributed.`,
+        ...d.resources.flatMap((r) => [
+          `${r.name}${r.partial ? ' (partial)' : ''}; fetched ${r.fetchedAt ?? 'never'}: ${r.values.map((v) => `${v.label}: ${v.value === null ? 'no data' : `${v.value} ${v.unit}`}`).join(', ')}`,
+          ...r.costByService.map((c) => `${r.name} / ${c.service}: ${c.value} USD`),
+        ]),
+        ...d.gaps.map((g) => `Coverage: ${g}`),
       ];
     }
     case 'deployments': {

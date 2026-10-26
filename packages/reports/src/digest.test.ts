@@ -268,3 +268,58 @@ describe('report story: yesterday in plain sentences', () => {
     expect(digest(await quietDay(), null).story.some((x) => x.kind === 'users')).toBe(true);
   });
 });
+
+describe('report digest: AWS', () => {
+  it('shows a card per AWS resource, a cost story line, and failures worth a look', async () => {
+    const s = await buildSnapshot(
+      fixtureSources({
+        aws: async () => ({
+          day: '2026-10-24',
+          timezone: 'UTC',
+          gaps: [],
+          resources: [
+            {
+              name: 'AWS account costs 123456789012 (shared, not product-attributed)',
+              externalId: 'aws-cost:123456789012',
+              resourceType: 'aws_cost_account',
+              partial: false,
+              fetchedAt: '2026-10-25T02:00:00Z',
+              values: [{ metric: 'cost_usd', label: 'Unblended cost', value: 12.5, unit: 'USD' }],
+              costByService: [
+                { service: 'Amazon S3', value: 2.5 },
+                { service: 'AWS Lambda', value: 10 },
+              ],
+            },
+            {
+              name: 'resize (us-east-1)',
+              externalId: 'arn:aws:lambda:us-east-1:123456789012:function:resize',
+              resourceType: 'aws_lambda_function',
+              partial: false,
+              fetchedAt: '2026-10-25T02:00:00Z',
+              values: [
+                { metric: 'invocations', label: 'Invocations', value: 1200, unit: 'count' },
+                { metric: 'errors', label: 'Errors', value: 3, unit: 'count' },
+              ],
+              costByService: [],
+            },
+          ],
+        }),
+      }),
+      w,
+    );
+    const d = digest(s, null);
+    expect(d.aws.map((c) => [c.name, c.label])).toEqual([
+      ['AWS account costs 123456789012 (shared, not product-attributed)', 'Healthy'],
+      ['resize (us-east-1)', 'Failures'],
+    ]);
+    expect(d.aws[0]!.rows).toEqual([
+      ['Unblended cost', '$12.50'],
+      ['AWS Lambda', '$10.00'],
+      ['Amazon S3', '$2.50'],
+    ]);
+    expect(d.story.find((x) => x.kind === 'aws')?.text).toBe(
+      'AWS cost $12.50 on 24 Oct (UTC), mostly AWS Lambda $10.00.',
+    );
+    expect(d.watch.map((x) => x.title)).toContain('resize (us-east-1): errors 3');
+  });
+});

@@ -1,4 +1,4 @@
-export type Unit = 'percent' | 'bytesPerSecond' | 'bytes' | 'count' | 'perSecond' | 'ms';
+export type Unit = 'percent' | 'bytesPerSecond' | 'bytes' | 'count' | 'perSecond' | 'ms' | 'USD';
 
 function scaled(value: number, units: string[]): string {
   let v = value;
@@ -16,6 +16,8 @@ const plain = (v: number) =>
 /** Display text for a metric value; callers render null as "no data", never 0. */
 export function formatValue(value: number, unit: Unit): string {
   switch (unit) {
+    case 'USD':
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
     case 'percent':
       return `${value.toFixed(1)}%`;
     case 'bytesPerSecond':

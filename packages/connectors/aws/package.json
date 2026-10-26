@@ -1,0 +1,38 @@
+{
+  "name": "@pcp/connectors-aws",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Read-only AWS S3, Lambda, Amplify and Cost Explorer connector.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-amplify": "3.1156.0",
+    "@aws-sdk/client-cloudwatch": "3.1156.0",
+    "@aws-sdk/client-cost-explorer": "3.1156.0",
+    "@aws-sdk/client-lambda": "3.1156.0",
+    "@aws-sdk/client-s3": "3.1156.0",
+    "@aws-sdk/client-sts": "3.1156.0",
+    "@pcp/connector-sdk": "workspace:*",
+    "@pcp/shared-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

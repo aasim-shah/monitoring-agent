@@ -6,7 +6,7 @@ describe('KPI catalog (WB-09 UC-09-05, BR-09-03)', () => {
     for (const d of Object.values(KPI_DEFINITIONS)) {
       expect(d.label.length, d.key).toBeGreaterThan(0);
       expect(d.definition.length, d.key).toBeGreaterThan(10);
-      expect(['count', 'percent', 'ratio', 'position'], d.key).toContain(d.unit);
+      expect(['count', 'percent', 'ratio', 'position', 'bytes', 'ms', 'USD'], d.key).toContain(d.unit);
       expect(d.window, d.key).toBe('day');
       expect(d.source.length, d.key).toBeGreaterThan(0);
       expect(d.timezone.length, d.key).toBeGreaterThan(0);

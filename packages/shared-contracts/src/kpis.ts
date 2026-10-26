@@ -1,18 +1,19 @@
+import { AWS_KPI_DEFINITIONS } from './aws-kpis.js';
 /**
  * KPI catalog (spec §11.2, WB-09 UC-09-05, BR-09-03). Definitions live in code; the database holds
  * daily values only. Every KPI states what it counts, its unit, window, source, timezone, and caveats.
  */
 
 /** Who a count is about. Counts of different populations are never added together (TC-09-05). */
-export type Population = 'ga4_users' | 'ga4_events' | 'search' | 'play_users' | 'rate';
+export type Population = 'ga4_users' | 'ga4_events' | 'search' | 'play_users' | 'rate' | 'aws_resource';
 
 export interface KpiDefinition {
   key: string;
   label: string;
   definition: string;
-  unit: 'count' | 'percent' | 'ratio' | 'position';
+  unit: 'count' | 'percent' | 'ratio' | 'position' | 'bytes' | 'ms' | 'USD';
   /** How days combine over a range. Unique-user counts are averaged: summing days double-counts. */
-  aggregation: 'sum' | 'mean';
+  aggregation: 'sum' | 'mean' | 'latest' | 'max';
   window: 'day';
   source: string;
   resourceType: string;
@@ -93,6 +94,7 @@ const play = (
 });
 
 const LIST: KpiDefinition[] = [
+  ...AWS_KPI_DEFINITIONS,
   ga4(
     'activeUsers',
     'Active users',
@@ -173,6 +175,8 @@ export const kpisFor = (resourceType: string) => LIST.filter((d) => d.resourceTy
 export function aggregate(def: KpiDefinition, values: Array<number | null>): number | null {
   const present = values.filter((v): v is number => v !== null && Number.isFinite(v));
   if (!present.length) return null;
+  if (def.aggregation === 'latest') return present.at(-1)!;
+  if (def.aggregation === 'max') return Math.max(...present);
   const sum = present.reduce((a, b) => a + b, 0);
   return def.aggregation === 'sum' ? sum : sum / present.length;
 }

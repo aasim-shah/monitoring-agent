@@ -72,6 +72,7 @@ export function KpiSources({
   chartKeys,
   children,
   emptyHint,
+  provider = 'Google',
 }: {
   orgId: string;
   productId: string;
@@ -81,6 +82,7 @@ export function KpiSources({
   chartKeys: Record<string, string>;
   children?: (data: ProductKpis) => React.ReactNode;
   emptyHint: string;
+  provider?: 'Google' | 'AWS';
 }) {
   const [range, setRange] = useState<KpiRange>('28d');
   const kpis = useProductKpis(productId, range);
@@ -102,11 +104,13 @@ export function KpiSources({
                 freshness={c.freshness}
               />
             ))}
-            {kpis.data.gaps.includes('Google: not connected') ? (
+            {(provider === 'Google' && kpis.data.gaps.includes('Google: not connected')) ||
+            (provider === 'AWS' &&
+              !kpis.data.resources.some((r) => resourceTypes.includes(r.resourceType))) ? (
               <Alert tone="info">
-                Google is not connected.{' '}
+                {provider} data is not available.{' '}
                 <Link className="underline" href={integrations}>
-                  Connect Google
+                  Connect {provider}
                 </Link>{' '}
                 to see {emptyHint}.
               </Alert>
@@ -123,7 +127,7 @@ export function KpiSources({
             {kpis.data.connections.length &&
             !kpis.data.resources.some((r) => resourceTypes.includes(r.resourceType)) ? (
               <Alert tone="info">
-                Nothing is scoped to this product yet. Open the Google connection under{' '}
+                Nothing is scoped to this product yet. Open the {provider} connection under{' '}
                 <Link className="underline" href={integrations}>
                   Integrations
                 </Link>{' '}
@@ -131,12 +135,16 @@ export function KpiSources({
               </Alert>
             ) : null}
             {children?.(kpis.data)}
-            {kpis.data.gaps.filter((g) => g !== 'Google: not connected').length ? (
+            {kpis.data.gaps.filter((g) =>
+              provider === 'Google' ? g !== 'Google: not connected' : !g.startsWith('Google:'),
+            ).length ? (
               <section aria-label="Not available" className="rounded-lg border border-border bg-card p-4">
                 <h2 className="text-sm font-semibold">Not available</h2>
                 <ul className="list-disc pl-5 text-xs text-muted-foreground">
                   {kpis.data.gaps
-                    .filter((g) => g !== 'Google: not connected')
+                    .filter((g) =>
+                      provider === 'Google' ? g !== 'Google: not connected' : !g.startsWith('Google:'),
+                    )
                     .map((g) => (
                       <li key={g}>{g}</li>
                     ))}

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConnectorError, transition, type ConnectorRegistry } from '@pcp/connector-sdk';
 import { NotFoundError, storeCredentials, type ConnectorRuntime } from '@pcp/connector-runtime';
@@ -78,6 +79,7 @@ export class ConnectionsService {
     const connector = this.registry.get(input.provider);
     if (!connector.executionLocations.includes(input.executionLocation))
       throw new ApiException(400, 'unsupported_location', 'This connector cannot run in that location');
+    if (input.provider === 'aws') input = { ...input, config: { ...input.config, externalId: randomUUID() } };
     const check = connector.validateConfig?.(input.config) ?? { ok: true };
     if (!check.ok)
       throw new ApiException(

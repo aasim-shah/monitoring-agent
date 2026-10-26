@@ -29,6 +29,7 @@ export interface ConnectionDetailData {
     statusReason: string | null;
     missingPermissions?: string[];
     scopes: Scope[];
+    config?: unknown;
   };
   productId: string;
   webhookUrl: string;
@@ -225,6 +226,25 @@ export function ConnectionDetail({
       {error ? <Alert>{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
+      {c.provider === 'aws' ? (
+        <Section title="AWS read-only access">
+          <p className="text-sm">
+            Add this external ID to the role trust policy’s sts:ExternalId condition, then select Validate
+            now. Use the trusted principal supplied by your platform administrator.
+          </p>
+          <p className="text-xs break-all">
+            Role: {String((c.config as Record<string, unknown> | undefined)?.roleArn ?? '')}
+          </p>
+          <p className="text-xs break-all">
+            External ID:{' '}
+            <code>{String((c.config as Record<string, unknown> | undefined)?.externalId ?? '')}</code>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Only read operations are allowed. Select resources below to include their metrics in this product.
+            Account costs are shared unless a cost allocation tag was configured.
+          </p>
+        </Section>
+      ) : null}
       <Section title="Discovered resources">
         {data.inventory.length === 0 ? (
           <p className="text-sm text-muted-foreground">

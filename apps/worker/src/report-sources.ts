@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@pcp/database';
 import type {
+  AwsStats,
   CoverageItem,
   DatabaseStats,
   DeploymentStats,
@@ -475,6 +476,92 @@ export function createReportSources(deps: {
         }),
       );
 
+    const aws = (w: ReportWindow) =>
+      once<AwsStats | null>('aws', w, () =>
+        db(async (tx) => {
+          const connections = await tx.connection.findMany({
+            where: {
+              provider: 'aws',
+              status: { notIn: ['disconnected', 'revoked'] },
+              scopes: { some: { productId } },
+            },
+            include: {
+              scopes: {
+                where: {
+                  productId,
+                  resourceType: {
+                    in: ['aws_s3_bucket', 'aws_lambda_function', 'aws_amplify_branch', 'aws_cost_account'],
+                  },
+                },
+              },
+            },
+          });
+          if (!connections.length) return null;
+          const rows = await tx.metricAggregate.findMany({
+            where: {
+              connectionId: { in: connections.map((c) => c.id) },
+              day: new Date(`${w.localDate}T00:00:00Z`),
+            },
+          });
+          const runs = await tx.syncRun.findMany({
+            where: {
+              connectionId: { in: connections.map((c) => c.id) },
+              kind: 'sync',
+              status: { in: ['succeeded', 'failed'] },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 200,
+          });
+          const gaps: string[] = [];
+          if (w.start.toISOString() !== `${w.localDate}T00:00:00.000Z` || w.hours !== 24)
+            gaps.push('AWS values cover the named UTC date, independently of this report’s local day');
+          for (const c of connections) {
+            const latest = runs.find((r) => r.connectionId === c.id);
+            if (!latest || latest.status === 'failed' || latest.errorMessage)
+              gaps.push(`${c.displayName}: ${latest?.errorMessage ?? 'No successful AWS sync'}`);
+          }
+          const resources = connections.flatMap((c) =>
+            c.scopes.map((sc) => {
+              const mine = rows.filter(
+                (r) =>
+                  r.connectionId === c.id &&
+                  r.resourceType === sc.resourceType &&
+                  r.externalId === sc.externalId,
+              );
+              const values = kpisFor(sc.resourceType).map((def) => ({
+                metric: def.metric,
+                label: def.label,
+                unit: def.unit,
+                value: mine.find((r) => r.metric === def.metric && r.dimension === '')?.value ?? null,
+              }));
+              if (values.some((v) => v.value === null))
+                gaps.push(`${sc.name}: missing AWS metrics for UTC ${w.localDate}`);
+              const fetched = mine.map((r) => r.fetchedAt).sort((a, b) => a.getTime() - b.getTime())[0];
+              if (fetched && fetched.getTime() < w.end.getTime())
+                gaps.push(`${sc.name}: collected before the report window ended`);
+              return {
+                name: sc.name,
+                externalId: sc.externalId,
+                resourceType: sc.resourceType,
+                partial:
+                  mine.some((r) => r.completeness === 'partial') ||
+                  !mine.length ||
+                  values.some((v) => v.value === null) ||
+                  Boolean(runs.find((r) => r.connectionId === c.id)?.errorMessage) ||
+                  runs.find((r) => r.connectionId === c.id)?.status === 'failed',
+                fetchedAt: fetched?.toISOString() ?? null,
+                values,
+                costByService: mine
+                  .filter((r) => r.metric === 'cost_usd' && r.dimension && r.value !== null)
+                  .map((r) => ({ service: r.dimension, value: r.value! })),
+              };
+            }),
+          );
+          if (!resources.length) gaps.push('No supported AWS resources are scoped to this product');
+          return { day: w.localDate, timezone: 'UTC', resources, gaps: [...new Set(gaps)] };
+        }),
+      );
+
     const coverage = async (w: ReportWindow): Promise<CoverageItem[]> => {
       const [h, l, d, s] = await Promise.all([hosts(w), logErrors(w), databases(w), websites(w)]);
       const telemetry = deps.vmQueryUrl ? null : 'Telemetry storage is not configured';
@@ -515,6 +602,17 @@ export function createReportSources(deps: {
         });
       });
 
-    return { incidents, hosts, logErrors, databases, websites, deployments, analytics, coverage, history };
+    return {
+      incidents,
+      hosts,
+      logErrors,
+      databases,
+      websites,
+      deployments,
+      analytics,
+      aws,
+      coverage,
+      history,
+    };
   };
 }

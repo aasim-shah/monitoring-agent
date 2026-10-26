@@ -14,4 +14,5 @@ export const DAILY_SECTIONS = [
   { id: 'S12', key: 'coverage', title: 'Data coverage and missing sources' },
 ] as const;
 
-export type SectionKey = (typeof DAILY_SECTIONS)[number]['key'];
+/** `aws` (S13) is added only for products with a scoped AWS connection. */
+export type SectionKey = (typeof DAILY_SECTIONS)[number]['key'] | 'aws';

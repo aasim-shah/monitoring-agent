@@ -21,7 +21,10 @@ export interface KpiResource {
   externalId: string;
   name: string;
   kpis: KpiView[];
-  breakdown?: { sessionsByChannel?: Array<{ channel: string; value: number }> };
+  breakdown?: {
+    sessionsByChannel?: Array<{ channel: string; value: number }>;
+    costByService?: Array<{ service: string; value: number }>;
+  };
 }
 
 export interface FreshnessView {
@@ -35,6 +38,10 @@ export interface FreshnessView {
 /** A KPI value for display; a missing value is "No data", never 0 (BR-09-05). */
 export function formatKpi(value: number | null, unit: string): string {
   if (value === null) return 'No data';
+  if (unit === 'USD')
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  if (unit === 'bytes') return `${Number((value / 1073741824).toFixed(3))} GiB`;
+  if (unit === 'ms') return `${Number(value.toFixed(2))} ms`;
   if (unit === 'ratio') return `${Number((value * 100).toFixed(value < 0.1 ? 2 : 1))}%`;
   if (unit === 'position') return value.toFixed(1);
   return Math.abs(value) >= 100
@@ -83,7 +90,17 @@ export function KpiResourcePanel({ resource, chartKey }: { resource: KpiResource
       {chart ? (
         <MetricChart
           title={`${chart.label} per day`}
-          unit={chart.unit === 'ratio' ? 'percent' : 'count'}
+          unit={
+            chart.unit === 'ratio' || chart.unit === 'percent'
+              ? 'percent'
+              : chart.unit === 'USD'
+                ? 'USD'
+                : chart.unit === 'bytes'
+                  ? 'bytes'
+                  : chart.unit === 'ms'
+                    ? 'ms'
+                    : 'count'
+          }
           multiDay
           series={[
             {
@@ -96,6 +113,24 @@ export function KpiResourcePanel({ resource, chartKey }: { resource: KpiResource
             },
           ]}
         />
+      ) : null}
+      {resource.breakdown?.costByService?.length ? (
+        <table aria-label="AWS cost by service" className="w-full text-left text-xs">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Unblended cost (USD, selected UTC range)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {resource.breakdown.costByService.map((c) => (
+              <tr key={c.service}>
+                <td>{c.service}</td>
+                <td>{formatKpi(c.value, 'USD')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : null}
       {channels.length ? (
         <table aria-label="Sessions by channel" className="w-full text-left text-xs">

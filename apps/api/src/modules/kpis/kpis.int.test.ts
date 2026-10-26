@@ -155,3 +155,38 @@ describe('KPI API (WB-09 UC-09-06, BR-09-05)', () => {
     expect((await kpis(owner, shop, '1y')).statusCode).toBe(400);
   });
 });
+
+describe('AWS product KPI scoping', () => {
+  it('returns only selected AWS resources, cost breakdowns, and sync coverage gaps', async () => {
+    const owner = await ownerWithOrg(t);
+    const productId = await createProduct(t, owner);
+    const conn = randomUUID();
+    const foreign = randomUUID();
+    await sql(
+      `INSERT INTO connections (id, organization_id, provider, display_name, status, execution_location, updated_at) VALUES ($1, $2, 'aws', 'AWS', 'connected', 'cloud', now())`,
+      [conn, owner.orgId],
+    );
+    await sql(
+      `INSERT INTO connection_resource_scopes (organization_id, connection_id, external_id, resource_type, name, product_id) VALUES ($1, $2, 'aws-cost:123456789012', 'aws_cost_account', 'AWS account costs (shared)', $3)`,
+      [owner.orgId, conn, productId],
+    );
+    await sql(
+      `INSERT INTO metric_aggregates (organization_id, connection_id, resource_type, external_id, metric, dimension, day, value, completeness) VALUES ($1, $2, 'aws_cost_account', 'aws-cost:123456789012', 'cost_usd', '', $3, 12.50, 'partial'), ($1, $2, 'aws_cost_account', 'aws-cost:123456789012', 'cost_usd', 'Amazon S3', $3, 12.50, 'partial'), ($1, $2, 'aws_cost_account', $4, 'cost_usd', '', $3, 99999, 'complete')`,
+      [owner.orgId, conn, day(-1), foreign],
+    );
+    await run(owner, conn, 'succeeded', 1, 'Amplify: permission denied');
+    const response = await t.app.inject({
+      method: 'GET',
+      url: `/api/v1/products/${productId}/kpis?range=7d`,
+      headers: headers(owner.cookie),
+    });
+    expect(response.statusCode).toBe(200);
+    const data = response.json();
+    expect(data.resources).toHaveLength(1);
+    expect(data.resources[0].kpis[0]).toMatchObject({ unit: 'USD', total: 12.5 });
+    expect(data.resources[0].breakdown.costByService).toEqual([{ service: 'Amazon S3', value: 12.5 }]);
+    expect(data.connections[0].freshness.status).toBe('stale');
+    expect(data.gaps).toContain('AWS: Amplify: permission denied');
+    expect(JSON.stringify(data)).not.toContain('99999');
+  });
+});
