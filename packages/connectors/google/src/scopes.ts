@@ -20,6 +20,12 @@ export const GOOGLE_DATA_SCOPES = [
 
 export const GOOGLE_IDENTITY_SCOPES = ['openid', 'email'];
 
+/** A service account can be granted everything except Google Ads, which needs a person's OAuth grant. */
+export const SERVICE_ACCOUNT_SCOPES = GOOGLE_DATA_SCOPES.filter((s) => s !== `${SCOPE_PREFIX}adwords`);
+
+export const isServiceAccountEmail = (email: string | null | undefined) =>
+  Boolean(email?.endsWith('.gserviceaccount.com'));
+
 export type GoogleService = 'ga4' | 'searchConsole' | 'firebase' | 'play' | 'ads' | 'bigquery';
 
 /** What each scope is for, one line each, for the connect screen. */

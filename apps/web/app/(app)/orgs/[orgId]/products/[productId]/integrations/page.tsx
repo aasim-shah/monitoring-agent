@@ -84,6 +84,25 @@ export default function IntegrationsPage() {
     window.location.assign(url);
   };
 
+  /** Creates the connection with an uploaded service account key: no Google sign-in at all. */
+  const connectGoogleKey = async (key: string) => {
+    const created = unwrap(
+      await api.POST('/api/v1/organizations/{orgId}/connections', {
+        params: { path: { orgId } },
+        body: { provider: 'google', displayName: 'Google', executionLocation: 'cloud', config: {} },
+      }),
+    );
+    const path = { params: { path: { id: created.id } } };
+    try {
+      unwrap(await api.POST('/api/v1/connections/{id}/google/service-account', { ...path, body: { key } }));
+    } catch (e) {
+      // A refused key leaves no half-made connection behind.
+      await api.DELETE('/api/v1/connections/{id}', path);
+      throw e;
+    }
+    router.push(`/orgs/${orgId}/products/${productId}/integrations/${created.id}`);
+  };
+
   return (
     <div className="portal-route portal-route-integrations space-y-6">
       <PageHeading
@@ -121,7 +140,7 @@ export default function IntegrationsPage() {
                   {canConfigure ? (
                     <div>
                       {spec.oauth ? (
-                        <GoogleConnectDialog onConnect={connectGoogle} />
+                        <GoogleConnectDialog onConnect={connectGoogle} onUploadKey={connectGoogleKey} />
                       ) : (
                         <ConnectDialog
                           spec={spec}

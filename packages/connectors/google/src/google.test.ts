@@ -1,3 +1,4 @@
+import { createPublicKey, generateKeyPairSync, verify } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import type { ExecutionContext } from '@pcp/connector-sdk';
 import { describe, expect, it } from 'vitest';
@@ -7,6 +8,8 @@ import {
   missingScopes,
   GOOGLE_DATA_SCOPES,
   SCOPE_PREFIX,
+  SERVICE_ACCOUNT_SCOPES,
+  parseServiceAccountKey,
 } from './index.js';
 
 const ALL = GOOGLE_DATA_SCOPES;
@@ -393,6 +396,94 @@ describe('Google connector (WB-08 UC-08-04/05/07/08)', () => {
       'Search Console: Google Search Console API has not been used in project 1 before or it is disabled.',
     ]);
     expect(points.some((p) => p.metric === 'activeUsers')).toBe(true);
+  });
+});
+
+describe('Google service account keys (no Google sign-in)', () => {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+  const keyFile = (over: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      type: 'service_account',
+      project_id: 'acme-prod',
+      private_key_id: 'kid',
+      private_key: pem,
+      client_email: 'pcp-reader@acme-prod.iam.gserviceaccount.com',
+      token_uri: 'https://oauth2.googleapis.com/token',
+      ...over,
+    });
+  const saCtx = (granted: string[] = SERVICE_ACCOUNT_SCOPES, key = keyFile()): ExecutionContext => ({
+    ...ctx(granted),
+    credentials: async () => ({ serviceAccountKey: key }),
+  });
+
+  it('parses a key file and names what is wrong with a bad one, without echoing the key', () => {
+    expect(parseServiceAccountKey(keyFile())).toMatchObject({
+      clientEmail: 'pcp-reader@acme-prod.iam.gserviceaccount.com',
+      projectId: 'acme-prod',
+    });
+    expect(() => parseServiceAccountKey('not json')).toThrow(/not JSON/);
+    expect(() => parseServiceAccountKey(keyFile({ type: 'authorized_user' }))).toThrow(
+      /not a service account/,
+    );
+    expect(() => parseServiceAccountKey(keyFile({ client_email: 'me@gmail.com' }))).toThrow(/client_email/);
+    expect(() => parseServiceAccountKey(keyFile({ private_key: 'secret-but-broken' }))).toThrow(
+      /^The key has no valid private key \(private_key\)$/,
+    );
+  });
+
+  it('signs a JWT bearer grant for every scope except Ads; no client secret or refresh token is sent', async () => {
+    const fake = fakeGoogle();
+    expect(await connector(fake).validate(saCtx())).toEqual({ ok: true });
+    const token = fake.calls.find((c) => c.url.hostname === 'oauth2.googleapis.com')!;
+    const form = Object.fromEntries(new URLSearchParams(token.body));
+    expect(Object.keys(form).sort()).toEqual(['assertion', 'grant_type']);
+    expect(form.grant_type).toBe('urn:ietf:params:oauth:grant-type:jwt-bearer');
+    const [h, p, sig] = form.assertion!.split('.') as [string, string, string];
+    const claims = JSON.parse(Buffer.from(p, 'base64url').toString());
+    expect(claims).toMatchObject({
+      iss: 'pcp-reader@acme-prod.iam.gserviceaccount.com',
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: NOW.getTime() / 1000,
+      exp: NOW.getTime() / 1000 + 3600,
+    });
+    expect(claims.scope.split(' ')).not.toContain(`${SCOPE_PREFIX}adwords`);
+    expect(claims.scope.split(' ')).toContain(`${SCOPE_PREFIX}analytics.readonly`);
+    expect(
+      verify(
+        'RSA-SHA256',
+        Buffer.from(`${h}.${p}`),
+        createPublicKey(privateKey),
+        Buffer.from(sig, 'base64url'),
+      ),
+    ).toBe(true);
+  });
+
+  it('a key Google refuses (deleted or disabled) is reauthorization_required', async () => {
+    const fake = fakeGoogle((c) =>
+      c.url.hostname === 'oauth2.googleapis.com'
+        ? { status: 400, body: { error: 'invalid_grant', error_description: 'Invalid JWT Signature.' } }
+        : undefined,
+    );
+    await expect(connector(fake).validate(saCtx())).rejects.toMatchObject({
+      reason: 'reauthorization_required',
+      message: expect.stringContaining('Invalid JWT Signature.'),
+    });
+  });
+
+  it('serviceAccess probes every service whatever the stored scopes say and names the denied ones', async () => {
+    const fake = fakeGoogle((c) =>
+      c.url.hostname === 'www.googleapis.com' || c.url.hostname.startsWith('playdev')
+        ? { status: 403, body: { error: { message: 'The caller does not have permission' } } }
+        : undefined,
+    );
+    expect(await connector(fake).serviceAccess(saCtx([]))).toEqual({
+      services: ['ga4', 'firebase'],
+      denied: [
+        'Search Console: The caller does not have permission',
+        'Play vitals: The caller does not have permission',
+      ],
+    });
   });
 });
 

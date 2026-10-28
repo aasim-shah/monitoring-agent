@@ -2,6 +2,7 @@ import {
   ConnectorError,
   redactSecrets,
   transition,
+  type Connector,
   type ConnectorRegistry,
   type ExecutionContext,
   type SyncResult,
@@ -152,6 +153,20 @@ export class ConnectorRuntime {
     if (!connector.discover)
       throw new ConnectorError('invalid_config', `${c.provider} does not support discovery`);
     return this.execute(ctx, c, (e) => connector.discover!(e));
+  }
+
+  /**
+   * Runs a provider-specific operation that is not part of the connector SDK (e.g. Google's access
+   * check for a service account) with the same loading, decryption, and redaction as the others.
+   */
+  async run<T>(
+    ctx: TenantContext,
+    connectionId: string,
+    fn: (connector: Connector, e: ExecutionContext) => Promise<T>,
+  ): Promise<T> {
+    const c = await this.load(ctx, connectionId);
+    const connector = this.registry.get(c.provider);
+    return this.execute(ctx, c, (e) => fn(connector, e));
   }
 
   /**

@@ -863,6 +863,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/connections/{id}/google/service-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Connect a Google connection with a service account JSON key
+         * @description Alternative to the Google consent flow (no Google sign-in, so no passkey). Stores the key encrypted in place of any OAuth grant, probes GA4, Search Console, Firebase, and Play vitals, and keeps the working services as granted scopes. Google Ads needs OAuth. Requires `connection.configure`.
+         */
+        post: operations["setGoogleServiceAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/connections/{id}/google/service-account/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check again what the stored service account can read
+         * @description Re-probes each service after the customer added the service account email in more Google consoles, updates the granted scopes, and revalidates. Requires `connection.configure`.
+         */
+        post: operations["checkGoogleServiceAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/connections/oauth/google/callback": {
         parameters: {
             query?: never;
@@ -4556,6 +4602,21 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /** @description What the service account can read */
+        GoogleServiceAccess: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    /** @description The service account email to add in each Google console */
+                    accountEmail: string;
+                    services: ("ga4" | "searchConsole" | "firebase" | "play")[];
+                    /** @description One line per service Google refused, e.g. "Search Console: no access" */
+                    denied: string[];
+                };
+            };
+        };
         /** @description Conflict (e.g. product_exists, environment_exists, last_owner, already_member) */
         Conflict: {
             headers: {
@@ -5907,6 +5968,51 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    setGoogleServiceAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The key file's JSON text */
+                    key: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["GoogleServiceAccess"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    checkGoogleServiceAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource ID */
+                id: components["parameters"]["id"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["GoogleServiceAccess"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     googleConnectionCallback: {

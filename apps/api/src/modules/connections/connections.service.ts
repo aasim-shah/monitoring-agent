@@ -11,6 +11,14 @@ import { ApiException, notFound } from '../../common/errors.js';
 import { KEY_RING, PRISMA } from '../../tokens.js';
 import { PrivateOpsService } from './private-ops.service.js';
 import { parseConnectionString, type ParsedConnection } from '@pcp/connectors-databases';
+import {
+  SERVICE_ACCOUNT_SCOPES,
+  SERVICE_SCOPE,
+  isServiceAccountEmail,
+  parseServiceAccountKey,
+  type GoogleConnector,
+  type GoogleService,
+} from '@pcp/connectors-google';
 
 const DB_PROVIDERS = ['postgres', 'mysql', 'mongodb'];
 import { AuditService } from '../auditing/audit.service.js';
@@ -19,6 +27,7 @@ import { CONNECTOR_REGISTRY, CONNECTOR_RUNTIME, QUEUES } from './registry.provid
 /** Providers whose credentials come only from an OAuth callback (M13b). */
 const OAUTH_PROVIDERS = ['google'];
 const TERMINAL: ConnectionStatus[] = ['disconnected', 'revoked'];
+const PROBED_GOOGLE_SERVICES: GoogleService[] = ['ga4', 'searchConsole', 'firebase', 'play'];
 
 const withScopes = { scopes: { orderBy: { createdAt: 'asc' } } } satisfies Prisma.ConnectionInclude;
 type ConnectionWithScopes = Prisma.ConnectionGetPayload<{ include: typeof withScopes }>;
@@ -315,7 +324,11 @@ export class ConnectionsService {
   ) {
     const current = await this.get(ctx, id);
     if (TERMINAL.includes(current.status)) throw closed();
-    if (!grant.refreshToken && !(await this.hasCredentials(ctx, id)))
+    // A service account key is no OAuth grant: switching back to Google sign-in needs a refresh token.
+    if (
+      !grant.refreshToken &&
+      (isServiceAccountEmail(current.accountEmail) || !(await this.hasCredentials(ctx, id)))
+    )
       throw new ApiException(
         502,
         'oauth_no_refresh_token',
@@ -341,6 +354,74 @@ export class ConnectionsService {
       });
     });
     await this.queue(ctx, 'connection-validate', id);
+  }
+
+  /**
+   * Stores an uploaded Google service account key in place of any OAuth grant (no Google sign-in,
+   * so no passkey), then checks which services the service account can read.
+   */
+  async setGoogleServiceAccount(ctx: TenantContext, id: string, keyText: string) {
+    const current = await this.get(ctx, id);
+    if (TERMINAL.includes(current.status)) throw closed();
+    if (current.provider !== 'google')
+      throw new ApiException(400, 'not_google', 'This is not a Google connection');
+    let clientEmail: string;
+    try {
+      clientEmail = parseServiceAccountKey(keyText).clientEmail;
+    } catch (err) {
+      throw new ApiException(400, 'invalid_service_account_key', (err as Error).message);
+    }
+    await withTenant(this.prisma, ctx, async (tx) => {
+      await storeCredentials(tx, ctx, id, { serviceAccountKey: keyText }, this.keys);
+      await tx.connection.update({
+        where: { id },
+        data: {
+          status: transition(current.status, 'auth_completed'),
+          statusReason: null,
+          grantedScopes: [],
+          accountEmail: clientEmail,
+        },
+      });
+      await this.audit.record(tx, ctx, {
+        action: 'connection.authorized',
+        targetType: 'connection',
+        targetId: id,
+        metadata: { method: 'service_account', accountEmail: clientEmail },
+      });
+    });
+    return this.checkGoogleAccess(ctx, id);
+  }
+
+  /**
+   * A service account has no consent screen: what it can read depends on where the customer added
+   * its email. Probes each service, stores the working ones as granted scopes, and revalidates.
+   */
+  async checkGoogleAccess(ctx: TenantContext, id: string) {
+    const current = await this.get(ctx, id);
+    if (TERMINAL.includes(current.status)) throw closed();
+    if (current.provider !== 'google' || !isServiceAccountEmail(current.accountEmail))
+      throw new ApiException(
+        400,
+        'not_service_account',
+        'This Google connection does not use a service account key',
+      );
+    let access: { services: GoogleService[]; denied: string[] };
+    try {
+      access = await this.runtime.run(ctx, id, (c, e) => (c as GoogleConnector).serviceAccess(e));
+    } catch (err) {
+      // The queued validation records the failure on the connection too.
+      await this.queue(ctx, 'connection-validate', id);
+      return connectorFailure(err);
+    }
+    // Probed services keep their scope only when the probe worked; the rest are not probed.
+    const probed = PROBED_GOOGLE_SERVICES.map((s) => SERVICE_SCOPE[s]);
+    const working = access.services.map((s) => SERVICE_SCOPE[s]);
+    const grantedScopes = SERVICE_ACCOUNT_SCOPES.filter((s) => !probed.includes(s) || working.includes(s));
+    await withTenant(this.prisma, ctx, (tx) =>
+      tx.connection.update({ where: { id }, data: { grantedScopes } }),
+    );
+    await this.queue(ctx, 'connection-validate', id);
+    return { accountEmail: current.accountEmail!, services: access.services, denied: access.denied };
   }
 
   /** Runs discovery now and returns the provider's resources for scoping. */

@@ -1095,6 +1095,50 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
       x-implemented-in: M13b
+  /api/v1/connections/{id}/google/service-account:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: setGoogleServiceAccount
+      tags: [connections]
+      summary: Connect a Google connection with a service account JSON key
+      description: >-
+        Alternative to the Google consent flow (no Google sign-in, so no passkey). Stores the key
+        encrypted in place of any OAuth grant, probes GA4, Search Console, Firebase, and Play vitals,
+        and keeps the working services as granted scopes. Google Ads needs OAuth. Requires
+        `connection.configure`.
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              additionalProperties: false
+              properties:
+                key: { type: string, maxLength: 16384, description: "The key file's JSON text" }
+      responses:
+        '200': { $ref: '#/components/responses/GoogleServiceAccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/connections/{id}/google/service-account/check:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: checkGoogleServiceAccount
+      tags: [connections]
+      summary: Check again what the stored service account can read
+      description: >-
+        Re-probes each service after the customer added the service account email in more Google
+        consoles, updates the granted scopes, and revalidates. Requires `connection.configure`.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/GoogleServiceAccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /api/v1/connections/oauth/google/callback:
     get:
       operationId: googleConnectionCallback
@@ -5671,6 +5715,23 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    GoogleServiceAccess:
+      description: What the service account can read
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [accountEmail, services, denied]
+            properties:
+              accountEmail:
+                { type: string, description: The service account email to add in each Google console }
+              services:
+                type: array
+                items: { type: string, enum: [ga4, searchConsole, firebase, play] }
+              denied:
+                type: array
+                description: 'One line per service Google refused, e.g. "Search Console: no access"'
+                items: { type: string }
     Conflict:
       description: Conflict (e.g. product_exists, environment_exists, last_owner, already_member)
       content:

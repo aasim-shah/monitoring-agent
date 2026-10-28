@@ -91,6 +91,16 @@ export default function IntegrationDetailPage() {
               );
               window.location.assign(url);
             }}
+            onUploadKey={async (key) => {
+              unwrap(
+                await api.POST('/api/v1/connections/{id}/google/service-account', { ...path, body: { key } }),
+              );
+              await refresh();
+            }}
+            onCheckKey={async () => {
+              unwrap(await api.POST('/api/v1/connections/{id}/google/service-account/check', path));
+              await refresh();
+            }}
           />
         </div>
       ) : null}

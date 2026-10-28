@@ -7,9 +7,15 @@ import {
   type MetricPoint,
 } from '@pcp/connector-sdk';
 import type { Observation } from '@pcp/shared-contracts';
-import { SERVICE_LABEL, SERVICE_SCOPE, type GoogleService } from './scopes.js';
+import { SERVICE_ACCOUNT_SCOPES, SERVICE_LABEL, SERVICE_SCOPE, type GoogleService } from './scopes.js';
+import {
+  parseServiceAccountKey,
+  serviceAccountAssertion,
+  type ServiceAccountKey,
+} from './service-account.js';
 
 export * from './scopes.js';
+export * from './service-account.js';
 
 export interface GoogleOptions {
   clientId: string;
@@ -84,7 +90,7 @@ const localDay = (now: Date, timeZone: string) => {
  * Google (WB-08, spec §7.2): one OAuth grant reads GA4, Search Console, Firebase, and Play vitals.
  * Read-only: the connector calls list, get, and report endpoints only (BR-08-04).
  */
-export function createGoogleConnector(opts: GoogleOptions): Connector {
+export function createGoogleConnector(opts: GoogleOptions): GoogleConnector {
   const http = createHttpClient({
     ...(opts.fetch ? { fetch: opts.fetch } : { destination: opts.destination ?? { allowPrivate: false } }),
     ...(opts.sleep ? { sleep: opts.sleep } : {}),
@@ -98,7 +104,8 @@ export function createGoogleConnector(opts: GoogleOptions): Connector {
 
   /** A fresh access token per execution; `invalid_grant` means the user revoked access (UC-08-10). */
   async function accessToken(ctx: ExecutionContext): Promise<string> {
-    const { refreshToken } = await ctx.credentials();
+    const { refreshToken, serviceAccountKey } = await ctx.credentials();
+    if (serviceAccountKey) return serviceAccountToken(serviceAccountKey);
     if (!refreshToken) throw new ConnectorError('reauthorization_required', 'no Google refresh token stored');
     const res = await http.request(url(HOST.token, '/token'), {
       method: 'POST',
@@ -122,6 +129,33 @@ export function createGoogleConnector(opts: GoogleOptions): Connector {
         `Google token endpoint refused the client: ${body?.error ?? res.status}`,
       );
     }
+    if (res.status !== 200 || !body?.access_token)
+      throw new ConnectorError('provider_unavailable', `Google token endpoint answered ${res.status}`);
+    return body.access_token;
+  }
+
+  /** An uploaded service account key signs its own token request: no Google sign-in, no passkey. */
+  async function serviceAccountToken(keyText: string): Promise<string> {
+    let key: ServiceAccountKey;
+    try {
+      key = parseServiceAccountKey(keyText);
+    } catch (err) {
+      throw new ConnectorError('reauthorization_required', (err as Error).message);
+    }
+    const res = await http.request(url(HOST.token, '/token'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: serviceAccountAssertion(key, SERVICE_ACCOUNT_SCOPES, now()),
+      }).toString(),
+    });
+    const body = safeJson<{ access_token?: string; error?: string; error_description?: string }>(res);
+    if (res.status === 400 || res.status === 401)
+      throw new ConnectorError(
+        'reauthorization_required',
+        `Google refused the service account key (${body?.error_description ?? body?.error ?? res.status}); upload a new key`,
+      );
     if (res.status !== 200 || !body?.access_token)
       throw new ConnectorError('provider_unavailable', `Google token endpoint answered ${res.status}`);
     return body.access_token;
@@ -435,12 +469,12 @@ export function createGoogleConnector(opts: GoogleOptions): Connector {
     return points;
   }
 
-  return {
+  const connector: GoogleConnector = {
     type: 'google',
     version: '1.0.0',
     displayName: 'Google',
     executionLocations: ['cloud'],
-    // Filled by the OAuth callback, never typed in (WB-08 UC-08-01).
+    // Filled by the OAuth callback or a service account key upload, never typed in (WB-08 UC-08-01).
     credentialFields: [],
     capabilities: () => ['validate', 'discover', 'health', 'sync'],
     configSchema: () => ({ type: 'object', properties: {}, additionalProperties: false }),
@@ -503,7 +537,23 @@ export function createGoogleConnector(opts: GoogleOptions): Connector {
       }
       return { points, gaps: [...new Set(gaps)] };
     },
+
+    async serviceAccess(ctx) {
+      const token = await accessToken(ctx);
+      const denied: string[] = [];
+      const services: GoogleService[] = [];
+      for (const s of READ_SERVICES)
+        if ((await service(s, denied, () => probes[s]!(token))) !== null) services.push(s);
+      return { services, denied };
+    },
   };
+  return connector;
+}
+
+/** The Google connector plus the access check a service account connection needs (no consent screen). */
+export interface GoogleConnector extends Connector {
+  /** Probes every readable service, whatever the stored scopes say. */
+  serviceAccess(ctx: ExecutionContext): Promise<{ services: GoogleService[]; denied: string[] }>;
 }
 
 function observation(

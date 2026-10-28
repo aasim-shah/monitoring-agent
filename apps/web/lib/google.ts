@@ -18,6 +18,7 @@ export const GOOGLE_SCOPE_PURPOSES: Array<[scope: string, purpose: string]> = [
 export const GOOGLE_SCOPES = GOOGLE_SCOPE_PURPOSES.map(([s]) => s);
 
 export type GoogleServiceStatus =
+  | 'needs_google_sign_in'
   | 'available'
   | 'permission_denied'
   | 'pending_platform_approval'
@@ -44,14 +45,32 @@ export const GOOGLE_SERVICES: Array<{
 ];
 
 export const STATUS_LABEL: Record<GoogleServiceStatus, string> = {
+  needs_google_sign_in: 'Needs Continue with Google',
   available: 'Available',
   permission_denied: 'Access not granted',
   pending_platform_approval: 'Pending platform approval',
   not_read_yet: 'Not read yet',
 };
 
-export const serviceStatuses = (granted: readonly string[]) =>
+/** A service account key (no Google sign-in) instead of an OAuth grant. */
+export const isServiceAccountEmail = (email: string | null | undefined) =>
+  Boolean(email?.endsWith('.gserviceaccount.com'));
+
+/** Where the customer adds the service account email so each service can be read. */
+export const SERVICE_ACCOUNT_STEPS: Array<[service: string, where: string]> = [
+  ['GA4', 'Admin → Property access management → add the email as Viewer'],
+  ['Search Console', 'Settings → Users and permissions → add the email (Restricted)'],
+  ['Firebase', 'Google Cloud console → IAM → grant the email the Viewer role on the project'],
+  ['Play vitals', 'Play Console → Users and permissions → invite the email (view app information)'],
+];
+
+export const serviceStatuses = (granted: readonly string[], serviceAccount = false) =>
   GOOGLE_SERVICES.map((s) => ({
     ...s,
-    status: granted.includes(s.scope) ? s.whenGranted : ('permission_denied' as const),
+    status:
+      serviceAccount && s.key === 'ads'
+        ? ('needs_google_sign_in' as const)
+        : granted.includes(s.scope)
+          ? s.whenGranted
+          : ('permission_denied' as const),
   }));

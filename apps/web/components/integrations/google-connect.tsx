@@ -13,9 +13,19 @@ import {
 } from '@/components/ui/dialog';
 import { errorMessage } from '@/lib/api';
 import { GOOGLE_SCOPE_PURPOSES } from '@/lib/google';
+import { ServiceAccountHowTo, ServiceAccountUpload } from './google-service-account';
 
-/** Explains each requested scope, then sends the member to Google's consent screen (WB-08 UC-08-01). */
-export function GoogleConnectDialog({ onConnect }: { onConnect: () => Promise<void> }) {
+/**
+ * Two ways in: Google's consent screen (WB-08 UC-08-01), or a service account JSON key for
+ * customers whose Google sign-in is blocked (e.g. a passkey this browser does not have).
+ */
+export function GoogleConnectDialog({
+  onConnect,
+  onUploadKey,
+}: {
+  onConnect: () => Promise<void>;
+  onUploadKey: (key: string) => Promise<void>;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   return (
@@ -59,6 +69,18 @@ export function GoogleConnectDialog({ onConnect }: { onConnect: () => Promise<vo
             {pending ? 'Opening Google…' : 'Continue to Google'}
           </Button>
         </div>
+        <section
+          aria-label="Connect with a service account key"
+          className="space-y-2 rounded-lg border border-border p-4"
+        >
+          <h3 className="text-sm font-semibold">Or upload a service account key</h3>
+          <p className="text-xs text-muted-foreground">
+            No Google sign-in and no passkey. Reads GA4, Search Console, Firebase, and Play vitals; Google Ads
+            still needs Continue to Google.
+          </p>
+          <ServiceAccountHowTo />
+          <ServiceAccountUpload label="Upload JSON key" onUpload={onUploadKey} />
+        </section>
       </DialogContent>
     </Dialog>
   );

@@ -5,6 +5,7 @@ import { RequirePermission, SessionOnly, TenantScope } from '../../common/decora
 import { parseBody } from '../../common/errors.js';
 import { requireAuth, type ApiRequest } from '../../common/request.js';
 import { requireTenant } from '../../common/tenant.js';
+import { ConnectionsService } from './connections.service.js';
 import { GoogleConnectService } from './google-connect.service.js';
 
 const startBody = z
@@ -20,10 +21,22 @@ const callbackQuery = z.object({
   hd: z.string().optional(),
   iss: z.string().optional(),
 });
+/** The key file's text as uploaded; the service parses and checks it. */
+const serviceAccountBody = z
+  .object({
+    key: z
+      .string()
+      .min(2)
+      .max(16 * 1024),
+  })
+  .strict();
 
 @Controller('api/v1/connections')
 export class GoogleConnectController {
-  constructor(private readonly google: GoogleConnectService) {}
+  constructor(
+    private readonly google: GoogleConnectService,
+    private readonly connections: ConnectionsService,
+  ) {}
 
   @RequirePermission('connection.configure')
   @TenantScope({ param: 'id', resource: 'connection' })
@@ -31,6 +44,25 @@ export class GoogleConnectController {
   @HttpCode(200)
   start(@Req() req: ApiRequest, @Param('id') id: string, @Body() body: unknown) {
     return this.google.start(requireTenant(req), id, parseBody(startBody, body));
+  }
+
+  /** Connects with an uploaded service account JSON key instead of Google sign-in. */
+  @RequirePermission('connection.configure')
+  @TenantScope({ param: 'id', resource: 'connection' })
+  @Post(':id/google/service-account')
+  @HttpCode(200)
+  serviceAccount(@Req() req: ApiRequest, @Param('id') id: string, @Body() body: unknown) {
+    const { key } = parseBody(serviceAccountBody, body);
+    return this.connections.setGoogleServiceAccount(requireTenant(req), id, key);
+  }
+
+  /** Re-checks what the stored service account can read, after the customer shared more. */
+  @RequirePermission('connection.configure')
+  @TenantScope({ param: 'id', resource: 'connection' })
+  @Post(':id/google/service-account/check')
+  @HttpCode(200)
+  checkServiceAccount(@Req() req: ApiRequest, @Param('id') id: string) {
+    return this.connections.checkGoogleAccess(requireTenant(req), id);
   }
 
   /** Google redirects the browser here; the session cookie (SameSite=Lax) identifies the member. */
