@@ -18,7 +18,7 @@ export interface DatabaseRow {
 const ENGINE: Record<string, string> = { postgres: 'PostgreSQL', mysql: 'MySQL', mongodb: 'MongoDB' };
 
 const REASONS: Record<string, string> = {
-  authentication_failed: 'Authentication failed (check the secret file)',
+  authentication_failed: 'Authentication failed (check the username and password)',
   network_unreachable: 'The worker cannot reach the database',
   tls_unavailable: 'The database does not offer TLS',
   invalid_config: 'Configuration error',
@@ -69,10 +69,12 @@ export function DatabaseList({
   rows,
   canConfigure,
   onOverride,
+  onDelete,
 }: {
   rows: DatabaseRow[];
   canConfigure: boolean;
   onOverride: (id: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   if (rows.length === 0)
     return (
@@ -91,6 +93,7 @@ export function DatabaseList({
             <th className="px-4 py-2 font-medium">Size</th>
             <th className="px-4 py-2 font-medium">Replication lag</th>
             <th className="px-4 py-2 font-medium">Slow queries</th>
+            {canConfigure ? <th className="px-4 py-2" /> : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -126,6 +129,20 @@ export function DatabaseList({
                   {typeof lag === 'number' ? `${lag.toFixed(1)} s` : '—'}
                 </td>
                 <td className="px-4 py-2 align-top text-xs">{h ? slowOf(h) : '—'}</td>
+                {canConfigure ? (
+                  <td className="px-4 py-2 text-right align-top">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (window.confirm(`Delete ${r.displayName}? The stored credentials are destroyed.`))
+                          void onDelete(r.id);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                ) : null}
               </tr>
             );
           })}

@@ -169,7 +169,7 @@ const row = (overrides: Partial<DatabaseRow>): DatabaseRow => ({
 
 describe('DatabaseList', () => {
   it('shows health for a connected database', () => {
-    render(<DatabaseList rows={[row({})]} canConfigure onOverride={vi.fn()} />);
+    render(<DatabaseList rows={[row({})]} canConfigure onOverride={vi.fn()} onDelete={vi.fn()} />);
     const r = screen.getByRole('row', { name: /Orders DB/ });
     expect(within(r).getByText('Connected')).toBeInTheDocument();
     expect(within(r).getByText('12 / 100')).toBeInTheDocument();
@@ -185,6 +185,7 @@ describe('DatabaseList', () => {
         rows={[row({ status: 'degraded', statusReason: 'permission_denied', health: null })]}
         canConfigure
         onOverride={onOverride}
+        onDelete={vi.fn()}
       />,
     );
     expect(screen.getByText(/can write/)).toBeInTheDocument();
@@ -195,6 +196,7 @@ describe('DatabaseList', () => {
         rows={[row({ status: 'degraded', statusReason: 'permission_denied', health: null })]}
         canConfigure={false}
         onOverride={onOverride}
+        onDelete={vi.fn()}
       />,
     );
     expect(screen.queryByRole('button', { name: 'Allow anyway' })).toBeNull();
@@ -206,10 +208,27 @@ describe('DatabaseList', () => {
         rows={[row({ status: 'degraded', statusReason: 'worker_offline' })]}
         canConfigure
         onOverride={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
     expect(screen.getByText('Worker offline')).toBeInTheDocument();
     expect(screen.queryByText('12 / 100')).toBeNull();
+  });
+
+  it('deletes after confirmation, and only for configurers', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const { rerender } = render(
+      <DatabaseList rows={[row({})]} canConfigure onOverride={vi.fn()} onDelete={onDelete} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(onDelete).toHaveBeenCalledWith('c1');
+    confirm.mockRestore();
+    rerender(<DatabaseList rows={[row({})]} canConfigure={false} onOverride={vi.fn()} onDelete={onDelete} />);
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
   });
 
   it('shows validation in progress', () => {
@@ -218,6 +237,7 @@ describe('DatabaseList', () => {
         rows={[row({ status: 'pending_validation', health: null })]}
         canConfigure
         onOverride={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
     expect(screen.getByText('Validating…')).toBeInTheDocument();

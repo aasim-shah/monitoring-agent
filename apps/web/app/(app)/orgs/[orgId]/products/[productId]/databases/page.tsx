@@ -18,6 +18,8 @@ import { useOrganization } from '@/lib/queries';
 import { useApiQuery } from '@/lib/use-api-query';
 
 const DB_PROVIDERS = ['postgres', 'mysql', 'mongodb'];
+// Deleting a connection disconnects it (kept for the audit trail); the list hides it.
+const DELETED = ['disconnected', 'revoked'];
 
 export default function DatabasesPage() {
   const { orgId, productId } = useParams<{ orgId: string; productId: string }>();
@@ -40,7 +42,10 @@ export default function DatabasesPage() {
       const all = unwrap(
         await api.GET('/api/v1/organizations/{orgId}/connections', { params: { path: { orgId } } }),
       ).connections.filter(
-        (c) => DB_PROVIDERS.includes(c.provider) && c.scopes.some((s) => s.productId === productId),
+        (c) =>
+          DB_PROVIDERS.includes(c.provider) &&
+          !DELETED.includes(c.status) &&
+          c.scopes.some((s) => s.productId === productId),
       );
       // Latest health for each database (connections, size, replication, slow queries).
       return Promise.all(
@@ -151,6 +156,15 @@ export default function DatabasesPage() {
             setError(null);
             try {
               unwrap(await api.POST('/api/v1/connections/{id}/write-override', { params: { path: { id } } }));
+              await refresh();
+            } catch (e) {
+              setError(errorMessage(e));
+            }
+          }}
+          onDelete={async (id) => {
+            setError(null);
+            try {
+              unwrap(await api.DELETE('/api/v1/connections/{id}', { params: { path: { id } } }));
               await refresh();
             } catch (e) {
               setError(errorMessage(e));
