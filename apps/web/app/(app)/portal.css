@@ -339,9 +339,6 @@
   outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent);
   outline-offset: 2px;
 }
-.portal .recharts-wrapper {
-  max-width: 100%;
-}
 .portal main > div {
   min-width: 0;
 }
